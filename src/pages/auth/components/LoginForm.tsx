@@ -76,6 +76,13 @@ const LoginForm = ({ toggleView }: LoginFormProps) => {
       });
       
       console.log("[Auth] Login successful, redirecting based on role:", data.role);
+      
+      // Force navigation immediately after login
+      if (data.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     } catch (error: any) {
       console.error("[Auth] Auth error:", error);
       const errorMsg = error.message || "Ocorreu um erro durante a autenticação";
