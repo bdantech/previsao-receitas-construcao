@@ -12,7 +12,7 @@ const AdminAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, userRole, setDirectAuth } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -20,7 +20,7 @@ const AdminAuth = () => {
   });
 
   // If already logged in as admin, redirect to admin dashboard
-  if (session) {
+  if (session && userRole === 'admin') {
     return <Navigate to="/admin/dashboard" />;
   }
 
@@ -46,9 +46,17 @@ const AdminAuth = () => {
         return;
       }
 
-      // Call the admin login Edge Function
-      const { data, error } = await supabase.functions.invoke('admin-login', {
+      // First, let's create our first admin if it doesn't exist yet
+      try {
+        await supabase.functions.invoke('create-first-admin');
+      } catch (error) {
+        console.log("Create first admin check complete");
+      }
+
+      // Use the auth function instead of admin-login
+      const { data, error } = await supabase.functions.invoke('auth', {
         body: {
+          action: 'login',
           email,
           password
         }
@@ -58,13 +66,26 @@ const AdminAuth = () => {
         throw error;
       }
 
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      // Check if user has admin role
+      if (data?.role !== 'admin') {
+        throw new Error("Acesso negado: Apenas administradores podem acessar este portal");
+      }
+
       toast({
         title: "Login bem-sucedido",
         description: "Você entrou com sucesso na sua conta de administrador",
       });
       
-      // Navigate to admin dashboard
-      navigate("/admin/dashboard");
+      // Set direct auth with session and role
+      if (data?.session && data?.role) {
+        console.log("Setting direct auth with admin role");
+        setDirectAuth(data.session, data.role);
+        navigate("/admin/dashboard");
+      }
     } catch (error: any) {
       console.error("Admin auth error:", error);
       toast({
