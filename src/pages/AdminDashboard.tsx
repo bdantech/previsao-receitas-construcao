@@ -15,9 +15,18 @@ const AdminDashboard = () => {
     const fetchCompanyData = async () => {
       if (session && userRole === 'admin') {
         try {
-          const { data, error } = await supabase.functions.invoke('company-data');
+          const { data, error } = await supabase.functions.invoke('company-data', {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`
+            }
+          });
           
-          if (error) throw error;
+          if (error) {
+            console.error("Function invocation error:", error);
+            throw error;
+          }
+          
+          console.log("Company data received:", data);
           setCompanies(data.companies || []);
         } catch (error) {
           console.error("Error fetching company data:", error);
