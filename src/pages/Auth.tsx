@@ -68,7 +68,7 @@ const Auth = () => {
 
         // Call the Edge Function to handle company user registration
         console.log("Sending registration request to Edge Function");
-        const response = await supabase.functions.invoke('auth', {
+        const { data, error } = await supabase.functions.invoke('auth', {
           body: {
             action: 'register_company_user',
             email,
@@ -82,12 +82,17 @@ const Auth = () => {
         });
 
         // Check for errors from the edge function
-        if (response.error) {
-          console.error("Edge Function error:", response.error);
-          throw new Error(response.error.message || "Erro ao chamar função de registro");
+        if (error) {
+          console.error("Edge Function error:", error);
+          throw new Error(error.message || "Erro ao chamar função de registro");
         }
 
-        console.log("Registration successful:", response.data);
+        if (data?.error) {
+          console.error("Registration error from API:", data.error);
+          throw new Error(data.error);
+        }
+
+        console.log("Registration successful:", data);
         toast({
           title: "Conta criada",
           description: "Sua conta foi criada com sucesso!",
@@ -112,7 +117,7 @@ const Auth = () => {
 
         console.log("Sending login request to Edge Function");
         // Call the Edge Function to handle login
-        const response = await supabase.functions.invoke('auth', {
+        const { data, error } = await supabase.functions.invoke('auth', {
           body: {
             action: 'login',
             email,
@@ -121,19 +126,24 @@ const Auth = () => {
         });
 
         // Check for errors from the edge function
-        if (response.error) {
-          console.error("Edge Function error:", response.error);
-          throw new Error(response.error.message || "Erro ao fazer login");
+        if (error) {
+          console.error("Edge Function error:", error);
+          throw new Error(error.message || "Erro ao fazer login");
         }
 
-        console.log("Login successful:", response.data);
+        if (data?.error) {
+          console.error("Login error from API:", data.error);
+          throw new Error(data.error);
+        }
+
+        console.log("Login successful:", data);
         toast({
           title: "Login bem-sucedido",
           description: "Você entrou com sucesso na sua conta",
         });
         
         // Navigate to appropriate dashboard based on user role
-        if (response.data.role === 'admin') {
+        if (data.role === 'admin') {
           navigate("/admin/dashboard");
         } else {
           navigate("/dashboard");
