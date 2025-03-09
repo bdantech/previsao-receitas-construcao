@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -33,6 +32,17 @@ serve(async (req) => {
     const adminSupabase = supabaseServiceKey ? 
       createClient(supabaseUrl, supabaseServiceKey) : 
       null;
+
+    if (!adminSupabase) {
+      console.error('Service role key is not available')
+      return new Response(
+        JSON.stringify({ error: 'Configuração do servidor incompleta: chave de serviço indisponível' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      )
+    }
 
     // Log da requisição para debugging
     console.log('Received request:', req.method, req.url)
@@ -313,18 +323,6 @@ serve(async (req) => {
         )
       }
 
-      // Verify if we have the service role available
-      if (!adminSupabase) {
-        console.error('Service role key is not available for login')
-        return new Response(
-          JSON.stringify({ error: 'Configuração do servidor incompleta: chave de serviço indisponível' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500 
-          }
-        )
-      }
-
       try {
         // First sign in the user
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -364,6 +362,7 @@ serve(async (req) => {
         }
 
         console.log('User profile fetched successfully:', profile)
+        console.log('User role:', profile.role)
 
         return new Response(
           JSON.stringify({ 

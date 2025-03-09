@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, Building } from "lucide-react";
@@ -143,6 +142,7 @@ const Auth = () => {
         });
         
         // Navigate to appropriate dashboard based on user role
+        console.log("User role:", data.role);
         if (data.role === 'admin') {
           navigate("/admin/dashboard");
         } else {
