@@ -198,25 +198,44 @@ serve(async (req) => {
 
     // Função para processar a requisição de login
     if (action === 'login') {
+      console.log('Processing login action for email:', email)
+      
       if (!email || !password) {
         throw new Error('Email e senha são obrigatórios')
       }
 
+      // Verify if we have the service role available
+      if (!adminSupabase) {
+        console.error('Service role key is not available for login')
+        throw new Error('Configuração do servidor incompleta: chave de serviço indisponível')
+      }
+
+      // First sign in the user
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) throw error
+      if (error) {
+        console.error('Login error:', error)
+        throw error
+      }
 
-      // Verificar o papel do usuário
-      const { data: profile, error: profileError } = await supabase
+      console.log('User logged in successfully, fetching profile')
+
+      // Use the admin supabase to get the user's profile
+      const { data: profile, error: profileError } = await adminSupabase
         .from('profiles')
         .select('role')
         .eq('id', data.user.id)
         .single()
 
-      if (profileError) throw profileError
+      if (profileError) {
+        console.error('Profile fetch error:', profileError)
+        throw profileError
+      }
+
+      console.log('User profile fetched successfully:', profile)
 
       return new Response(
         JSON.stringify({ 
