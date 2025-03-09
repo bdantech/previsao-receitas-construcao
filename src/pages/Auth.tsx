@@ -12,10 +12,8 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [redirectNeeded, setRedirectNeeded] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { session, userRole: authUserRole } = useAuth();
+  const { session, user, userRole, isLoading: authLoading } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -26,21 +24,23 @@ const Auth = () => {
   });
 
   useEffect(() => {
-    if (redirectNeeded && userRole) {
-      console.log("Redirecting user with role:", userRole);
+    console.log("[Auth] Effect triggered - session:", !!session, "userRole:", userRole, "authLoading:", authLoading);
+    
+    if (session && userRole && !authLoading) {
+      console.log("[Auth] Redirecting user with role:", userRole);
       if (userRole === 'admin') {
         navigate("/admin/dashboard");
       } else {
         navigate("/dashboard");
       }
     }
-  }, [redirectNeeded, userRole, navigate]);
+  }, [session, userRole, authLoading, navigate]);
 
-  if (session) {
-    console.log("Session exists, redirecting based on role:", authUserRole);
-    if (authUserRole === 'admin') {
+  if (!authLoading && session) {
+    console.log("[Auth] Immediate redirect check - userRole:", userRole);
+    if (userRole === 'admin') {
       return <Navigate to="/admin/dashboard" />;
-    } else {
+    } else if (userRole) {
       return <Navigate to="/dashboard" />;
     }
   }
@@ -76,7 +76,7 @@ const Auth = () => {
           return;
         }
 
-        console.log("Sending registration request to Edge Function");
+        console.log("[Auth] Sending registration request to Edge Function");
         const { data, error } = await supabase.functions.invoke('auth', {
           body: {
             action: 'register_company_user',
@@ -91,16 +91,16 @@ const Auth = () => {
         });
 
         if (error) {
-          console.error("Edge Function error:", error);
+          console.error("[Auth] Edge Function error:", error);
           throw new Error(error.message || "Erro ao chamar função de registro");
         }
 
         if (data?.error) {
-          console.error("Registration error from API:", data.error);
+          console.error("[Auth] Registration error from API:", data.error);
           throw new Error(data.error);
         }
 
-        console.log("Registration successful:", data);
+        console.log("[Auth] Registration successful:", data);
         toast({
           title: "Conta criada",
           description: "Sua conta foi criada com sucesso!",
@@ -121,7 +121,7 @@ const Auth = () => {
           return;
         }
 
-        console.log("Sending login request to Edge Function");
+        console.log("[Auth] Sending login request to Edge Function");
         const { data, error } = await supabase.functions.invoke('auth', {
           body: {
             action: 'login',
@@ -131,34 +131,26 @@ const Auth = () => {
         });
 
         if (error) {
-          console.error("Edge Function error:", error);
+          console.error("[Auth] Edge Function error:", error);
           throw new Error(error.message || "Erro ao fazer login");
         }
 
         if (data?.error) {
-          console.error("Login error from API:", data.error);
+          console.error("[Auth] Login error from API:", data.error);
           throw new Error(data.error);
         }
 
-        console.log("Login successful:", data);
-        console.log("User role:", data.role);
+        console.log("[Auth] Login successful, data:", data);
         
         toast({
           title: "Login bem-sucedido",
           description: "Você entrou com sucesso na sua conta",
         });
         
-        setUserRole(data.role);
-        setRedirectNeeded(true);
-        
-        if (data.role === 'admin') {
-          navigate("/admin/dashboard");
-        } else {
-          navigate("/dashboard");
-        }
+        console.log("[Auth] Login successful, redirecting based on role:", data.role);
       }
     } catch (error: any) {
-      console.error("Auth error:", error);
+      console.error("[Auth] Auth error:", error);
       const errorMsg = error.message || "Ocorreu um erro durante a autenticação";
       setErrorMessage(errorMsg);
       toast({

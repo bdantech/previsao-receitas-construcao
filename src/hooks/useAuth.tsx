@@ -25,9 +25,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Function to fetch user role
+  const fetchUserRole = async (userId: string) => {
+    console.log("[useAuth] Fetching user role for ID:", userId);
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+        
+      if (profileError) {
+        console.error('[useAuth] Error fetching user role:', profileError);
+        return null;
+      }
+      
+      console.log("[useAuth] Profile data retrieved:", profileData);
+      return profileData?.role || null;
+    } catch (error) {
+      console.error('[useAuth] Exception fetching user role:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const setData = async () => {
       try {
+        console.log("[useAuth] Getting initial session");
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
         
@@ -35,23 +59,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user role from profiles
-          console.log("Fetching user role for ID:", session.user.id);
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (profileError) {
-            console.error('Error fetching user role:', profileError);
-            throw profileError;
-          }
-          console.log("Profile data retrieved:", profileData);
-          setUserRole(profileData?.role || null);
+          const role = await fetchUserRole(session.user.id);
+          setUserRole(role);
+          console.log("[useAuth] Initial user role set:", role);
         }
       } catch (error) {
-        console.error('Error getting session:', error);
+        console.error('[useAuth] Error getting session:', error);
       } finally {
         setIsLoading(false);
       }
@@ -62,28 +75,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("Auth state changed:", event, session?.user?.id);
+        console.log("[useAuth] Auth state changed:", event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user role from profiles
-          console.log("Auth changed: Fetching user role for ID:", session.user.id);
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (profileError) {
-            console.error('Error fetching user role:', profileError);
-            setUserRole(null);
-          } else {
-            console.log("Auth changed: Profile data retrieved:", profileData);
-            setUserRole(profileData?.role || null);
-          }
+          const role = await fetchUserRole(session.user.id);
+          setUserRole(role);
+          console.log("[useAuth] Auth state changed: user role set to:", role);
         } else {
           setUserRole(null);
+          console.log("[useAuth] Auth state changed: user role cleared");
         }
         
         setIsLoading(false);
@@ -99,8 +101,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
+      console.log("[useAuth] User signed out");
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error("[useAuth] Error signing out:", error);
     }
   };
 
