@@ -36,13 +36,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (session?.user) {
           // Fetch user role from profiles
+          console.log("Fetching user role for ID:", session.user.id);
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', session.user.id)
             .single();
             
-          if (profileError) throw profileError;
+          if (profileError) {
+            console.error('Error fetching user role:', profileError);
+            throw profileError;
+          }
+          console.log("Profile data retrieved:", profileData);
           setUserRole(profileData?.role || null);
         }
       } catch (error) {
@@ -57,11 +62,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("Auth state changed:", event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
           // Fetch user role from profiles
+          console.log("Auth changed: Fetching user role for ID:", session.user.id);
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('role')
@@ -72,6 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             console.error('Error fetching user role:', profileError);
             setUserRole(null);
           } else {
+            console.log("Auth changed: Profile data retrieved:", profileData);
             setUserRole(profileData?.role || null);
           }
         } else {

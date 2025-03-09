@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, Building } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,8 +12,10 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [redirectNeeded, setRedirectNeeded] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { session, userRole } = useAuth();
+  const { session, userRole: authUserRole } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -23,9 +25,20 @@ const Auth = () => {
     companyWebsite: ""
   });
 
-  // If already logged in, redirect to appropriate dashboard based on role
+  useEffect(() => {
+    if (redirectNeeded && userRole) {
+      console.log("Redirecting user with role:", userRole);
+      if (userRole === 'admin') {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/dashboard");
+      }
+    }
+  }, [redirectNeeded, userRole, navigate]);
+
   if (session) {
-    if (userRole === 'admin') {
+    console.log("Session exists, redirecting based on role:", authUserRole);
+    if (authUserRole === 'admin') {
       return <Navigate to="/admin/dashboard" />;
     } else {
       return <Navigate to="/dashboard" />;
@@ -35,7 +48,6 @@ const Auth = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error when user changes input
     setErrorMessage(null);
   };
 
@@ -51,7 +63,6 @@ const Auth = () => {
 
     try {
       if (isSignUp) {
-        // Sign up flow
         const { email, password, companyName, companyCNPJ, companyWebsite } = formData;
         
         if (!email || !password || !companyName || !companyCNPJ) {
@@ -65,7 +76,6 @@ const Auth = () => {
           return;
         }
 
-        // Call the Edge Function to handle company user registration
         console.log("Sending registration request to Edge Function");
         const { data, error } = await supabase.functions.invoke('auth', {
           body: {
@@ -80,7 +90,6 @@ const Auth = () => {
           }
         });
 
-        // Check for errors from the edge function
         if (error) {
           console.error("Edge Function error:", error);
           throw new Error(error.message || "Erro ao chamar função de registro");
@@ -97,10 +106,8 @@ const Auth = () => {
           description: "Sua conta foi criada com sucesso!",
         });
         
-        // Navigate to login view
         setIsSignUp(false);
       } else {
-        // Sign in flow
         const { email, password } = formData;
         
         if (!email || !password) {
@@ -115,7 +122,6 @@ const Auth = () => {
         }
 
         console.log("Sending login request to Edge Function");
-        // Call the Edge Function to handle login
         const { data, error } = await supabase.functions.invoke('auth', {
           body: {
             action: 'login',
@@ -124,7 +130,6 @@ const Auth = () => {
           }
         });
 
-        // Check for errors from the edge function
         if (error) {
           console.error("Edge Function error:", error);
           throw new Error(error.message || "Erro ao fazer login");
@@ -136,13 +141,16 @@ const Auth = () => {
         }
 
         console.log("Login successful:", data);
+        console.log("User role:", data.role);
+        
         toast({
           title: "Login bem-sucedido",
           description: "Você entrou com sucesso na sua conta",
         });
         
-        // Navigate to appropriate dashboard based on user role
-        console.log("User role:", data.role);
+        setUserRole(data.role);
+        setRedirectNeeded(true);
+        
         if (data.role === 'admin') {
           navigate("/admin/dashboard");
         } else {
