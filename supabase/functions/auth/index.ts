@@ -19,6 +19,7 @@ serve(async (req) => {
     // Obter URL da Supabase e chave anônima das variáveis de ambiente
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('As variáveis de ambiente SUPABASE_URL e SUPABASE_ANON_KEY são obrigatórias')
@@ -26,6 +27,11 @@ serve(async (req) => {
 
     // Inicializar cliente do Supabase
     const supabase = createClient(supabaseUrl, supabaseKey)
+    
+    // Inicializar cliente do Supabase com service role (para operações administrativas)
+    const adminSupabase = supabaseServiceKey ? 
+      createClient(supabaseUrl, supabaseServiceKey) : 
+      null;
 
     // Log da requisição para debugging
     console.log('Received request:', req.method, req.url)
@@ -57,6 +63,12 @@ serve(async (req) => {
         throw new Error('Email, senha e dados da empresa são obrigatórios')
       }
 
+      // Verificar se o service role está disponível
+      if (!adminSupabase) {
+        console.error('Service role key is not available')
+        throw new Error('Configuração do servidor incompleta: chave de serviço indisponível')
+      }
+
       // 1. Registrar o usuário
       console.log('Registering user with email:', email)
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -72,9 +84,9 @@ serve(async (req) => {
       const userId = authData.user?.id
       if (!userId) throw new Error('Falha ao criar usuário')
 
-      // 2. Criar a empresa
-      console.log('Creating company:', companyData.name)
-      const { data: companyResult, error: companyError } = await supabase
+      // 2. Criar a empresa usando o service role que ignora RLS
+      console.log('Creating company with service role:', companyData.name)
+      const { data: companyResult, error: companyError } = await adminSupabase
         .from('companies')
         .insert({
           name: companyData.name,
@@ -89,9 +101,9 @@ serve(async (req) => {
         throw companyError
       }
 
-      // 3. Relacionar o usuário com a empresa
-      console.log('Linking user to company')
-      const { error: relationError } = await supabase
+      // 3. Relacionar o usuário com a empresa usando o service role
+      console.log('Linking user to company using service role')
+      const { error: relationError } = await adminSupabase
         .from('user_companies')
         .insert({
           user_id: userId,
@@ -131,6 +143,12 @@ serve(async (req) => {
         )
       }
 
+      // Verificar se o service role está disponível
+      if (!adminSupabase) {
+        console.error('Service role key is not available')
+        throw new Error('Configuração do servidor incompleta: chave de serviço indisponível')
+      }
+
       const { data: currentUserProfile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
@@ -149,8 +167,8 @@ serve(async (req) => {
         )
       }
 
-      // Registrar o novo administrador
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // Registrar o novo administrador usando o service role
+      const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
@@ -159,7 +177,7 @@ serve(async (req) => {
       if (authError) throw authError
 
       // Atualizar o perfil para definir como administrador
-      const { error: updateError } = await supabase
+      const { error: updateError } = await adminSupabase
         .from('profiles')
         .update({ role: 'admin' })
         .eq('id', authData.user.id)
