@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
@@ -75,14 +74,10 @@ const LoginForm = ({ toggleView }: LoginFormProps) => {
         description: "Você entrou com sucesso na sua conta",
       });
       
-      console.log("[Auth] Login successful, redirecting based on role:", data.role);
-      
-      // Force navigation immediately after login
-      if (data.role === 'admin') {
-        navigate('/admin/dashboard', { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
+      // Wait for auth state to update before navigating
+      // The useAuth hook will handle the navigation through AuthPage component
+      console.log("[Auth] Login successful, waiting for auth state update. Role:", data.role);
+
     } catch (error: any) {
       console.error("[Auth] Auth error:", error);
       const errorMsg = error.message || "Ocorreu um erro durante a autenticação";
