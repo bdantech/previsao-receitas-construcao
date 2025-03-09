@@ -27,10 +27,14 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Extrair o corpo da requisição
-    const { action, email, password, companyData, isAdmin } = await req.json()
-
+    const requestData = await req.json()
+    const { action, email, password } = requestData
+    
     // Função para processar a requisição de registro de usuário de empresa
     if (action === 'register_company_user') {
+      // Verificar se todos os campos necessários estão presentes
+      const { companyData } = requestData
+      
       if (!email || !password || !companyData) {
         throw new Error('Email, senha e dados da empresa são obrigatórios')
       }
