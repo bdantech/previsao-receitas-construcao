@@ -9,6 +9,7 @@ type AuthContextType = {
   userRole: string | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  setDirectAuth: (session: Session, role: string) => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   userRole: null,
   isLoading: true,
   signOut: async () => {},
+  setDirectAuth: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -24,6 +26,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Function to directly set authentication state from login response
+  const setDirectAuth = (newSession: Session, role: string) => {
+    console.log("[useAuth] Setting direct auth with session and role:", role);
+    setSession(newSession);
+    setUser(newSession?.user ?? null);
+    setUserRole(role);
+    setIsLoading(false);
+  };
 
   // Function to fetch user role
   const fetchUserRole = async (userId: string) => {
@@ -55,6 +66,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
         
+        console.log("[useAuth] Auth state changed: INITIAL_SESSION", session);
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -62,6 +75,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const role = await fetchUserRole(session.user.id);
           setUserRole(role);
           console.log("[useAuth] Initial user role set:", role);
+        } else {
+          console.log("[useAuth] No session, no role to set");
         }
       } catch (error) {
         console.error('[useAuth] Error getting session:', error);
@@ -113,6 +128,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     userRole,
     isLoading,
     signOut,
+    setDirectAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

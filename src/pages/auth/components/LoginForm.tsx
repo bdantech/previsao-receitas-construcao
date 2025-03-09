@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,12 +16,21 @@ const LoginForm = ({ toggleView }: LoginFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { session, userRole } = useAuth();
+  const { session, userRole, setDirectAuth } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+
+  useEffect(() => {
+    if (session && userRole) {
+      console.log("[LoginForm] User is authenticated with role:", userRole);
+      const redirectPath = userRole === 'admin' ? '/admin/dashboard' : '/dashboard';
+      console.log("[LoginForm] Redirecting to:", redirectPath);
+      navigate(redirectPath, { replace: true });
+    }
+  }, [session, userRole, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -74,9 +83,14 @@ const LoginForm = ({ toggleView }: LoginFormProps) => {
         description: "Você entrou com sucesso na sua conta",
       });
       
-      // Wait for auth state to update before navigating
-      // The useAuth hook will handle the navigation through AuthPage component
-      console.log("[Auth] Login successful, waiting for auth state update. Role:", data.role);
+      if (data?.session && data?.role) {
+        console.log("[Auth] Setting direct auth with role:", data.role);
+        setDirectAuth(data.session, data.role);
+        
+        const redirectPath = data.role === 'admin' ? '/admin/dashboard' : '/dashboard';
+        console.log("[Auth] Redirecting to:", redirectPath);
+        navigate(redirectPath, { replace: true });
+      }
 
     } catch (error: any) {
       console.error("[Auth] Auth error:", error);
