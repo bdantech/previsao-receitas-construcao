@@ -12,6 +12,7 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const navigate = useNavigate();
   const { session } = useAuth();
 
@@ -31,15 +32,19 @@ const Auth = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear error when user changes input
+    setErrorMessage(null);
   };
 
   const toggleView = () => {
     setIsSignUp(!isSignUp);
+    setErrorMessage(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage(null);
 
     try {
       if (isSignUp) {
@@ -47,6 +52,7 @@ const Auth = () => {
         const { email, password, companyName, companyCNPJ, companyWebsite } = formData;
         
         if (!email || !password || !companyName || !companyCNPJ) {
+          setErrorMessage("Preencha todos os campos obrigatórios");
           toast({
             title: "Erro",
             description: "Preencha todos os campos obrigatórios",
@@ -57,7 +63,8 @@ const Auth = () => {
         }
 
         // Call the Edge Function to handle company user registration
-        const { data, error } = await supabase.functions.invoke('auth', {
+        console.log("Sending registration request to Edge Function");
+        const response = await supabase.functions.invoke('auth', {
           body: {
             action: 'register_company_user',
             email,
@@ -70,10 +77,13 @@ const Auth = () => {
           }
         });
 
-        if (error) {
-          throw error;
+        // Check for errors from the edge function
+        if (response.error) {
+          console.error("Edge Function error:", response.error);
+          throw new Error(response.error.message || "Erro ao chamar função de registro");
         }
 
+        console.log("Registration successful:", response.data);
         toast({
           title: "Conta criada",
           description: "Sua conta foi criada com sucesso!",
@@ -86,6 +96,7 @@ const Auth = () => {
         const { email, password } = formData;
         
         if (!email || !password) {
+          setErrorMessage("Preencha email e senha");
           toast({
             title: "Erro",
             description: "Preencha email e senha",
@@ -95,8 +106,9 @@ const Auth = () => {
           return;
         }
 
+        console.log("Sending login request to Edge Function");
         // Call the Edge Function to handle login
-        const { data, error } = await supabase.functions.invoke('auth', {
+        const response = await supabase.functions.invoke('auth', {
           body: {
             action: 'login',
             email,
@@ -104,10 +116,13 @@ const Auth = () => {
           }
         });
 
-        if (error) {
-          throw error;
+        // Check for errors from the edge function
+        if (response.error) {
+          console.error("Edge Function error:", response.error);
+          throw new Error(response.error.message || "Erro ao fazer login");
         }
 
+        console.log("Login successful:", response.data);
         toast({
           title: "Login bem-sucedido",
           description: "Você entrou com sucesso na sua conta",
@@ -118,9 +133,11 @@ const Auth = () => {
       }
     } catch (error: any) {
       console.error("Auth error:", error);
+      const errorMsg = error.message || "Ocorreu um erro durante a autenticação";
+      setErrorMessage(errorMsg);
       toast({
         title: "Erro",
-        description: error.message || "Ocorreu um erro durante a autenticação",
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {
@@ -139,6 +156,12 @@ const Auth = () => {
         </div>
 
         <div className="bg-white p-8 rounded-lg shadow-md">
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+              {errorMessage}
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700">
