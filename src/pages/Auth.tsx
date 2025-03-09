@@ -14,7 +14,7 @@ const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, userRole } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -24,9 +24,13 @@ const Auth = () => {
     companyWebsite: ""
   });
 
-  // If already logged in, redirect to dashboard
+  // If already logged in, redirect to appropriate dashboard based on role
   if (session) {
-    return <Navigate to="/dashboard" />;
+    if (userRole === 'admin') {
+      return <Navigate to="/admin/dashboard" />;
+    } else {
+      return <Navigate to="/dashboard" />;
+    }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,8 +132,12 @@ const Auth = () => {
           description: "Você entrou com sucesso na sua conta",
         });
         
-        // Navigate to dashboard
-        navigate("/dashboard");
+        // Navigate to appropriate dashboard based on user role
+        if (response.data.role === 'admin') {
+          navigate("/admin/dashboard");
+        } else {
+          navigate("/dashboard");
+        }
       }
     } catch (error: any) {
       console.error("Auth error:", error);
