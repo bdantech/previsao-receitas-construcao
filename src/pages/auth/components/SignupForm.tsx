@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, Building } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,7 +63,16 @@ const SignupForm = ({ toggleView }: SignupFormProps) => {
 
       if (error) {
         console.error("[Auth] Edge Function error:", error);
-        throw new Error(error.message || "Erro ao chamar função de registro");
+        let errorMessage = "Erro ao chamar função de registro";
+        try {
+          const responseData = JSON.parse(error.message);
+          if (responseData?.error) {
+            errorMessage = responseData.error;
+          }
+        } catch {
+          errorMessage = error.message || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       if (data?.error) {

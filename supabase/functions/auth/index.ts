@@ -71,7 +71,13 @@ serve(async (req) => {
       const { companyData } = requestData
       
       if (!email || !password || !companyData) {
-        throw new Error('Email, senha e dados da empresa são obrigatórios')
+        return new Response(
+          JSON.stringify({ error: 'Email, senha e dados da empresa são obrigatórios' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        )
       }
 
       // Verificar se o service role está disponível
@@ -82,6 +88,17 @@ serve(async (req) => {
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500 
+          }
+        )
+      }
+
+      // Validar campos da empresa
+      if (!companyData.name || !companyData.cnpj) {
+        return new Response(
+          JSON.stringify({ error: 'Nome da empresa e CNPJ são obrigatórios' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
           }
         )
       }
@@ -100,7 +117,58 @@ serve(async (req) => {
       }
 
       try {
-        // 1. Registrar o usuário
+        // 1. Verificar se já existe usuário com este email
+        const { data: existingUser, error: existingUserError } = await adminSupabase.auth.admin.listUsers()
+        if (existingUserError) {
+          console.error('Error checking existing user:', existingUserError)
+          return new Response(
+            JSON.stringify({ error: 'Erro ao verificar usuário existente' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500 
+            }
+          )
+        }
+
+        if (existingUser.users.some(u => u.email === email)) {
+          return new Response(
+            JSON.stringify({ error: 'Este email já está em uso' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          )
+        }
+
+        // 2. Verificar se já existe empresa com este CNPJ
+        const { data: existingCompany, error: existingCompanyError } = await adminSupabase
+          .from('companies')
+          .select('id')
+          .eq('cnpj', companyData.cnpj)
+          .single()
+
+        if (existingCompanyError && existingCompanyError.code !== 'PGRST116') {
+          console.error('Error checking existing company:', existingCompanyError)
+          return new Response(
+            JSON.stringify({ error: 'Erro ao verificar empresa existente' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500 
+            }
+          )
+        }
+
+        if (existingCompany) {
+          return new Response(
+            JSON.stringify({ error: 'Já existe uma empresa cadastrada com este CNPJ' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          )
+        }
+
+        // 3. Registrar o usuário
         console.log('Registering user with email:', email)
         const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
           email,
@@ -124,7 +192,7 @@ serve(async (req) => {
           throw new Error('Falha ao criar usuário')
         }
 
-        // 2. Criar a empresa usando o service role que ignora RLS
+        // 4. Criar a empresa usando o service role que ignora RLS
         console.log('Creating company with service role:', companyData.name)
         const { data: companyResult, error: companyError } = await adminSupabase
           .from('companies')
@@ -149,7 +217,7 @@ serve(async (req) => {
           )
         }
 
-        // 3. Relacionar o usuário com a empresa usando o service role
+        // 5. Relacionar o usuário com a empresa usando o service role
         console.log('Linking user to company using service role')
         const { error: relationError } = await adminSupabase
           .from('user_companies')
@@ -172,7 +240,7 @@ serve(async (req) => {
           )
         }
 
-        // 4. Criar documentos iniciais para a empresa manualmente, agora usando status 'not_sent'
+        // 6. Criar documentos iniciais para a empresa manualmente, agora usando status 'not_sent'
         console.log('Creating initial documents for company')
         
         // First, check if ANY documents exist for this company
