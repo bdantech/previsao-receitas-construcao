@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, Building } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,14 +65,25 @@ const SignupForm = ({ toggleView }: SignupFormProps) => {
       if (error) {
         console.error("[Auth] Edge Function error:", error);
         let errorMessage = "Erro ao chamar função de registro";
-        try {
-          const responseData = JSON.parse(error.message);
-          if (responseData?.error) {
-            errorMessage = responseData.error;
+        
+        // Extract the actual error message from the response
+        if (error.message && error.message.includes("non-2xx status code")) {
+          try {
+            // Try to extract the response body from the error
+            const regex = /Response body:\s*({.*})/;
+            const match = regex.exec(error.message);
+            
+            if (match && match[1]) {
+              const errorBody = JSON.parse(match[1]);
+              if (errorBody.error) {
+                errorMessage = errorBody.error;
+              }
+            }
+          } catch (parseError) {
+            console.error("[Auth] Error parsing error message:", parseError);
           }
-        } catch {
-          errorMessage = error.message || errorMessage;
         }
+        
         throw new Error(errorMessage);
       }
 

@@ -22,7 +22,13 @@ serve(async (req) => {
 
     if (!supabaseUrl || !supabaseKey) {
       console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY')
-      throw new Error('As variáveis de ambiente SUPABASE_URL e SUPABASE_ANON_KEY são obrigatórias')
+      return new Response(
+        JSON.stringify({ error: 'As variáveis de ambiente SUPABASE_URL e SUPABASE_ANON_KEY são obrigatórias' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      )
     }
 
     // Inicializar cliente do Supabase
@@ -54,7 +60,7 @@ serve(async (req) => {
       console.log('Request data:', JSON.stringify(requestData))
     } catch (e) {
       return new Response(
-        JSON.stringify({ error: 'Invalid JSON body: ' + e.message }),
+        JSON.stringify({ error: 'Formato de dados inválido. Por favor, verifique seu envio.' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400 
@@ -72,7 +78,7 @@ serve(async (req) => {
       
       if (!email || !password || !companyData) {
         return new Response(
-          JSON.stringify({ error: 'Email, senha e dados da empresa são obrigatórios' }),
+          JSON.stringify({ error: 'Email, senha e dados da empresa são obrigatórios para criar uma conta' }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400 
@@ -116,13 +122,37 @@ serve(async (req) => {
         )
       }
 
+      // Validar CNPJ (formato básico)
+      const cnpjRegex = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$|^\d{14}$/
+      if (!cnpjRegex.test(companyData.cnpj)) {
+        console.error('Invalid CNPJ format:', companyData.cnpj)
+        return new Response(
+          JSON.stringify({ error: 'CNPJ inválido. Use o formato XX.XXX.XXX/XXXX-XX ou 14 dígitos sem pontuação.' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        )
+      }
+
+      // Validar senha (mínimo 6 caracteres)
+      if (password.length < 6) {
+        return new Response(
+          JSON.stringify({ error: 'A senha deve ter no mínimo 6 caracteres' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        )
+      }
+
       try {
         // 1. Verificar se já existe usuário com este email
         const { data: existingUser, error: existingUserError } = await adminSupabase.auth.admin.listUsers()
         if (existingUserError) {
           console.error('Error checking existing user:', existingUserError)
           return new Response(
-            JSON.stringify({ error: 'Erro ao verificar usuário existente' }),
+            JSON.stringify({ error: 'Erro ao verificar usuário existente. Por favor, tente novamente.' }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 500 
@@ -132,7 +162,7 @@ serve(async (req) => {
 
         if (existingUser.users.some(u => u.email === email)) {
           return new Response(
-            JSON.stringify({ error: 'Este email já está em uso' }),
+            JSON.stringify({ error: 'Este email já está em uso. Por favor, tente outro ou faça login.' }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 400 
@@ -150,7 +180,7 @@ serve(async (req) => {
         if (existingCompanyError && existingCompanyError.code !== 'PGRST116') {
           console.error('Error checking existing company:', existingCompanyError)
           return new Response(
-            JSON.stringify({ error: 'Erro ao verificar empresa existente' }),
+            JSON.stringify({ error: 'Erro ao verificar empresa existente. Por favor, tente novamente.' }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 500 
@@ -160,7 +190,7 @@ serve(async (req) => {
 
         if (existingCompany) {
           return new Response(
-            JSON.stringify({ error: 'Já existe uma empresa cadastrada com este CNPJ' }),
+            JSON.stringify({ error: 'Já existe uma empresa cadastrada com este CNPJ. Verifique os dados ou entre em contato com suporte.' }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 400 
@@ -179,7 +209,7 @@ serve(async (req) => {
         if (authError) {
           console.error('Auth error:', authError)
           return new Response(
-            JSON.stringify({ error: authError.message }),
+            JSON.stringify({ error: `Erro ao criar usuário: ${authError.message}` }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 400 
@@ -189,7 +219,7 @@ serve(async (req) => {
 
         const userId = authData.user?.id
         if (!userId) {
-          throw new Error('Falha ao criar usuário')
+          throw new Error('Falha ao criar usuário. Por favor, tente novamente.')
         }
 
         // 4. Criar a empresa usando o service role que ignora RLS
@@ -209,7 +239,7 @@ serve(async (req) => {
           // Tentar remover o usuário já que a criação da empresa falhou
           await adminSupabase.auth.admin.deleteUser(userId)
           return new Response(
-            JSON.stringify({ error: companyError.message }),
+            JSON.stringify({ error: `Erro ao criar empresa: ${companyError.message}` }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 400 
@@ -232,7 +262,7 @@ serve(async (req) => {
           await adminSupabase.auth.admin.deleteUser(userId)
           await adminSupabase.from('companies').delete().eq('id', companyResult.id)
           return new Response(
-            JSON.stringify({ error: relationError.message }),
+            JSON.stringify({ error: `Erro ao vincular usuário à empresa: ${relationError.message}` }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 400 
@@ -309,7 +339,7 @@ serve(async (req) => {
       } catch (error) {
         console.error('Unexpected error:', error)
         return new Response(
-          JSON.stringify({ error: error.message }),
+          JSON.stringify({ error: `Ocorreu um erro inesperado: ${error.message}` }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500 
@@ -512,7 +542,7 @@ serve(async (req) => {
 
     // Se não for nenhuma ação reconhecida
     return new Response(
-      JSON.stringify({ error: 'Ação inválida: ' + action }),
+      JSON.stringify({ error: `Ação inválida: ${action}. As ações disponíveis são: login, register_company_user, register_admin_user` }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400 
@@ -522,7 +552,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in edge function:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: `Erro no servidor: ${error.message}. Por favor, tente novamente mais tarde.` }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500 
