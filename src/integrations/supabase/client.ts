@@ -78,10 +78,22 @@ export const documentManagementApi = {
 
 // Project management API utilities
 export const projectManagementApi = {
+  // Get user's company
+  getUserCompany: async () => {
+    const { data } = await supabase.functions.invoke('project-management', {
+      body: {
+        method: 'GET',
+        endpoint: 'user-company'
+      }
+    });
+    return data?.companyId;
+  },
+  
   // Get projects
   getProjects: async (filters?: { name?: string, status?: string }) => {
     const { data } = await supabase.functions.invoke('project-management', {
       body: {
+        method: 'GET',
         endpoint: 'projects',
         ...filters
       }
@@ -100,6 +112,7 @@ export const projectManagementApi = {
     const { data } = await supabase.functions.invoke('project-management', {
       method: 'POST',
       body: {
+        method: 'POST',
         endpoint: 'projects',
         ...project
       }
@@ -111,6 +124,7 @@ export const projectManagementApi = {
   getProject: async (id: string) => {
     const { data } = await supabase.functions.invoke('project-management', {
       body: {
+        method: 'GET',
         endpoint: `projects/${id}`
       }
     });
@@ -126,6 +140,7 @@ export const projectManagementApi = {
     const { data } = await supabase.functions.invoke('project-management', {
       method: 'PUT',
       body: {
+        method: 'PUT',
         endpoint: id,
         ...updates
       }

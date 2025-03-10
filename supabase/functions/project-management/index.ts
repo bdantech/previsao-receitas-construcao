@@ -81,6 +81,47 @@ serve(async (req) => {
 
     const isAdmin = profile.role === 'admin'
 
+    // Handle GET request for user's company
+    if (req.method === 'GET' && endpoint === 'user-company') {
+      // Get the user's company
+      const { data: userCompany, error: companyError } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (companyError) {
+        console.error('Error fetching user company:', companyError);
+        
+        // If not found, return 404
+        if (companyError.code === 'PGRST116') {
+          return new Response(
+            JSON.stringify({ error: 'User not associated with any company' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 404 
+            }
+          )
+        }
+        
+        return new Response(
+          JSON.stringify({ error: companyError.message }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        )
+      }
+      
+      return new Response(
+        JSON.stringify({ companyId: userCompany.company_id }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
+    }
+
     // Handle GET requests (list projects with filtering)
     if (req.method === 'GET' && endpoint === 'projects') {
       const queryParams = url.searchParams

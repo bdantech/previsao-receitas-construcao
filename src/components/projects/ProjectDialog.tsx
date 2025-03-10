@@ -24,6 +24,7 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
   const [cnpj, setCnpj] = useState("");
   const [initialDate, setInitialDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [fetchingCompany, setFetchingCompany] = useState(false);
   
   // Fetch the user's company ID when the dialog opens
   useEffect(() => {
@@ -31,24 +32,48 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
       if (!session?.user) return;
       
       try {
-        const { data } = await supabase
-          .from('user_companies')
-          .select('company_id')
-          .eq('user_id', session.user.id)
-          .single();
+        setFetchingCompany(true);
+        
+        // Use the functions API instead of direct database access
+        const { data, error } = await supabase.functions.invoke('project-management', {
+          body: {
+            method: 'GET',
+            endpoint: 'user-company'
+          }
+        });
+        
+        if (error) {
+          console.error('Error fetching user company:', error);
+          toast({
+            title: "Erro ao carregar empresa",
+            description: "Não foi possível carregar os dados da sua empresa.",
+            variant: "destructive"
+          });
+          return;
+        }
           
-        if (data) {
-          setCompanyId(data.company_id);
+        if (data && data.companyId) {
+          console.log('Company fetched successfully:', data.companyId);
+          setCompanyId(data.companyId);
+        } else {
+          console.error('No company ID found for user');
+          toast({
+            title: "Empresa não encontrada",
+            description: "Você precisa estar associado a uma empresa para criar projetos.",
+            variant: "destructive"
+          });
         }
       } catch (error) {
         console.error('Error fetching user company:', error);
+      } finally {
+        setFetchingCompany(false);
       }
     };
     
     if (open) {
       fetchUserCompany();
     }
-  }, [open, session]);
+  }, [open, session, toast]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,15 +217,20 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
               variant="outline" 
               onClick={() => onOpenChange(false)}
               className="mr-2"
-              disabled={isLoading}
+              disabled={isLoading || fetchingCompany}
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || fetchingCompany}>
               {isLoading ? (
                 <>
                   <Loader className="mr-2 h-4 w-4 animate-spin" />
                   Criando...
+                </>
+              ) : fetchingCompany ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Carregando empresa...
                 </>
               ) : (
                 'Criar Projeto'
