@@ -169,6 +169,50 @@ export type Database = {
         }
         Relationships: []
       }
+      projects: {
+        Row: {
+          cnpj: string
+          company_id: string
+          created_at: string
+          end_date: string | null
+          id: string
+          initial_date: string
+          name: string
+          status: Database["public"]["Enums"]["project_status"]
+          updated_at: string
+        }
+        Insert: {
+          cnpj: string
+          company_id: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          initial_date: string
+          name: string
+          status?: Database["public"]["Enums"]["project_status"]
+          updated_at?: string
+        }
+        Update: {
+          cnpj?: string
+          company_id?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          initial_date?: string
+          name?: string
+          status?: Database["public"]["Enums"]["project_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_companies: {
         Row: {
           company_id: string
@@ -223,6 +267,7 @@ export type Database = {
     }
     Enums: {
       document_status: "sent" | "approved" | "needs_revision"
+      project_status: "active" | "inactive"
       user_role: "company_user" | "admin"
     }
     CompositeTypes: {
