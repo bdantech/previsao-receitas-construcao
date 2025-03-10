@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +17,8 @@ const Dashboard = () => {
       if (session?.access_token) {
         try {
           setLoadingCompanies(true);
+          console.log('Fetching company data with token:', session.access_token);
+          
           const { data, error } = await supabase.functions.invoke('company-data', {
             headers: {
               Authorization: `Bearer ${session.access_token}`
@@ -26,21 +27,34 @@ const Dashboard = () => {
           
           if (error) {
             console.error("Error invoking company-data function:", error);
+            console.error("Error details:", error.message);
             throw error;
           }
           
           console.log("Company data response:", data);
-          setCompanies(data.companies || []);
+          
+          if (!data.companies) {
+            console.error("No companies array in response:", data);
+            throw new Error("Invalid response format");
+          }
+          
+          setCompanies(data.companies);
           
           // Set company name if available
           if (data.companies && data.companies.length > 0) {
-            setCompanyName(data.companies[0].name || "");
+            console.log("Setting company name:", data.companies[0].name);
+            setCompanyName(data.companies[0].name);
+          } else {
+            console.log("No companies found for user");
           }
         } catch (error) {
           console.error("Error fetching company data:", error);
+          // You might want to show an error message to the user here
         } finally {
           setLoadingCompanies(false);
         }
+      } else {
+        console.log("No session access token available");
       }
     };
 

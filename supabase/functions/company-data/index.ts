@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -105,21 +104,34 @@ serve(async (req) => {
     } 
     // Se for usuário de empresa, retornar apenas suas empresas associadas
     else {
-      const { data: userCompanies, error: relationError } = await supabaseClient
+      console.log('Fetching company data for user:', user.id)
+      
+      // Use service role client for all database operations
+      const adminSupabase = createClient(supabaseUrl, supabaseServiceKey)
+
+      // First get user's companies
+      const { data: userCompanies, error: relationError } = await adminSupabase
         .from('user_companies')
         .select('company_id')
         .eq('user_id', user.id)
 
       if (relationError) {
         console.error('User companies error:', relationError)
-        throw relationError
+        return new Response(
+          JSON.stringify({ error: 'Erro ao buscar empresas do usuário: ' + relationError.message }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        )
       }
 
-      console.log('User companies:', userCompanies)
+      console.log('User companies found:', userCompanies)
 
       const companyIds = userCompanies.map(uc => uc.company_id)
       
       if (companyIds.length === 0) {
+        console.log('No companies found for user')
         return new Response(
           JSON.stringify({ companies: [] }),
           { 
@@ -129,7 +141,8 @@ serve(async (req) => {
         )
       }
 
-      const { data: companies, error: companiesError } = await supabaseClient
+      // Then get company details
+      const { data: companies, error: companiesError } = await adminSupabase
         .from('companies')
         .select('*')
         .in('id', companyIds)
@@ -137,8 +150,16 @@ serve(async (req) => {
 
       if (companiesError) {
         console.error('Companies error:', companiesError)
-        throw companiesError
+        return new Response(
+          JSON.stringify({ error: 'Erro ao buscar detalhes das empresas: ' + companiesError.message }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        )
       }
+
+      console.log('Companies found:', companies)
 
       return new Response(
         JSON.stringify({ companies }),
