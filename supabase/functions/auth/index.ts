@@ -174,60 +174,51 @@ serve(async (req) => {
 
         // 4. Criar documentos iniciais para a empresa manualmente, agora usando status 'not_sent'
         console.log('Creating initial documents for company')
-        const { data: docTypes, error: docTypesError } = await adminSupabase
-          .from('document_types')
-          .select('id, name')
-          .eq('resource', 'company')
         
-        if (docTypesError) {
-          console.error('Error fetching document types:', docTypesError)
-          // Continue anyway, this is not a critical error
-        } else if (docTypes && docTypes.length > 0) {
-          try {
-            // First, check if documents already exist for this company
-            const { data: existingDocs, error: existingDocsError } = await adminSupabase
-              .from('documents')
-              .select('document_type_id')
-              .eq('resource_type', 'company')
-              .eq('resource_id', companyResult.id)
+        // First, check if ANY documents exist for this company
+        const { data: existingDocs, error: existingDocsError } = await adminSupabase
+          .from('documents')
+          .select('id')
+          .eq('resource_type', 'company')
+          .eq('resource_id', companyResult.id)
 
-            if (existingDocsError) {
-              console.error('Error checking existing documents:', existingDocsError)
-            } else {
-              // Create a map of existing document types
-              const existingDocTypes = new Set(existingDocs?.map(doc => doc.document_type_id) || [])
-              
-              // Only create documents for types that don't exist yet
-              const documentInserts = docTypes
-                .filter(docType => !existingDocTypes.has(docType.id))
-                .map(docType => ({
-                  document_type_id: docType.id,
-                  resource_type: 'company',
-                  resource_id: companyResult.id,
-                  status: 'not_sent',
-                  file_path: '',
-                  file_name: `Aguardando Upload - ${docType.name}`
-                }))
+        if (existingDocsError) {
+          console.error('Error checking existing documents:', existingDocsError)
+        } else if (existingDocs && existingDocs.length > 0) {
+          console.log('Documents already exist for this company, skipping creation')
+        } else {
+          // Only proceed with document creation if NO documents exist
+          const { data: docTypes, error: docTypesError } = await adminSupabase
+            .from('document_types')
+            .select('id, name')
+            .eq('resource', 'company')
+          
+          if (docTypesError) {
+            console.error('Error fetching document types:', docTypesError)
+          } else if (docTypes && docTypes.length > 0) {
+            try {
+              const documentInserts = docTypes.map(docType => ({
+                document_type_id: docType.id,
+                resource_type: 'company',
+                resource_id: companyResult.id,
+                status: 'not_sent',
+                file_path: '',
+                file_name: `Aguardando Upload - ${docType.name}`
+              }))
 
-              if (documentInserts.length > 0) {
-                const { error: docsError } = await adminSupabase
-                  .from('documents')
-                  .insert(documentInserts)
+              const { error: docsError } = await adminSupabase
+                .from('documents')
+                .insert(documentInserts)
 
-                if (docsError) {
-                  console.error('Error creating initial documents:', docsError)
-                  console.error('Error details:', JSON.stringify(docsError))
-                  // Continue anyway, this is not a critical error as the company is created
-                } else {
-                  console.log('Initial documents created successfully')
-                }
+              if (docsError) {
+                console.error('Error creating initial documents:', docsError)
+                console.error('Error details:', JSON.stringify(docsError))
               } else {
-                console.log('No new documents to create')
+                console.log('Initial documents created successfully')
               }
+            } catch (docError) {
+              console.error('Exception creating documents:', docError)
             }
-          } catch (docError) {
-            console.error('Exception creating documents:', docError)
-            // Continue anyway, don't fail registration
           }
         }
 
