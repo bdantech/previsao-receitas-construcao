@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -173,7 +172,7 @@ serve(async (req) => {
           )
         }
 
-        // 4. Criar documentos iniciais para a empresa manualmente, sem definir o submitted_by
+        // 4. Criar documentos iniciais para a empresa manualmente, agora usando status 'not_sent'
         console.log('Creating initial documents for company')
         const { data: docTypes, error: docTypesError } = await adminSupabase
           .from('document_types')
@@ -184,17 +183,16 @@ serve(async (req) => {
           console.error('Error fetching document types:', docTypesError)
           // Continue anyway, this is not a critical error
         } else if (docTypes && docTypes.length > 0) {
-          // Insert a document record for each document type with status "not_sent"
           try {
-            // Insert a document record for each document type
+            // Criar um registro de documento para cada tipo de documento
             const documentInserts = docTypes.map(docType => ({
               document_type_id: docType.id,
               resource_type: 'company',
               resource_id: companyResult.id,
-              status: 'needs_revision', // Changed from 'sent' to 'needs_revision'
+              status: 'not_sent', // Usando o novo status 'not_sent'
               file_path: '',
-              file_name: `Pending Upload - ${docType.name}`
-              // No submitted_by field to avoid errors with required fields
+              file_name: `Aguardando Upload - ${docType.name}`
+              // Sem submitted_by e submitted_at, agora que são campos opcionais
             }))
 
             const { error: docsError } = await adminSupabase

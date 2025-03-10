@@ -84,8 +84,8 @@ export type Database = {
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["document_status"]
-          submitted_at: string
-          submitted_by: string
+          submitted_at: string | null
+          submitted_by: string | null
           updated_at: string
         }
         Insert: {
@@ -102,8 +102,8 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["document_status"]
-          submitted_at?: string
-          submitted_by: string
+          submitted_at?: string | null
+          submitted_by?: string | null
           updated_at?: string
         }
         Update: {
@@ -120,8 +120,8 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["document_status"]
-          submitted_at?: string
-          submitted_by?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -269,7 +269,7 @@ export type Database = {
       }
     }
     Enums: {
-      document_status: "sent" | "approved" | "needs_revision"
+      document_status: "sent" | "approved" | "needs_revision" | "not_sent"
       project_status: "active" | "inactive"
       user_role: "company_user" | "admin"
     }

@@ -17,8 +17,7 @@ export const documentManagementApi = {
   getDocumentTypes: async () => {
     const { data } = await supabase.functions.invoke('document-management', {
       body: { 
-        action: 'getDocumentTypes',
-        path: 'document-types' 
+        action: 'getDocumentTypes'
       }
     });
     return data?.documentTypes || [];
@@ -29,7 +28,6 @@ export const documentManagementApi = {
       method: 'POST',
       body: { 
         action: 'createDocumentType',
-        path: 'document-types',
         documentType
       }
     });
@@ -41,7 +39,6 @@ export const documentManagementApi = {
     const { data } = await supabase.functions.invoke('document-management', {
       body: { 
         action: 'getDocuments',
-        path: 'documents',
         filters
       }
     });
@@ -61,7 +58,6 @@ export const documentManagementApi = {
       method: 'POST',
       body: { 
         action: 'submitDocument',
-        path: 'documents',
         document
       }
     });
@@ -73,7 +69,6 @@ export const documentManagementApi = {
       method: 'PUT',
       body: { 
         action: 'updateDocumentStatus',
-        path: 'documents',
         update
       }
     });

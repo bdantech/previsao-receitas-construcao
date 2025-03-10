@@ -81,13 +81,13 @@ serve(async (req) => {
 
     const isAdmin = profile.role === 'admin'
     
-    // Parse request body to get action and path
+    // Parse request body to get action and parameters
     const requestData = await req.json()
-    const { action, path } = requestData
+    const { action } = requestData
     
-    if (!action || !path) {
+    if (!action) {
       return new Response(
-        JSON.stringify({ error: 'Missing required action or path in request body' }),
+        JSON.stringify({ error: 'Missing required action in request body' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400 
@@ -95,266 +95,130 @@ serve(async (req) => {
       )
     }
 
-    // Handle different operations based on action and path
-    if (path === 'document-types') {
+    // Handle different operations based on action
+    if (action === 'getDocumentTypes') {
       // Get all document types (both admin and company users can view)
-      if (action === 'getDocumentTypes') {
-        const { data, error } = await supabaseClient
-          .from('document_types')
-          .select('*')
-          .order('name')
+      const { data, error } = await supabaseClient
+        .from('document_types')
+        .select('*')
+        .order('name')
 
-        if (error) throw error
+      if (error) throw error
 
-        return new Response(
-          JSON.stringify({ documentTypes: data }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 
-          }
-        )
-      }
-      // Create new document type (admin only)
-      else if (action === 'createDocumentType' && req.method === 'POST' && isAdmin) {
-        const { documentType } = requestData
-        const { name, resource, description, required } = documentType
-
-        const { data, error } = await supabaseClient
-          .from('document_types')
-          .insert({
-            name,
-            resource,
-            description,
-            required: required || false
-          })
-          .select()
-          .single()
-
-        if (error) throw error
-
-        return new Response(
-          JSON.stringify({ success: true, documentType: data }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 201 
-          }
-        )
-      }
+      return new Response(
+        JSON.stringify({ documentTypes: data }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
     }
-    else if (path === 'documents') {
-      // Get documents
-      if (action === 'getDocuments') {
-        let query = supabaseClient
-          .from('documents')
-          .select(`
-            *,
-            document_type:document_type_id(id, name, resource, description, required),
-            submitter:submitted_by(id, email),
-            reviewer:reviewed_by(id, email)
-          `)
+    else if (action === 'createDocumentType' && req.method === 'POST' && isAdmin) {
+      const { documentType } = requestData
+      const { name, resource, description, required } = documentType
 
-        // Apply filter for company users - they can only see their company's documents
-        if (!isAdmin) {
-          // Get user's companies
-          const { data: userCompanies } = await supabaseClient
-            .from('user_companies')
-            .select('company_id')
-            .eq('user_id', user.id)
+      const { data, error } = await supabaseClient
+        .from('document_types')
+        .insert({
+          name,
+          resource,
+          description,
+          required: required || false
+        })
+        .select()
+        .single()
 
-          if (!userCompanies || userCompanies.length === 0) {
-            return new Response(
-              JSON.stringify({ documents: [] }),
-              { 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200 
-              }
-            )
-          }
+      if (error) throw error
 
-          const companyIds = userCompanies.map(uc => uc.company_id)
-          query = query
-            .eq('resource_type', 'company')
-            .in('resource_id', companyIds)
+      return new Response(
+        JSON.stringify({ success: true, documentType: data }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 201 
         }
+      )
+    }
+    else if (action === 'getDocuments') {
+      let query = supabaseClient
+        .from('documents')
+        .select(`
+          *,
+          document_type:document_type_id(id, name, resource, description, required),
+          submitter:submitted_by(id, email),
+          reviewer:reviewed_by(id, email)
+        `)
 
-        // Apply additional filters if provided
-        const { filters } = requestData
-        if (filters) {
-          const { resourceType, resourceId, status } = filters
-          if (resourceType) query = query.eq('resource_type', resourceType)
-          if (resourceId) query = query.eq('resource_id', resourceId)
-          if (status) query = query.eq('status', status)
-        }
+      // Apply filter for company users - they can only see their company's documents
+      if (!isAdmin) {
+        // Get user's companies
+        const { data: userCompanies } = await supabaseClient
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
 
-        // Execute the query
-        const { data, error } = await query.order('submitted_at', { ascending: false })
-
-        if (error) throw error
-
-        return new Response(
-          JSON.stringify({ documents: data }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200 
-          }
-        )
-      }
-      // Update document status (admin only for approval/rejection)
-      else if (action === 'updateDocumentStatus' && req.method === 'PUT') {
-        const { update } = requestData
-        const { id, status, reviewNotes } = update
-
-        if (isAdmin) {
-          // Admins can update status to 'approved' or 'needs_revision'
-          if (status !== 'approved' && status !== 'needs_revision') {
-            return new Response(
-              JSON.stringify({ error: 'Invalid status. Admins can only set status to approved or needs_revision' }),
-              { 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 400 
-              }
-            )
-          }
-
-          const { data, error } = await supabaseClient
-            .from('documents')
-            .update({
-              status,
-              review_notes: reviewNotes,
-              reviewed_by: user.id,
-              reviewed_at: new Date().toISOString()
-            })
-            .eq('id', id)
-            .select()
-            .single()
-
-          if (error) throw error
-
+        if (!userCompanies || userCompanies.length === 0) {
           return new Response(
-            JSON.stringify({ success: true, document: data }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200 
-            }
-          )
-        } else {
-          // Company users can only update documents with 'needs_revision' status to 'sent'
-          if (status !== 'sent') {
-            return new Response(
-              JSON.stringify({ error: 'Company users can only resubmit documents (setting status to sent)' }),
-              { 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 400 
-              }
-            )
-          }
-
-          // Verify the document belongs to one of the user's companies and has 'needs_revision' status
-          const { data: document, error: getError } = await supabaseClient
-            .from('documents')
-            .select('*')
-            .eq('id', id)
-            .eq('status', 'needs_revision')
-            .single()
-
-          if (getError) {
-            return new Response(
-              JSON.stringify({ error: 'Document not found or not eligible for update' }),
-              { 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 404 
-              }
-            )
-          }
-
-          // Verify user belongs to the document's company
-          const { data: userCompanies, error: companyError } = await supabaseClient
-            .from('user_companies')
-            .select('company_id')
-            .eq('user_id', user.id)
-            .eq('company_id', document.resource_id)
-
-          if (companyError || !userCompanies.length) {
-            return new Response(
-              JSON.stringify({ error: 'You do not have permission to update this document' }),
-              { 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 403 
-              }
-            )
-          }
-
-          // Update the document
-          const { data, error } = await supabaseClient
-            .from('documents')
-            .update({
-              status: 'sent',
-              submitted_at: new Date().toISOString(),
-              reviewed_by: null,
-              reviewed_at: null,
-              review_notes: null
-            })
-            .eq('id', id)
-            .select()
-            .single()
-
-          if (error) throw error
-
-          return new Response(
-            JSON.stringify({ success: true, document: data }),
+            JSON.stringify({ documents: [] }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200 
             }
           )
         }
+
+        const companyIds = userCompanies.map(uc => uc.company_id)
+        query = query
+          .eq('resource_type', 'company')
+          .in('resource_id', companyIds)
       }
-      // Submit new document
-      else if (action === 'submitDocument' && req.method === 'POST') {
-        const { document } = requestData
-        const { 
-          documentTypeId, 
-          resourceType, 
-          resourceId, 
-          filePath, 
-          fileName, 
-          fileSize, 
-          mimeType 
-        } = document
 
-        // If user is not admin, verify they belong to the company
-        if (!isAdmin && resourceType === 'company') {
-          const { data: userCompanies, error: companyError } = await supabaseClient
-            .from('user_companies')
-            .select('company_id')
-            .eq('user_id', user.id)
-            .eq('company_id', resourceId)
+      // Apply additional filters if provided
+      const { filters } = requestData
+      if (filters) {
+        const { resourceType, resourceId, status } = filters
+        if (resourceType) query = query.eq('resource_type', resourceType)
+        if (resourceId) query = query.eq('resource_id', resourceId)
+        if (status) query = query.eq('status', status)
+      }
 
-          if (companyError || !userCompanies.length) {
-            return new Response(
-              JSON.stringify({ error: 'You do not have permission to submit documents for this company' }),
-              { 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 403 
-              }
-            )
-          }
+      // Execute the query
+      const { data, error } = await query.order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      return new Response(
+        JSON.stringify({ documents: data }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
+    }
+    else if (action === 'updateDocumentStatus' && req.method === 'PUT') {
+      const { update } = requestData
+      const { id, status, reviewNotes } = update
+
+      if (isAdmin) {
+        // Admins can update status to 'approved' or 'needs_revision'
+        if (status !== 'approved' && status !== 'needs_revision') {
+          return new Response(
+            JSON.stringify({ error: 'Invalid status. Admins can only set status to approved or needs_revision' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          )
         }
 
-        // Create new document
         const { data, error } = await supabaseClient
           .from('documents')
-          .insert({
-            document_type_id: documentTypeId,
-            resource_type: resourceType,
-            resource_id: resourceId,
-            status: 'sent',
-            file_path: filePath,
-            file_name: fileName,
-            file_size: fileSize,
-            mime_type: mimeType,
-            submitted_by: user.id
+          .update({
+            status,
+            review_notes: reviewNotes,
+            reviewed_by: user.id,
+            reviewed_at: new Date().toISOString()
           })
+          .eq('id', id)
           .select()
           .single()
 
@@ -364,10 +228,140 @@ serve(async (req) => {
           JSON.stringify({ success: true, document: data }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 201 
+            status: 200 
+          }
+        )
+      } else {
+        // Company users can update 'not_sent' or 'needs_revision' documents to 'sent'
+        if (status !== 'sent') {
+          return new Response(
+            JSON.stringify({ error: 'Company users can only submit documents (setting status to sent)' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          )
+        }
+
+        // Verify the document belongs to one of the user's companies and has appropriate status
+        const { data: document, error: getError } = await supabaseClient
+          .from('documents')
+          .select('*')
+          .eq('id', id)
+          .or('status.eq.not_sent,status.eq.needs_revision')
+          .single()
+
+        if (getError) {
+          return new Response(
+            JSON.stringify({ error: 'Document not found or not eligible for update' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 404 
+            }
+          )
+        }
+
+        // Verify user belongs to the document's company
+        const { data: userCompanies, error: companyError } = await supabaseClient
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .eq('company_id', document.resource_id)
+
+        if (companyError || !userCompanies.length) {
+          return new Response(
+            JSON.stringify({ error: 'You do not have permission to update this document' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 403 
+            }
+          )
+        }
+
+        // Update the document
+        const { data, error } = await supabaseClient
+          .from('documents')
+          .update({
+            status: 'sent',
+            submitted_by: user.id,
+            submitted_at: new Date().toISOString(),
+            reviewed_by: null,
+            reviewed_at: null,
+            review_notes: null
+          })
+          .eq('id', id)
+          .select()
+          .single()
+
+        if (error) throw error
+
+        return new Response(
+          JSON.stringify({ success: true, document: data }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
           }
         )
       }
+    }
+    else if (action === 'submitDocument' && req.method === 'POST') {
+      const { document } = requestData
+      const { 
+        documentTypeId, 
+        resourceType, 
+        resourceId, 
+        filePath, 
+        fileName, 
+        fileSize, 
+        mimeType 
+      } = document
+
+      // If user is not admin, verify they belong to the company
+      if (!isAdmin && resourceType === 'company') {
+        const { data: userCompanies, error: companyError } = await supabaseClient
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .eq('company_id', resourceId)
+
+        if (companyError || !userCompanies.length) {
+          return new Response(
+            JSON.stringify({ error: 'You do not have permission to submit documents for this company' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 403 
+            }
+          )
+        }
+      }
+
+      // Create new document
+      const { data, error } = await supabaseClient
+        .from('documents')
+        .insert({
+          document_type_id: documentTypeId,
+          resource_type: resourceType,
+          resource_id: resourceId,
+          status: 'sent',
+          file_path: filePath,
+          file_name: fileName,
+          file_size: fileSize,
+          mime_type: mimeType,
+          submitted_by: user.id,
+          submitted_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      return new Response(
+        JSON.stringify({ success: true, document: data }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 201 
+        }
+      )
     }
 
     // If we get here, the operation or method is not supported
