@@ -203,7 +203,12 @@ serve(async (req) => {
                 resource_id: companyResult.id,
                 status: 'not_sent',
                 file_path: '',
-                file_name: `Aguardando Upload - ${docType.name}`
+                file_name: `Pending Upload - ${docType.name}`,
+                submitted_by: null,
+                submitted_at: null,
+                reviewed_by: null,
+                reviewed_at: null,
+                review_notes: null
               }))
 
               const { error: docsError } = await adminSupabase
