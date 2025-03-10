@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -335,28 +334,67 @@ serve(async (req) => {
         }
       }
 
-      // Create new document
-      const { data, error } = await supabaseClient
+      // Find existing document with status 'not_sent'
+      const { data: existingDoc, error: findError } = await supabaseClient
         .from('documents')
-        .insert({
-          document_type_id: documentTypeId,
-          resource_type: resourceType,
-          resource_id: resourceId,
-          status: 'sent',
-          file_path: filePath,
-          file_name: fileName,
-          file_size: fileSize,
-          mime_type: mimeType,
-          submitted_by: user.id,
-          submitted_at: new Date().toISOString()
-        })
-        .select()
+        .select('id')
+        .eq('document_type_id', documentTypeId)
+        .eq('resource_type', resourceType)
+        .eq('resource_id', resourceId)
+        .eq('status', 'not_sent')
         .single()
 
-      if (error) throw error
+      if (findError && findError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        return new Response(
+          JSON.stringify({ error: 'Error finding existing document' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        )
+      }
+
+      let result;
+      if (existingDoc) {
+        // Update existing document
+        result = await supabaseClient
+          .from('documents')
+          .update({
+            status: 'sent',
+            file_path: filePath,
+            file_name: fileName,
+            file_size: fileSize,
+            mime_type: mimeType,
+            submitted_by: user.id,
+            submitted_at: new Date().toISOString()
+          })
+          .eq('id', existingDoc.id)
+          .select()
+          .single()
+      } else {
+        // Create new document if no existing one found
+        result = await supabaseClient
+          .from('documents')
+          .insert({
+            document_type_id: documentTypeId,
+            resource_type: resourceType,
+            resource_id: resourceId,
+            status: 'sent',
+            file_path: filePath,
+            file_name: fileName,
+            file_size: fileSize,
+            mime_type: mimeType,
+            submitted_by: user.id,
+            submitted_at: new Date().toISOString()
+          })
+          .select()
+          .single()
+      }
+
+      if (result.error) throw result.error
 
       return new Response(
-        JSON.stringify({ success: true, document: data }),
+        JSON.stringify({ success: true, document: result.data }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 201 
