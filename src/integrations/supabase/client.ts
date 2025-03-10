@@ -16,37 +16,34 @@ export const documentManagementApi = {
   // Document Types
   getDocumentTypes: async () => {
     const { data } = await supabase.functions.invoke('document-management', {
-      path: 'document-types'
+      body: { 
+        action: 'getDocumentTypes',
+        path: 'document-types' 
+      }
     });
     return data?.documentTypes || [];
   },
   
   createDocumentType: async (documentType: { name: string, resource: string, description?: string, required?: boolean }) => {
     const { data } = await supabase.functions.invoke('document-management', {
-      path: 'document-types',
       method: 'POST',
-      body: documentType
+      body: { 
+        action: 'createDocumentType',
+        path: 'document-types',
+        documentType
+      }
     });
     return data;
   },
   
   // Documents
   getDocuments: async (filters?: { resourceType?: string, resourceId?: string, status?: string }) => {
-    let path = 'documents';
-    if (filters) {
-      const searchParams = new URLSearchParams();
-      if (filters.resourceType) searchParams.set('resourceType', filters.resourceType);
-      if (filters.resourceId) searchParams.set('resourceId', filters.resourceId);
-      if (filters.status) searchParams.set('status', filters.status);
-      
-      const queryString = searchParams.toString();
-      if (queryString) {
-        path += `?${queryString}`;
-      }
-    }
-    
     const { data } = await supabase.functions.invoke('document-management', {
-      path
+      body: { 
+        action: 'getDocuments',
+        path: 'documents',
+        filters
+      }
     });
     return data?.documents || [];
   },
@@ -61,18 +58,24 @@ export const documentManagementApi = {
     mimeType?: string
   }) => {
     const { data } = await supabase.functions.invoke('document-management', {
-      path: 'documents',
       method: 'POST',
-      body: document
+      body: { 
+        action: 'submitDocument',
+        path: 'documents',
+        document
+      }
     });
     return data;
   },
   
   updateDocumentStatus: async (update: { id: string, status: string, reviewNotes?: string }) => {
     const { data } = await supabase.functions.invoke('document-management', {
-      path: 'documents',
       method: 'PUT',
-      body: update
+      body: { 
+        action: 'updateDocumentStatus',
+        path: 'documents',
+        update
+      }
     });
     return data;
   }

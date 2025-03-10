@@ -80,14 +80,25 @@ serve(async (req) => {
     }
 
     const isAdmin = profile.role === 'admin'
-    const url = new URL(req.url)
-    const pathParts = url.pathname.split('/').filter(Boolean)
-    const operation = pathParts[1] // e.g., /document-management/document-types
+    
+    // Parse request body to get action and path
+    const requestData = await req.json()
+    const { action, path } = requestData
+    
+    if (!action || !path) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required action or path in request body' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      )
+    }
 
-    // Handle different operations
-    if (operation === 'document-types') {
+    // Handle different operations based on action and path
+    if (path === 'document-types') {
       // Get all document types (both admin and company users can view)
-      if (req.method === 'GET') {
+      if (action === 'getDocumentTypes') {
         const { data, error } = await supabaseClient
           .from('document_types')
           .select('*')
@@ -104,9 +115,9 @@ serve(async (req) => {
         )
       }
       // Create new document type (admin only)
-      else if (req.method === 'POST' && isAdmin) {
-        const requestData = await req.json()
-        const { name, resource, description, required } = requestData
+      else if (action === 'createDocumentType' && req.method === 'POST' && isAdmin) {
+        const { documentType } = requestData
+        const { name, resource, description, required } = documentType
 
         const { data, error } = await supabaseClient
           .from('document_types')
@@ -130,9 +141,9 @@ serve(async (req) => {
         )
       }
     }
-    else if (operation === 'documents') {
+    else if (path === 'documents') {
       // Get documents
-      if (req.method === 'GET') {
+      if (action === 'getDocuments') {
         let query = supabaseClient
           .from('documents')
           .select(`
@@ -166,14 +177,14 @@ serve(async (req) => {
             .in('resource_id', companyIds)
         }
 
-        // Apply additional filters if provided in the URL
-        const resourceType = url.searchParams.get('resourceType')
-        const resourceId = url.searchParams.get('resourceId')
-        const status = url.searchParams.get('status')
-
-        if (resourceType) query = query.eq('resource_type', resourceType)
-        if (resourceId) query = query.eq('resource_id', resourceId)
-        if (status) query = query.eq('status', status)
+        // Apply additional filters if provided
+        const { filters } = requestData
+        if (filters) {
+          const { resourceType, resourceId, status } = filters
+          if (resourceType) query = query.eq('resource_type', resourceType)
+          if (resourceId) query = query.eq('resource_id', resourceId)
+          if (status) query = query.eq('status', status)
+        }
 
         // Execute the query
         const { data, error } = await query.order('submitted_at', { ascending: false })
@@ -189,9 +200,9 @@ serve(async (req) => {
         )
       }
       // Update document status (admin only for approval/rejection)
-      else if (req.method === 'PUT') {
-        const requestData = await req.json()
-        const { id, status, reviewNotes } = requestData
+      else if (action === 'updateDocumentStatus' && req.method === 'PUT') {
+        const { update } = requestData
+        const { id, status, reviewNotes } = update
 
         if (isAdmin) {
           // Admins can update status to 'approved' or 'needs_revision'
@@ -299,8 +310,8 @@ serve(async (req) => {
         }
       }
       // Submit new document
-      else if (req.method === 'POST') {
-        const requestData = await req.json()
+      else if (action === 'submitDocument' && req.method === 'POST') {
+        const { document } = requestData
         const { 
           documentTypeId, 
           resourceType, 
@@ -309,7 +320,7 @@ serve(async (req) => {
           fileName, 
           fileSize, 
           mimeType 
-        } = requestData
+        } = document
 
         // If user is not admin, verify they belong to the company
         if (!isAdmin && resourceType === 'company') {
