@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -26,7 +26,7 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
   const [endDate, setEndDate] = useState("");
   
   // Fetch the user's company ID when the dialog opens
-  useState(() => {
+  useEffect(() => {
     const fetchUserCompany = async () => {
       if (!session?.user) return;
       
@@ -48,12 +48,28 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
     if (open) {
       fetchUserCompany();
     }
-  });
+  }, [open, session]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Debug output to check the form values
+    console.log("Form values:", {
+      name,
+      cnpj,
+      initialDate,
+      companyId
+    });
+    
     if (!name || !cnpj || !initialDate || !companyId) {
+      // Log which fields are missing
+      console.log("Missing fields:", {
+        name: !name,
+        cnpj: !cnpj,
+        initialDate: !initialDate,
+        companyId: !companyId
+      });
+      
       toast({
         title: "Campos obrigatórios",
         description: "Por favor, preencha todos os campos obrigatórios.",
@@ -78,6 +94,7 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
       });
       
       if (response.error) {
+        console.error("Project creation error:", response.error);
         toast({
           title: "Erro ao criar projeto",
           description: response.error.message || "Ocorreu um erro ao criar o projeto.",
@@ -102,6 +119,7 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
         onProjectCreated(response.data.project);
       }
     } catch (error: any) {
+      console.error("Project creation exception:", error);
       toast({
         title: "Erro ao criar projeto",
         description: error.message || "Ocorreu um erro ao criar o projeto.",

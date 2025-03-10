@@ -32,6 +32,7 @@ const ProjectsPage = () => {
           return;
         }
         
+        console.log('Projects response:', response);
         setProjects(response.data.projects || []);
       } catch (error) {
         console.error('Error fetching projects:', error);
@@ -46,6 +47,7 @@ const ProjectsPage = () => {
   }, [session]);
   
   const handleProjectCreated = (newProject) => {
+    console.log('New project created:', newProject);
     setProjects((prevProjects) => [...prevProjects, newProject]);
     setIsDialogOpen(false);
   };
