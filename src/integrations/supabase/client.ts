@@ -11,11 +11,27 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
+// Helper to get auth headers for function calls
+const getAuthHeaders = async () => {
+  const { data } = await supabase.auth.getSession();
+  const session = data?.session;
+  
+  if (session?.access_token) {
+    return {
+      Authorization: `Bearer ${session.access_token}`
+    };
+  }
+  
+  return {};
+};
+
 // Document management API utilities
 export const documentManagementApi = {
   // Document Types
   getDocumentTypes: async () => {
+    const headers = await getAuthHeaders();
     const { data } = await supabase.functions.invoke('document-management', {
+      headers,
       body: { 
         action: 'getDocumentTypes'
       }
@@ -24,8 +40,10 @@ export const documentManagementApi = {
   },
   
   createDocumentType: async (documentType: { name: string, resource: string, description?: string, required?: boolean }) => {
+    const headers = await getAuthHeaders();
     const { data } = await supabase.functions.invoke('document-management', {
       method: 'POST',
+      headers,
       body: { 
         action: 'createDocumentType',
         documentType
@@ -36,7 +54,9 @@ export const documentManagementApi = {
   
   // Documents
   getDocuments: async (filters?: { resourceType?: string, resourceId?: string, status?: string }) => {
+    const headers = await getAuthHeaders();
     const { data } = await supabase.functions.invoke('document-management', {
+      headers,
       body: { 
         action: 'getDocuments',
         filters
@@ -54,8 +74,10 @@ export const documentManagementApi = {
     fileSize?: number,
     mimeType?: string
   }) => {
+    const headers = await getAuthHeaders();
     const { data } = await supabase.functions.invoke('document-management', {
       method: 'POST',
+      headers,
       body: { 
         action: 'submitDocument',
         document
@@ -65,8 +87,10 @@ export const documentManagementApi = {
   },
   
   updateDocumentStatus: async (update: { id: string, status: string, reviewNotes?: string }) => {
+    const headers = await getAuthHeaders();
     const { data } = await supabase.functions.invoke('document-management', {
       method: 'PUT',
+      headers,
       body: { 
         action: 'updateDocumentStatus',
         update
@@ -80,7 +104,9 @@ export const documentManagementApi = {
 export const projectManagementApi = {
   // Get user's company
   getUserCompany: async () => {
+    const headers = await getAuthHeaders();
     const { data } = await supabase.functions.invoke('project-management', {
+      headers,
       body: {
         method: 'GET',
         endpoint: 'user-company'
@@ -91,7 +117,9 @@ export const projectManagementApi = {
   
   // Get projects
   getProjects: async (filters?: { name?: string, status?: string }) => {
+    const headers = await getAuthHeaders();
     const { data } = await supabase.functions.invoke('project-management', {
+      headers,
       body: {
         method: 'GET',
         endpoint: 'projects',
@@ -109,8 +137,10 @@ export const projectManagementApi = {
     initial_date: string,
     end_date?: string | null
   }) => {
+    const headers = await getAuthHeaders();
     const { data } = await supabase.functions.invoke('project-management', {
       method: 'POST',
+      headers,
       body: {
         method: 'POST',
         endpoint: 'projects',
@@ -122,7 +152,9 @@ export const projectManagementApi = {
   
   // Get single project
   getProject: async (id: string) => {
+    const headers = await getAuthHeaders();
     const { data } = await supabase.functions.invoke('project-management', {
+      headers,
       body: {
         method: 'GET',
         endpoint: `projects/${id}`
@@ -137,8 +169,10 @@ export const projectManagementApi = {
     status?: 'active' | 'inactive',
     end_date?: string | null
   }) => {
+    const headers = await getAuthHeaders();
     const { data } = await supabase.functions.invoke('project-management', {
       method: 'PUT',
+      headers,
       body: {
         method: 'PUT',
         endpoint: id,

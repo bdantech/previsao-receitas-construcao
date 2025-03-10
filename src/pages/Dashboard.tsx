@@ -8,19 +8,28 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 
 // Placeholder dashboard for company users
 const Dashboard = () => {
-  const { session, userRole, isLoading, signOut } = useAuth();
+  const { session, userRole, isLoading } = useAuth();
   const [companies, setCompanies] = useState<any[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [companyName, setCompanyName] = useState<string>("");
 
   useEffect(() => {
     const fetchCompanyData = async () => {
-      if (session) {
+      if (session?.access_token) {
         try {
           setLoadingCompanies(true);
-          const { data, error } = await supabase.functions.invoke('company-data');
+          const { data, error } = await supabase.functions.invoke('company-data', {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`
+            }
+          });
           
-          if (error) throw error;
+          if (error) {
+            console.error("Error invoking company-data function:", error);
+            throw error;
+          }
+          
+          console.log("Company data response:", data);
           setCompanies(data.companies || []);
           
           // Set company name if available

@@ -10,6 +10,7 @@ type AuthContextType = {
   isLoading: boolean;
   signOut: () => Promise<void>;
   setDirectAuth: (session: Session, role: string) => void;
+  getAuthHeader: () => Record<string, string>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   signOut: async () => {},
   setDirectAuth: () => {},
+  getAuthHeader: () => ({}),
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -26,6 +28,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Function to get auth header for API requests
+  const getAuthHeader = () => {
+    if (session?.access_token) {
+      return {
+        Authorization: `Bearer ${session.access_token}`
+      };
+    }
+    return {};
+  };
 
   // Function to directly set authentication state from login response
   const setDirectAuth = (newSession: Session, role: string) => {
@@ -129,6 +141,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isLoading,
     signOut,
     setDirectAuth,
+    getAuthHeader,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

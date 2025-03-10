@@ -18,13 +18,11 @@ serve(async (req) => {
     // Obter URL da Supabase e chave anônima das variáveis de ambiente
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('As variáveis de ambiente SUPABASE_URL e SUPABASE_ANON_KEY são obrigatórias')
+    if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
+      throw new Error('Missing environment variables')
     }
-
-    // Inicializar cliente do Supabase
-    const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Obter o token de autorização do cabeçalho
     const authHeader = req.headers.get('Authorization')
@@ -54,7 +52,11 @@ serve(async (req) => {
     // Autenticação e informações do usuário
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     
-    if (authError) throw authError
+    if (authError) {
+      console.error('Auth error:', authError)
+      throw authError
+    }
+    
     if (!user) {
       return new Response(
         JSON.stringify({ error: 'Autenticação necessária' }),
@@ -65,6 +67,8 @@ serve(async (req) => {
       )
     }
 
+    console.log('User authenticated:', user.id)
+
     // Verificar o papel do usuário
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
@@ -72,7 +76,12 @@ serve(async (req) => {
       .eq('id', user.id)
       .single()
 
-    if (profileError) throw profileError
+    if (profileError) {
+      console.error('Profile error:', profileError)
+      throw profileError
+    }
+
+    console.log('User role:', profile.role)
 
     // Se o usuário for administrador, retornar todas as empresas
     if (profile.role === 'admin') {
@@ -81,7 +90,10 @@ serve(async (req) => {
         .select('*')
         .order('name')
 
-      if (companiesError) throw companiesError
+      if (companiesError) {
+        console.error('Companies error:', companiesError)
+        throw companiesError
+      }
 
       return new Response(
         JSON.stringify({ companies }),
@@ -98,7 +110,12 @@ serve(async (req) => {
         .select('company_id')
         .eq('user_id', user.id)
 
-      if (relationError) throw relationError
+      if (relationError) {
+        console.error('User companies error:', relationError)
+        throw relationError
+      }
+
+      console.log('User companies:', userCompanies)
 
       const companyIds = userCompanies.map(uc => uc.company_id)
       
@@ -118,7 +135,10 @@ serve(async (req) => {
         .in('id', companyIds)
         .order('name')
 
-      if (companiesError) throw companiesError
+      if (companiesError) {
+        console.error('Companies error:', companiesError)
+        throw companiesError
+      }
 
       return new Response(
         JSON.stringify({ companies }),

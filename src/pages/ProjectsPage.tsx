@@ -17,27 +17,32 @@ const ProjectsPage = () => {
   
   useEffect(() => {
     const fetchProjects = async () => {
-      try {
-        setIsLoading2(true);
-        
-        const response = await supabase.functions.invoke('project-management', {
-          body: {
-            method: 'GET',
-            endpoint: 'projects'
+      if (session?.access_token) {
+        try {
+          setIsLoading2(true);
+          
+          const { data, error } = await supabase.functions.invoke('project-management', {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`
+            },
+            body: {
+              method: 'GET',
+              endpoint: 'projects'
+            }
+          });
+          
+          if (error) {
+            console.error('Error fetching projects:', error);
+            return;
           }
-        });
-        
-        if (response.error) {
-          console.error('Error fetching projects:', response.error);
-          return;
+          
+          console.log('Projects response:', data);
+          setProjects(data.projects || []);
+        } catch (error) {
+          console.error('Error fetching projects:', error);
+        } finally {
+          setIsLoading2(false);
         }
-        
-        console.log('Projects response:', response);
-        setProjects(response.data.projects || []);
-      } catch (error) {
-        console.error('Error fetching projects:', error);
-      } finally {
-        setIsLoading2(false);
       }
     };
     

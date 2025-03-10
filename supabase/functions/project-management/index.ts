@@ -2,57 +2,31 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
-// CORS configuration
+// Configuração CORS para permitir chamadas do frontend
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
 }
 
 serve(async (req) => {
-  // Handle preflight requests
+  // Tratamento para requisições OPTIONS (preflight CORS)
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Get Supabase environment variables
+    // Obter URL da Supabase e chave anônima das variáveis de ambiente
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase environment variables')
+    if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
+      throw new Error('Missing environment variables')
     }
 
-    // Extract the request path and method
-    const url = new URL(req.url)
-    const path = url.pathname.split('/').filter(Boolean)
-    
-    // The last segment of the path is the endpoint
-    const endpoint = path[path.length - 1]
-
-    // Initialize Supabase client with the user's token
+    // Obter o token de autorização do cabeçalho
     const authHeader = req.headers.get('Authorization')
-    const supabase = createClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        global: {
-          headers: authHeader ? { Authorization: authHeader } : {},
-        },
-      }
-    )
-
-    // Initialize admin Supabase client (only used when necessary)
-    const adminSupabase = supabaseServiceKey ? 
-      createClient(supabaseUrl, supabaseServiceKey) : 
-      null
-
-    // Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
+    if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
         { 
@@ -62,57 +36,76 @@ serve(async (req) => {
       )
     }
 
-    // Get user role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    // Parse request body
+    const requestData = await req.json()
+    const { method, endpoint, ...params } = requestData
 
-    if (profileError) {
+    console.log('Project management request:', method, endpoint, params)
+
+    // Usar o token para autenticar o cliente do Supabase
+    const supabaseClient = createClient(
+      supabaseUrl,
+      supabaseKey,
+      {
+        global: {
+          headers: {
+            Authorization: authHeader
+          },
+        },
+      }
+    )
+
+    // Service client for operations that need admin privileges
+    const serviceClient = createClient(
+      supabaseUrl,
+      supabaseServiceKey
+    )
+
+    // Autenticação e informações do usuário
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    
+    if (authError) {
+      console.error('Auth error:', authError)
+      throw authError
+    }
+    
+    if (!user) {
       return new Response(
-        JSON.stringify({ error: 'Could not verify user role' }),
+        JSON.stringify({ error: 'Authentication required' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400 
+          status: 401 
         }
       )
     }
 
-    const isAdmin = profile.role === 'admin'
+    console.log('User authenticated:', user.id)
 
-    // Handle GET request for user's company
-    if (req.method === 'GET' && endpoint === 'user-company') {
-      // Get the user's company
-      const { data: userCompany, error: companyError } = await supabase
+    // Get user company endpoint
+    if (endpoint === 'user-company') {
+      console.log('Fetching user company')
+      const { data: userCompany, error: userCompanyError } = await supabaseClient
         .from('user_companies')
         .select('company_id')
         .eq('user_id', user.id)
         .single()
-      
-      if (companyError) {
-        console.error('Error fetching user company:', companyError);
-        
-        // If not found, return 404
-        if (companyError.code === 'PGRST116') {
+
+      if (userCompanyError) {
+        if (userCompanyError.code === 'PGRST116') {
+          // No company found, not an error for this endpoint
           return new Response(
-            JSON.stringify({ error: 'User not associated with any company' }),
+            JSON.stringify({ companyId: null }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 404 
+              status: 200 
             }
           )
         }
-        
-        return new Response(
-          JSON.stringify({ error: companyError.message }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
-          }
-        )
+        console.error('User company error:', userCompanyError)
+        throw userCompanyError
       }
-      
+
+      console.log('User company found:', userCompany)
       return new Response(
         JSON.stringify({ companyId: userCompany.company_id }),
         { 
@@ -122,72 +115,59 @@ serve(async (req) => {
       )
     }
 
-    // Handle GET requests (list projects with filtering)
-    if (req.method === 'GET' && endpoint === 'projects') {
-      const queryParams = url.searchParams
-      const name = queryParams.get('name')
-      const status = queryParams.get('status')
-      
-      // Start building query
-      let query = supabase.from('projects')
-        .select('*, companies(name)')
-        .order('name')
+    // Get user profile to determine role
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError) {
+      console.error('Profile error:', profileError)
+      throw profileError
+    }
+
+    const isAdmin = profile.role === 'admin'
+    console.log('User role:', profile.role)
+
+    // Get projects endpoint
+    if (endpoint === 'projects' && method === 'GET') {
+      let query = supabaseClient
+        .from('projects')
+        .select('*')
       
       // Apply filters if provided
-      if (name) {
-        query = query.ilike('name', `%${name}%`)
+      if (params.name) {
+        query = query.ilike('name', `%${params.name}%`)
       }
       
-      if (status && (status === 'active' || status === 'inactive')) {
-        query = query.eq('status', status)
+      if (params.status) {
+        query = query.eq('status', params.status)
       }
       
-      // For non-admin users, only show projects from their companies
+      // If not admin, filter by user's company
       if (!isAdmin) {
-        // Get user's companies
-        const { data: userCompanies, error: relationError } = await supabase
+        const { data: userCompany, error: userCompanyError } = await supabaseClient
           .from('user_companies')
           .select('company_id')
           .eq('user_id', user.id)
-        
-        if (relationError) {
-          return new Response(
-            JSON.stringify({ error: 'Error fetching user companies' }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400 
-            }
-          )
+          .single()
+
+        if (userCompanyError) {
+          console.error('User company error:', userCompanyError)
+          throw userCompanyError
         }
         
-        if (userCompanies.length === 0) {
-          // No companies associated with the user
-          return new Response(
-            JSON.stringify({ projects: [] }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200 
-            }
-          )
-        }
-        
-        const companyIds = userCompanies.map(uc => uc.company_id)
-        query = query.in('company_id', companyIds)
+        query = query.eq('company_id', userCompany.company_id)
       }
       
-      // Execute the query
-      const { data: projects, error: projectsError } = await query
+      const { data: projects, error: projectsError } = await query.order('created_at', { ascending: false })
       
       if (projectsError) {
-        return new Response(
-          JSON.stringify({ error: projectsError.message }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
-          }
-        )
+        console.error('Projects error:', projectsError)
+        throw projectsError
       }
-      
+
       return new Response(
         JSON.stringify({ projects }),
         { 
@@ -197,16 +177,15 @@ serve(async (req) => {
       )
     }
     
-    // Handle POST requests (create project)
-    if (req.method === 'POST' && endpoint === 'projects') {
-      // Parse the request body
-      const requestData = await req.json()
-      const { name, cnpj, company_id, initial_date, end_date } = requestData
+    // Create project endpoint
+    if (endpoint === 'projects' && method === 'POST') {
+      console.log('Creating project with data:', params)
       
-      // Validate required fields
+      const { name, cnpj, company_id, initial_date, end_date } = params
+      
       if (!name || !cnpj || !company_id || !initial_date) {
         return new Response(
-          JSON.stringify({ error: 'Missing required fields' }),
+          JSON.stringify({ error: 'Required fields: name, cnpj, company_id, initial_date' }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400 
@@ -214,18 +193,19 @@ serve(async (req) => {
         )
       }
       
-      // If not admin, verify user belongs to the company
+      // If not admin, verify user belongs to company
       if (!isAdmin) {
-        const { data: userCompany, error: relationError } = await supabase
+        const { data: userCompany, error: userCompanyError } = await supabaseClient
           .from('user_companies')
-          .select('*')
+          .select('company_id')
           .eq('user_id', user.id)
           .eq('company_id', company_id)
-          .maybeSingle()
-        
-        if (relationError || !userCompany) {
+          .single()
+
+        if (userCompanyError) {
+          console.error('User company verification error:', userCompanyError)
           return new Response(
-            JSON.stringify({ error: 'You do not have permission to create projects for this company' }),
+            JSON.stringify({ error: 'You can only create projects for your company' }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 403 
@@ -234,59 +214,25 @@ serve(async (req) => {
         }
       }
       
-      // Check if a project with this CNPJ already exists
-      const { data: existingProject, error: checkError } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('cnpj', cnpj)
-        .maybeSingle()
-      
-      if (checkError) {
-        return new Response(
-          JSON.stringify({ error: 'Error checking for existing project' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500 
-          }
-        )
-      }
-      
-      if (existingProject) {
-        return new Response(
-          JSON.stringify({ error: 'A project with this CNPJ already exists' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
-          }
-        )
-      }
-      
-      // Create the new project
-      const { data: newProject, error: createError } = await supabase
+      const { data: project, error: projectError } = await supabaseClient
         .from('projects')
         .insert({
           name,
           cnpj,
           company_id,
           initial_date,
-          end_date: end_date || null,
-          status: 'active' // Default status
+          end_date: end_date || null
         })
         .select()
         .single()
       
-      if (createError) {
-        return new Response(
-          JSON.stringify({ error: createError.message }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
-          }
-        )
+      if (projectError) {
+        console.error('Project creation error:', projectError)
+        throw projectError
       }
-      
+
       return new Response(
-        JSON.stringify({ project: newProject }),
+        JSON.stringify({ project }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 201 
@@ -294,138 +240,47 @@ serve(async (req) => {
       )
     }
     
-    // Handle PUT requests (update project)
-    if (req.method === 'PUT' && path.length > 1) {
-      const projectId = path[path.length - 1]
+    // Get single project endpoint
+    if (endpoint && endpoint.startsWith('projects/') && method === 'GET') {
+      const projectId = endpoint.split('/')[1]
       
-      // Get the project to update
-      const { data: existingProject, error: getError } = await supabase
+      let query = supabaseClient
         .from('projects')
         .select('*')
         .eq('id', projectId)
-        .maybeSingle()
       
-      if (getError || !existingProject) {
-        return new Response(
-          JSON.stringify({ error: 'Project not found' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 404 
-          }
-        )
+      // If not admin, verify user has access to this project
+      if (!isAdmin) {
+        const { data: userCompany, error: userCompanyError } = await supabaseClient
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single()
+
+        if (userCompanyError) {
+          console.error('User company error:', userCompanyError)
+          throw userCompanyError
+        }
+        
+        query = query.eq('company_id', userCompany.company_id)
       }
       
-      // If not admin, verify user belongs to the project's company
-      if (!isAdmin) {
-        const { data: userCompany, error: relationError } = await supabase
-          .from('user_companies')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('company_id', existingProject.company_id)
-          .maybeSingle()
-        
-        if (relationError || !userCompany) {
+      const { data: project, error: projectError } = await query.single()
+      
+      if (projectError) {
+        console.error('Project fetch error:', projectError)
+        if (projectError.code === 'PGRST116') {
           return new Response(
-            JSON.stringify({ error: 'You do not have permission to update this project' }),
+            JSON.stringify({ error: 'Project not found or you lack access' }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 403 
+              status: 404 
             }
           )
         }
+        throw projectError
       }
-      
-      // Parse request body
-      const requestData = await req.json()
-      
-      // Create an update object
-      const updateData: any = {}
-      
-      // For company users, only allow updating status, name, and end_date
-      if (!isAdmin) {
-        if ('name' in requestData) updateData.name = requestData.name
-        if ('status' in requestData && 
-            (requestData.status === 'active' || requestData.status === 'inactive')) {
-          updateData.status = requestData.status
-        }
-        if ('end_date' in requestData) updateData.end_date = requestData.end_date
-      } else {
-        // Admins can update any field except CNPJ
-        Object.keys(requestData).forEach(key => {
-          if (key !== 'cnpj' && key !== 'id') { // Never allow changing CNPJ or ID
-            updateData[key] = requestData[key]
-          }
-        })
-      }
-      
-      // Update the project
-      const { data: updatedProject, error: updateError } = await supabase
-        .from('projects')
-        .update(updateData)
-        .eq('id', projectId)
-        .select()
-        .single()
-      
-      if (updateError) {
-        return new Response(
-          JSON.stringify({ error: updateError.message }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
-          }
-        )
-      }
-      
-      return new Response(
-        JSON.stringify({ project: updatedProject }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      )
-    }
-    
-    // Handle GET single project
-    if (req.method === 'GET' && path.length > 1) {
-      const projectId = path[path.length - 1]
-      
-      // Get the project
-      const { data: project, error: getError } = await supabase
-        .from('projects')
-        .select('*, companies(name)')
-        .eq('id', projectId)
-        .single()
-      
-      if (getError) {
-        return new Response(
-          JSON.stringify({ error: 'Project not found' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 404 
-          }
-        )
-      }
-      
-      // For non-admin users, verify they belong to the project's company
-      if (!isAdmin) {
-        const { data: userCompany, error: relationError } = await supabase
-          .from('user_companies')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('company_id', project.company_id)
-          .maybeSingle()
-        
-        if (relationError || !userCompany) {
-          return new Response(
-            JSON.stringify({ error: 'You do not have permission to view this project' }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 403 
-            }
-          )
-        }
-      }
-      
+
       return new Response(
         JSON.stringify({ project }),
         { 
@@ -435,7 +290,65 @@ serve(async (req) => {
       )
     }
     
-    // If we get here, the endpoint was not found
+    // Update project endpoint
+    if (endpoint && method === 'PUT') {
+      const projectId = endpoint
+      
+      const { name, status, end_date } = params
+      const updates = {}
+      
+      if (name !== undefined) updates.name = name
+      if (status !== undefined) updates.status = status
+      if (end_date !== undefined) updates.end_date = end_date
+      
+      let query = supabaseClient
+        .from('projects')
+        .update(updates)
+        .eq('id', projectId)
+      
+      // If not admin, verify user has access to this project
+      if (!isAdmin) {
+        const { data: userCompany, error: userCompanyError } = await supabaseClient
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single()
+
+        if (userCompanyError) {
+          console.error('User company error:', userCompanyError)
+          throw userCompanyError
+        }
+        
+        query = query.eq('company_id', userCompany.company_id)
+      }
+      
+      const { data: project, error: projectError } = await query
+        .select()
+        .single()
+      
+      if (projectError) {
+        console.error('Project update error:', projectError)
+        if (projectError.code === 'PGRST116') {
+          return new Response(
+            JSON.stringify({ error: 'Project not found or you lack access' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 404 
+            }
+          )
+        }
+        throw projectError
+      }
+
+      return new Response(
+        JSON.stringify({ project }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
+    }
+    
     return new Response(
       JSON.stringify({ error: 'Endpoint not found' }),
       { 
@@ -443,9 +356,9 @@ serve(async (req) => {
         status: 404 
       }
     )
-    
+
   } catch (error) {
-    console.error('Error in project-management function:', error)
+    console.error("Error in project-management function:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

@@ -29,13 +29,16 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
   // Fetch the user's company ID when the dialog opens
   useEffect(() => {
     const fetchUserCompany = async () => {
-      if (!session?.user) return;
+      if (!session?.access_token) return;
       
       try {
         setFetchingCompany(true);
         
-        // Use the functions API instead of direct database access
+        // Use the functions API with authentication token
         const { data, error } = await supabase.functions.invoke('project-management', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
           body: {
             method: 'GET',
             endpoint: 'user-company'
@@ -106,7 +109,19 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
     try {
       setIsLoading(true);
       
+      if (!session?.access_token) {
+        toast({
+          title: "Sessão expirada",
+          description: "Sua sessão expirou. Por favor, faça login novamente.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const response = await supabase.functions.invoke('project-management', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
         body: {
           method: 'POST',
           endpoint: 'projects',
@@ -221,7 +236,7 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading || fetchingCompany}>
+            <Button type="submit" disabled={isLoading || fetchingCompany || !companyId}>
               {isLoading ? (
                 <>
                   <Loader className="mr-2 h-4 w-4 animate-spin" />
