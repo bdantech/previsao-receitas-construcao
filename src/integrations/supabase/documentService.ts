@@ -44,7 +44,9 @@ export type DocumentFilter = {
 
 // Generate the URL for the document management edge function
 const getDocumentManagementUrl = (endpoint: string, params?: Record<string, string>) => {
-  const url = new URL(`${supabase.functions.url}/document-management/${endpoint}`);
+  // Correctly build the URL for the edge function
+  const baseUrl = `${import.meta.env.VITE_SUPABASE_URL || 'https://hshfqxjrilqzjpkcotgz.supabase.co'}/functions/v1/document-management/${endpoint}`;
+  const url = new URL(baseUrl);
   
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
