@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Building, Settings, FolderKanban } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building, Settings, FolderKanban, LayoutDashboard } from "lucide-react";
 
 interface SidebarItemProps {
   icon: React.ElementType;
@@ -46,6 +46,11 @@ export const Sidebar = () => {
   };
 
   const sidebarItems = [
+    {
+      icon: LayoutDashboard,
+      label: "Dashboard",
+      href: "/dashboard"
+    },
     {
       icon: FolderKanban,
       label: "Projetos",
@@ -102,7 +107,7 @@ export const Sidebar = () => {
               label={item.label} 
               href={item.href}
               isCollapsed={isCollapsed}
-              isActive={location.pathname.startsWith(item.href)}
+              isActive={location.pathname === item.href}
             />
           ))}
         </nav>

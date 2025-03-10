@@ -11,15 +11,22 @@ const Dashboard = () => {
   const { session, userRole, isLoading, signOut } = useAuth();
   const [companies, setCompanies] = useState<any[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [companyName, setCompanyName] = useState<string>("");
 
   useEffect(() => {
     const fetchCompanyData = async () => {
       if (session) {
         try {
+          setLoadingCompanies(true);
           const { data, error } = await supabase.functions.invoke('company-data');
           
           if (error) throw error;
           setCompanies(data.companies || []);
+          
+          // Set company name if available
+          if (data.companies && data.companies.length > 0) {
+            setCompanyName(data.companies[0].name || "");
+          }
         } catch (error) {
           console.error("Error fetching company data:", error);
         } finally {
@@ -51,6 +58,15 @@ const Dashboard = () => {
   return (
     <DashboardLayout>
       <div className="p-6">
+        {companyName && (
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-800">
+              {companyName}
+            </h1>
+            <p className="text-gray-500 mt-1">Dashboard</p>
+          </div>
+        )}
+        
         <h2 className="text-xl font-semibold mb-4">Seus dados de empresa</h2>
         
         {loadingCompanies ? (
