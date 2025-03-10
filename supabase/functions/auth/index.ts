@@ -173,7 +173,7 @@ serve(async (req) => {
           )
         }
 
-        // 4. Criar documentos iniciais para a empresa manualmente, em vez de usar o trigger
+        // 4. Criar documentos iniciais para a empresa manualmente, sem definir o submitted_by
         console.log('Creating initial documents for company')
         const { data: docTypes, error: docTypesError } = await adminSupabase
           .from('document_types')
@@ -184,24 +184,33 @@ serve(async (req) => {
           console.error('Error fetching document types:', docTypesError)
           // Continue anyway, this is not a critical error
         } else if (docTypes && docTypes.length > 0) {
-          // Insert a document record for each document type
-          const documentInserts = docTypes.map(docType => ({
-            document_type_id: docType.id,
-            resource_type: 'company',
-            resource_id: companyResult.id,
-            status: 'sent',
-            file_path: '',
-            file_name: `Pending Upload - ${docType.name}`,
-            submitted_by: userId  // Use the newly created user's ID
-          }))
+          // Insert a document record for each document type with status "not_sent"
+          try {
+            // Insert a document record for each document type
+            const documentInserts = docTypes.map(docType => ({
+              document_type_id: docType.id,
+              resource_type: 'company',
+              resource_id: companyResult.id,
+              status: 'needs_revision', // Changed from 'sent' to 'needs_revision'
+              file_path: '',
+              file_name: `Pending Upload - ${docType.name}`
+              // No submitted_by field to avoid errors with required fields
+            }))
 
-          const { error: docsError } = await adminSupabase
-            .from('documents')
-            .insert(documentInserts)
+            const { error: docsError } = await adminSupabase
+              .from('documents')
+              .insert(documentInserts)
 
-          if (docsError) {
-            console.error('Error creating initial documents:', docsError)
-            // Continue anyway, this is not a critical error as the company is created
+            if (docsError) {
+              console.error('Error creating initial documents:', docsError)
+              console.error('Error details:', JSON.stringify(docsError))
+              // Continue anyway, this is not a critical error as the company is created
+            } else {
+              console.log('Initial documents created successfully')
+            }
+          } catch (docError) {
+            console.error('Exception creating documents:', docError)
+            // Continue anyway, don't fail registration
           }
         }
 
