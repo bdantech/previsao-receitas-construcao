@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -138,6 +139,7 @@ serve(async (req) => {
       )
     }
     else if (action === 'getDocuments') {
+      // Define base query
       let query = supabaseClient
         .from('documents')
         .select(`
