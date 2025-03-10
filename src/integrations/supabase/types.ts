@@ -13,6 +13,7 @@ export type Database = {
         Row: {
           cnpj: string
           created_at: string
+          documents_status: string
           id: string
           name: string
           updated_at: string
@@ -21,6 +22,7 @@ export type Database = {
         Insert: {
           cnpj: string
           created_at?: string
+          documents_status?: string
           id?: string
           name: string
           updated_at?: string
@@ -29,6 +31,7 @@ export type Database = {
         Update: {
           cnpj?: string
           created_at?: string
+          documents_status?: string
           id?: string
           name?: string
           updated_at?: string
