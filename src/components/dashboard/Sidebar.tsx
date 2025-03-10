@@ -72,9 +72,14 @@ export const Sidebar = () => {
     >
       {/* Logo Area */}
       <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
-        {!isCollapsed && (
-          <div className="font-bold text-xl text-sidebar-primary-foreground">
-            ONE pay
+        {!isCollapsed ? (
+          <div className="flex items-center space-x-1">
+            <span className="font-bold text-2xl text-gray-500">ONE</span>
+            <span className="font-bold text-2xl text-green-500">PAY</span>
+          </div>
+        ) : (
+          <div className="w-full flex justify-center">
+            <span className="font-bold text-xl text-green-500">OP</span>
           </div>
         )}
         <Button 
