@@ -75,3 +75,61 @@ export const documentManagementApi = {
     return data;
   }
 };
+
+// Project management API utilities
+export const projectManagementApi = {
+  // Get projects
+  getProjects: async (filters?: { name?: string, status?: string }) => {
+    const { data } = await supabase.functions.invoke('project-management', {
+      body: {
+        endpoint: 'projects',
+        ...filters
+      }
+    });
+    return data?.projects || [];
+  },
+  
+  // Create project
+  createProject: async (project: {
+    name: string,
+    cnpj: string,
+    company_id: string,
+    initial_date: string,
+    end_date?: string | null
+  }) => {
+    const { data } = await supabase.functions.invoke('project-management', {
+      method: 'POST',
+      body: {
+        endpoint: 'projects',
+        ...project
+      }
+    });
+    return data?.project;
+  },
+  
+  // Get single project
+  getProject: async (id: string) => {
+    const { data } = await supabase.functions.invoke('project-management', {
+      body: {
+        endpoint: `projects/${id}`
+      }
+    });
+    return data?.project;
+  },
+  
+  // Update project
+  updateProject: async (id: string, updates: {
+    name?: string,
+    status?: 'active' | 'inactive',
+    end_date?: string | null
+  }) => {
+    const { data } = await supabase.functions.invoke('project-management', {
+      method: 'PUT',
+      body: {
+        endpoint: id,
+        ...updates
+      }
+    });
+    return data?.project;
+  }
+};
