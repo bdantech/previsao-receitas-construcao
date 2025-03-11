@@ -26,6 +26,7 @@ serve(async (req) => {
     // Get authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      console.error('No Authorization header provided')
       return new Response(
         JSON.stringify({ error: 'Authorization not provided' }),
         { 
@@ -34,6 +35,7 @@ serve(async (req) => {
         }
       )
     }
+    console.log('Authorization header received:', authHeader.substring(0, 20) + '...')
 
     // Initialize authenticated Supabase client with user's token
     const supabaseClient = createClient(
@@ -52,6 +54,7 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     
     if (authError || !user) {
+      console.error('Auth error:', authError)
       return new Response(
         JSON.stringify({ error: authError?.message || 'Authentication required' }),
         { 
@@ -60,6 +63,7 @@ serve(async (req) => {
         }
       )
     }
+    console.log('User authenticated:', user.id)
 
     // Get user profile to determine role
     const { data: profile, error: profileError } = await supabaseClient

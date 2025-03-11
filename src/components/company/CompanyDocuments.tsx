@@ -12,7 +12,8 @@ interface DocumentType {
   required?: boolean;
 }
 
-interface Document {
+// Rename Document to CompanyDocument to avoid conflict with the global Document interface
+interface CompanyDocument {
   id: string;
   document_type: DocumentType;
   status: "not_sent" | "sent" | "approved" | "needs_revision";
@@ -30,7 +31,7 @@ interface CompanyDocumentsProps {
 }
 
 export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId }) => {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<CompanyDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
 
@@ -38,7 +39,9 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
   const fetchDocuments = async () => {
     try {
       setLoading(true);
+      console.log("Fetching documents for company:", companyId);
       const docs = await documentManagementApi.getCompanyDocuments(companyId);
+      console.log("Retrieved documents:", docs);
       setDocuments(docs);
     } catch (error) {
       console.error("Error fetching documents:", error);
@@ -108,8 +111,8 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
     }
   };
 
-  // Download document
-  const downloadDocument = async (doc: Document) => {
+  // Download document - Fixed to use window.document instead of Document interface
+  const downloadDocument = async (doc: CompanyDocument) => {
     try {
       if (!doc.file_path) {
         toast({
@@ -126,7 +129,7 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
       
       if (error) throw error;
       
-      // Create a download link
+      // Create a download link - Use window.document to avoid type conflict
       const url = URL.createObjectURL(data);
       const a = window.document.createElement('a');
       a.href = url;
@@ -146,7 +149,7 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
   };
 
   // Get status badge based on document status
-  const getStatusBadge = (status: Document['status']) => {
+  const getStatusBadge = (status: CompanyDocument['status']) => {
     switch (status) {
       case 'approved':
         return <span className="inline-flex items-center gap-1 text-green-700 bg-green-100 px-2 py-1 rounded text-xs"><CheckCircle className="h-3 w-3" /> Aprovado</span>;
