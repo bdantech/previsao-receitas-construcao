@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -261,17 +260,21 @@ serve(async (req) => {
           .select('buyer_status')
           .eq('project_id', projectId)
           .eq('cpf', buyerCpf)
-          .single()
+          .maybeSingle()
         
         if (buyerError) {
           console.error('Buyer verification error:', buyerError)
-          return new Response(
-          JSON.stringify({ error: 'Buyer not found in project' }),
-          { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400 
-            }
-          )
+          throw buyerError
+        }
+
+        // Determine initial status based on buyer status
+        let initialStatus = 'enviado'
+        if (buyerData) {
+          if (buyerData.buyer_status === 'aprovado') {
+            initialStatus = 'elegivel_para_antecipacao'
+          } else if (buyerData.buyer_status === 'reprovado') {
+            initialStatus = 'reprovado'
+          }
         }
 
         // Create the receivable
@@ -283,7 +286,7 @@ serve(async (req) => {
             amount,
             due_date: dueDate,
             description,
-            status: buyerData.buyer_status === 'aprovado' ? 'elegivel_para_antecipacao' : 'enviado',
+            status: initialStatus,
             created_by: user.id
           })
           .select()
