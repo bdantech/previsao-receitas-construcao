@@ -7,6 +7,7 @@ import { projectManagementApi } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader } from "lucide-react";
 
 export function ProjectDashboardPage() {
   const { projectId } = useParams();
@@ -14,7 +15,7 @@ export function ProjectDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { session } = useAuth();
+  const { session, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -29,7 +30,13 @@ export function ProjectDashboardPage() {
 
       try {
         setIsLoading(true);
-        console.log(`Fetching project with ID: ${projectId}`);
+        console.log(`Fetching project with ID: ${projectId}, session exists: ${!!session}`);
+        
+        if (!session) {
+          console.log("No active session, cannot fetch project");
+          return;
+        }
+        
         const fetchedProject = await projectManagementApi.getProject(projectId);
         console.log("Project data received:", fetchedProject);
         
@@ -55,14 +62,17 @@ export function ProjectDashboardPage() {
       }
     };
 
-    if (session) {
+    // Only fetch project when we have a valid session and we're not in auth loading state
+    if (session && !authLoading) {
+      console.log("Session available, fetching project data");
       fetchProject();
-    } else {
-      console.log("No session available, waiting for authentication");
+    } else if (!authLoading) {
+      console.log("No session available, cannot fetch project");
+      navigate("/auth", { replace: true });
     }
-  }, [projectId, toast, session]);
+  }, [projectId, toast, session, authLoading, navigate]);
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="container mx-auto py-6">
         <div className="flex justify-between items-center mb-6">
@@ -91,6 +101,9 @@ export function ProjectDashboardPage() {
       <div className="container mx-auto py-6 text-center">
         <h1 className="text-2xl font-bold mb-4">Projeto não encontrado</h1>
         <p className="mb-6">O projeto que você está tentando acessar não existe ou você não tem permissão para visualizá-lo.</p>
+        <pre className="bg-gray-100 p-4 mb-6 text-left overflow-auto max-w-xl mx-auto text-xs">
+          Project ID: {projectId}
+        </pre>
         <Button onClick={() => navigate("/projects")}>
           Voltar para Lista de Projetos
         </Button>

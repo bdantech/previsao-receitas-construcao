@@ -5,51 +5,47 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Loader, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { projectManagementApi } from "@/integrations/supabase/client";
 import { ProjectsList } from "@/components/projects/ProjectsList";
 import { ProjectDialog } from "@/components/projects/ProjectDialog";
+import { useToast } from "@/hooks/use-toast";
 
 const ProjectsPage = () => {
   const { session, userRole, isLoading } = useAuth();
   const [isLoading2, setIsLoading2] = useState(true);
   const [projects, setProjects] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast();
   
   useEffect(() => {
     const fetchProjects = async () => {
-      if (session?.access_token) {
-        try {
-          setIsLoading2(true);
-          
-          const { data, error } = await supabase.functions.invoke('project-management', {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`
-            },
-            body: {
-              method: 'GET',
-              endpoint: 'projects'
-            }
-          });
-          
-          if (error) {
-            console.error('Error fetching projects:', error);
-            return;
-          }
-          
-          console.log('Projects response:', data);
-          setProjects(data.projects || []);
-        } catch (error) {
-          console.error('Error fetching projects:', error);
-        } finally {
-          setIsLoading2(false);
-        }
+      if (!session) {
+        console.log("No session available, cannot fetch projects");
+        return;
+      }
+      
+      try {
+        setIsLoading2(true);
+        console.log("Fetching projects...");
+        const fetchedProjects = await projectManagementApi.getProjects();
+        console.log('Projects retrieved:', fetchedProjects);
+        setProjects(fetchedProjects || []);
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        toast({
+          title: "Erro",
+          description: error.message || "Falha ao carregar os projetos.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading2(false);
       }
     };
     
-    if (session) {
+    if (session && !isLoading) {
       fetchProjects();
     }
-  }, [session]);
+  }, [session, isLoading, toast]);
   
   const handleProjectCreated = (newProject) => {
     console.log('New project created:', newProject);
