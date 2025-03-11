@@ -174,7 +174,9 @@ const ProjectDashboardPage = () => {
       const receivablesData = await supabase.functions.invoke('project-receivables', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
-          method: 'GET',
+        },
+        body: {
+          action: 'list',
           projectId: projectId
         }
       });
