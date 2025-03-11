@@ -173,10 +173,11 @@ const ProjectDashboardPage = () => {
       console.log('Fetching receivables for project:', projectId);
       const receivablesData = await supabase.functions.invoke('project-receivables', {
         headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: {
-          action: 'list',
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          method: 'GET',
+          endpoint: 'project-receivables',
           projectId: projectId
         }
       });
