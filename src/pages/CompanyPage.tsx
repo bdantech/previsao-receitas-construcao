@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -148,20 +147,22 @@ const CompanyPage = () => {
   
   return (
     <DashboardLayout>
-      <div className="p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Minha Empresa</h1>
-          <p className="text-gray-500 mt-1">Gerencie os dados da sua empresa</p>
-        </div>
-        
+      <div className="space-y-8 p-6">
         {loading ? (
-          <div className="flex justify-center my-10">
+          <div className="flex justify-center">
             <Loader className="h-8 w-8 animate-spin text-gray-500" />
           </div>
         ) : company ? (
-          <div>
-            <div className="bg-white shadow rounded-lg p-6 max-w-2xl">
-              <form onSubmit={handleSubmit} className="space-y-6">
+          <>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 mb-1">
+                {company.name}
+              </h1>
+              <p className="text-gray-500">CNPJ: {company.cnpj}</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid gap-4 max-w-xl">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome da Empresa</Label>
                   <Input
@@ -169,58 +170,45 @@ const CompanyPage = () => {
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    placeholder="Nome da empresa"
                     required
                   />
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="cnpj">CNPJ</Label>
-                  <Input
-                    id="cnpj"
-                    value={company.cnpj}
-                    readOnly
-                    className="bg-gray-50"
-                  />
-                  <p className="text-sm text-gray-500">O CNPJ não pode ser alterado</p>
-                </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="website">Website (opcional)</Label>
                   <Input
                     id="website"
                     name="website"
+                    type="url"
                     value={formData.website}
                     onChange={handleInputChange}
-                    placeholder="https://www.empresa.com.br"
+                    placeholder="https://www.exemplo.com.br"
                   />
                 </div>
-                
-                <Button 
-                  type="submit" 
-                  disabled={updating}
-                  className="w-full sm:w-auto"
-                >
-                  {updating ? (
-                    <>
-                      <Loader className="h-4 w-4 mr-2 animate-spin" />
-                      Atualizando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Salvar Alterações
-                    </>
-                  )}
-                </Button>
-              </form>
+              </div>
+
+              <Button type="submit" disabled={updating}>
+                {updating ? (
+                  <>
+                    <Loader className="h-4 w-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar Alterações
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-8">
+              {company.id && <CompanyDocuments companyId={company.id} />}
             </div>
-            
-            {company && <CompanyDocuments companyId={company.id} />}
-          </div>
+          </>
         ) : (
-          <div className="bg-white p-6 rounded-lg shadow-sm text-center">
-            <p className="text-gray-500">Nenhuma empresa encontrada.</p>
+          <div className="text-center py-8 text-gray-500">
+            Nenhuma empresa encontrada.
           </div>
         )}
       </div>

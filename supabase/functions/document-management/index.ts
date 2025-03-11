@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -139,61 +138,88 @@ serve(async (req) => {
       )
     }
     else if (action === 'getDocuments') {
-      // Define base query
-      let query = supabaseClient
-        .from('documents')
-        .select(`
-          *,
-          document_type:document_type_id(id, name, resource, description, required),
-          submitter:submitted_by(id, email),
-          reviewer:reviewed_by(id, email)
-        `)
+      try {
+        // Initialize service role client
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+        if (!supabaseServiceKey) {
+          throw new Error('Service role key not available')
+        }
+        const adminSupabase = createClient(supabaseUrl, supabaseServiceKey)
 
-      // Apply filter for company users - they can only see their company's documents
-      if (!isAdmin) {
-        // Get user's companies
-        const { data: userCompanies } = await supabaseClient
-          .from('user_companies')
-          .select('company_id')
-          .eq('user_id', user.id)
+        // Define base query
+        let query = adminSupabase
+          .from('documents')
+          .select(`
+            *,
+            document_type:document_type_id(id, name, resource, description, required),
+            submitter:submitted_by(id, email),
+            reviewer:reviewed_by(id, email)
+          `)
 
-        if (!userCompanies || userCompanies.length === 0) {
-          return new Response(
-            JSON.stringify({ documents: [] }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200 
-            }
-          )
+        // Apply filter for company users - they can only see their company's documents
+        if (!isAdmin) {
+          // Get user's companies
+          const { data: userCompanies, error: companiesError } = await adminSupabase
+            .from('user_companies')
+            .select('company_id')
+            .eq('user_id', user.id)
+
+          if (companiesError) {
+            console.error('Error fetching user companies:', companiesError)
+            throw new Error('Failed to fetch user companies')
+          }
+
+          if (!userCompanies || userCompanies.length === 0) {
+            return new Response(
+              JSON.stringify({ documents: [] }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200 
+              }
+            )
+          }
+
+          const companyIds = userCompanies.map(uc => uc.company_id)
+          query = query
+            .eq('resource_type', 'company')
+            .in('resource_id', companyIds)
         }
 
-        const companyIds = userCompanies.map(uc => uc.company_id)
-        query = query
-          .eq('resource_type', 'company')
-          .in('resource_id', companyIds)
-      }
-
-      // Apply additional filters if provided
-      const { filters } = requestData
-      if (filters) {
-        const { resourceType, resourceId, status } = filters
-        if (resourceType) query = query.eq('resource_type', resourceType)
-        if (resourceId) query = query.eq('resource_id', resourceId)
-        if (status) query = query.eq('status', status)
-      }
-
-      // Execute the query
-      const { data, error } = await query.order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      return new Response(
-        JSON.stringify({ documents: data }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
+        // Apply additional filters if provided
+        const { filters } = requestData
+        if (filters) {
+          const { resourceType, resourceId, status } = filters
+          if (resourceType) query = query.eq('resource_type', resourceType)
+          if (resourceId) query = query.eq('resource_id', resourceId)
+          if (status) query = query.eq('status', status)
         }
-      )
+
+        // Execute the query
+        const { data: documents, error: documentsError } = await query.order('created_at', { ascending: false })
+
+        if (documentsError) {
+          console.error('Error fetching documents:', documentsError)
+          throw new Error('Failed to fetch documents')
+        }
+
+        console.log(`Found ${documents?.length || 0} documents`)
+        return new Response(
+          JSON.stringify({ documents }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        )
+      } catch (error) {
+        console.error('Error in getDocuments:', error)
+        return new Response(
+          JSON.stringify({ error: error.message || 'Failed to fetch documents' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        )
+      }
     }
     else if (action === 'updateDocumentStatus' && req.method === 'PUT') {
       const { update } = requestData
