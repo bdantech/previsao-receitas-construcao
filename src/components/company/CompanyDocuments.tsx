@@ -1,18 +1,22 @@
 
-import { useState, useEffect } from "react";
-import { documentManagementApi } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 import { Loader } from "lucide-react";
 import { DocumentList } from "./DocumentList";
 import { useCompanyDocuments } from "@/hooks/useCompanyDocuments";
-import { CompanyDocument } from "@/types/document";
 
 interface CompanyDocumentsProps {
   companyId: string;
 }
 
 export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId }) => {
-  const { documents, loading, uploading, handleFileUpload, downloadDocument, fetchDocuments } = 
-    useCompanyDocuments(companyId);
+  const { 
+    documents, 
+    loading, 
+    uploading, 
+    handleFileUpload, 
+    downloadDocument, 
+    fetchDocuments 
+  } = useCompanyDocuments(companyId);
 
   useEffect(() => {
     if (companyId) {
@@ -30,7 +34,13 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
         </div>
       ) : documents.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          Nenhum documento encontrado.
+          <p>Nenhum documento encontrado.</p>
+          <button 
+            onClick={fetchDocuments}
+            className="mt-2 text-blue-500 hover:text-blue-700 underline"
+          >
+            Tentar novamente
+          </button>
         </div>
       ) : (
         <DocumentList 

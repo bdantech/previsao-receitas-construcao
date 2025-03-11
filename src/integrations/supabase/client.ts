@@ -111,10 +111,16 @@ export const documentManagementApi = {
       console.log('Calling getCompanyDocuments for company ID:', companyId);
       
       // Get fresh auth session
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Error getting session:', sessionError);
+        throw sessionError;
+      }
       
       if (!sessionData?.session?.access_token) {
         console.error('No valid session found');
+        // Return empty documents array instead of throwing an error
         return [];
       }
       
@@ -124,6 +130,7 @@ export const documentManagementApi = {
       
       console.log('Using auth token:', sessionData.session.access_token.substring(0, 15) + '...');
       
+      // Call Edge function with proper headers
       const { data, error } = await supabase.functions.invoke('document-management', {
         headers,
         body: { 
@@ -142,16 +149,24 @@ export const documentManagementApi = {
 
       console.log('Documents response:', data);
       
-      // Handle documents with missing file paths
+      // Process documents and ensure they have consistent structure
       const documents = data?.documents || [];
       return documents.map(doc => ({
         ...doc,
         file_path: doc.file_path || '',
-        file_name: doc.file_name || `Document ${doc.id}`
+        file_name: doc.file_name || `Document ${doc.id}`,
+        document_type: {
+          id: doc.document_type?.id || '',
+          name: doc.document_type?.name || 'Unknown Document Type',
+          description: doc.document_type?.description || '',
+          required: doc.document_type?.required || false
+        },
+        status: doc.status || 'not_sent'
       }));
     } catch (error) {
       console.error('Exception in getCompanyDocuments:', error);
-      throw error;
+      // Return empty array instead of throwing to avoid breaking the UI
+      return [];
     }
   }
 };

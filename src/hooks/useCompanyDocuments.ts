@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { documentManagementApi, supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { CompanyDocument } from "@/types/document";
@@ -11,12 +11,38 @@ export const useCompanyDocuments = (companyId: string) => {
 
   // Fetch company documents
   const fetchDocuments = useCallback(async () => {
+    if (!companyId) {
+      console.log("No company ID provided");
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       console.log("Fetching documents for company:", companyId);
+      
+      // Ensure we have a fresh session
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        console.error("No valid session for document fetch");
+        toast({
+          title: "Sessão expirada",
+          description: "Por favor, faça login novamente",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+      
       const docs = await documentManagementApi.getCompanyDocuments(companyId);
       console.log("Retrieved documents:", docs);
-      setDocuments(docs);
+      
+      if (Array.isArray(docs)) {
+        setDocuments(docs);
+      } else {
+        console.error("Unexpected document format:", docs);
+        setDocuments([]);
+      }
     } catch (error) {
       console.error("Error fetching documents:", error);
       toast({
@@ -28,6 +54,13 @@ export const useCompanyDocuments = (companyId: string) => {
       setLoading(false);
     }
   }, [companyId]);
+
+  // Load documents on mount and when companyId changes
+  useEffect(() => {
+    if (companyId) {
+      fetchDocuments();
+    }
+  }, [companyId, fetchDocuments]);
 
   // Handle file upload
   const handleFileUpload = async (documentId: string, documentTypeId: string, event: React.ChangeEvent<HTMLInputElement>) => {

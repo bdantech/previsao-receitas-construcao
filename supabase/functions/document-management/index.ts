@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -73,6 +74,7 @@ serve(async (req) => {
       .single()
 
     if (profileError) {
+      console.error('Error getting profile:', profileError)
       return new Response(
         JSON.stringify({ error: 'Error retrieving user profile' }),
         { 
@@ -83,6 +85,7 @@ serve(async (req) => {
     }
 
     const isAdmin = profile.role === 'admin'
+    console.log('User role:', profile.role, 'Is admin:', isAdmin)
     
     // Parse request body to get action and parameters
     const requestData = await req.json()
@@ -171,6 +174,7 @@ serve(async (req) => {
             }
 
             if (!userCompanies || userCompanies.length === 0) {
+              console.log('User has no associated companies')
               return new Response(
                 JSON.stringify({ documents: [] }),
                 { 
@@ -181,6 +185,7 @@ serve(async (req) => {
             }
 
             const companyIds = userCompanies.map(uc => uc.company_id)
+            console.log('User belongs to companies:', companyIds)
             query = query
               .eq('resource_type', 'company')
               .in('resource_id', companyIds)
@@ -190,6 +195,7 @@ serve(async (req) => {
           const { filters } = requestData
           if (filters) {
             const { resourceType, resourceId, status } = filters
+            console.log('Applying filters:', filters)
             if (resourceType) query = query.eq('resource_type', resourceType)
             if (resourceId) query = query.eq('resource_id', resourceId)
             if (status) query = query.eq('status', status)
@@ -205,7 +211,7 @@ serve(async (req) => {
 
           console.log(`Found ${documents?.length || 0} documents`)
           return new Response(
-            JSON.stringify({ documents }),
+            JSON.stringify({ documents: documents || [] }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200 
@@ -213,7 +219,8 @@ serve(async (req) => {
           )
         }
 
-        // If service role is available, use it
+        // If service role is available, use it for more reliable queries
+        console.log('Using service role for document query')
         const adminSupabase = createClient(supabaseUrl, supabaseServiceKey)
 
         // Define base query
@@ -240,6 +247,7 @@ serve(async (req) => {
           }
 
           if (!userCompanies || userCompanies.length === 0) {
+            console.log('User has no associated companies (service role check)')
             return new Response(
               JSON.stringify({ documents: [] }),
               { 
@@ -250,6 +258,7 @@ serve(async (req) => {
           }
 
           const companyIds = userCompanies.map(uc => uc.company_id)
+          console.log('User belongs to companies (service role):', companyIds)
           query = query
             .eq('resource_type', 'company')
             .in('resource_id', companyIds)
@@ -259,6 +268,7 @@ serve(async (req) => {
         const { filters } = requestData
         if (filters) {
           const { resourceType, resourceId, status } = filters
+          console.log('Applying filters (service role):', filters)
           if (resourceType) query = query.eq('resource_type', resourceType)
           if (resourceId) query = query.eq('resource_id', resourceId)
           if (status) query = query.eq('status', status)
@@ -272,9 +282,9 @@ serve(async (req) => {
           throw new Error('Failed to fetch documents')
         }
 
-        console.log(`Found ${documents?.length || 0} documents`)
+        console.log(`Found ${documents?.length || 0} documents (service role)`)
         return new Response(
-          JSON.stringify({ documents }),
+          JSON.stringify({ documents: documents || [] }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200 
@@ -283,7 +293,7 @@ serve(async (req) => {
       } catch (error) {
         console.error('Error in getDocuments:', error)
         return new Response(
-          JSON.stringify({ error: error.message || 'Failed to fetch documents' }),
+          JSON.stringify({ error: error.message || 'Failed to fetch documents', documents: [] }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500 
