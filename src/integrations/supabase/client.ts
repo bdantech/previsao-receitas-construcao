@@ -521,15 +521,18 @@ export const projectBuyersApi = {
 export const receivablesApi = {
   getReceivables: async ({ projectId, status, buyerCpf }: { projectId?: string, status?: string, buyerCpf?: string } = {}) => {
     try {
-      console.log('Getting auth headers for receivables...');
+      console.log('Getting session for receivables...');
       const headers = await getAuthHeaders();
       
-      if (!headers.Authorization) {
-        console.error('No active session found');
-        throw new Error('Authentication required');
-      }
+      //if (!session) {
+      //  console.error('No active session found');
+      //  throw new Error('Authentication required');
+      //}
       
-      console.log('Using auth headers for receivables');
+      //console.log('Using session for receivables:', {
+      //  userId: session.user?.id,
+      //  expiresAt: session.expires_at
+      //});
 
       const { data, error } = await supabase.functions.invoke('project-receivables', {
         headers,
@@ -562,19 +565,24 @@ export const receivablesApi = {
     description?: string
   }) => {
     try {
-      console.log('Getting auth headers for creating receivable...');
-      const headers = await getAuthHeaders();
+      console.log('Getting session for creating receivable...');
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (!headers.Authorization) {
+      if (!session) {
         console.error('No active session found');
         throw new Error('Authentication required');
       }
       
-      console.log('Using auth headers for creating receivable');
+      console.log('Using session for creating receivable:', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at
+      });
 
       const { data, error } = await supabase.functions.invoke('project-receivables', {
         method: 'POST',
-        headers,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
         body: {
           method: 'POST',
           endpoint: 'receivables',
