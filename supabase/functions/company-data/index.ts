@@ -4,11 +4,26 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.32.0";
 
 console.log("Company data service active");
 
+// CORS headers for browser requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+};
+
 // Create a Supabase client with the service role key
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 serve(async (req: Request) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
+  }
+
   try {
     // Create a Supabase client for admin functionalities
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
@@ -18,22 +33,22 @@ serve(async (req: Request) => {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(
         JSON.stringify({ error: "Missing or invalid authorization header" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const token = authHeader.split(" ")[1];
 
-    // Verify the token
+    // Verify the token and get user data
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: "Invalid token" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Fetching company data for user: ${user.id}`);
+    console.log(`User authenticated: ${user.id}`);
 
     // Get user's role from profiles
     const { data: profileData, error: profileError } = await supabaseAdmin
@@ -45,19 +60,11 @@ serve(async (req: Request) => {
     if (profileError || !profileData) {
       return new Response(
         JSON.stringify({ error: "User profile not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } }
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const userRole = profileData.role;
-
-    // Check if the user is an admin
-    if (userRole !== "admin") {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized. Admin access required." }),
-        { status: 403, headers: { "Content-Type": "application/json" } }
-      );
-    }
 
     // Parse request body
     let requestBody = {};
@@ -67,43 +74,54 @@ serve(async (req: Request) => {
 
     const { action, companyId } = requestBody as { action?: string; companyId?: string };
 
-    // Handle different actions
-    if (action === "getCompanyDetails" && companyId) {
-      // Fetch specific company details
-      const { data: company, error: companyError } = await supabaseAdmin
-        .from("companies")
-        .select("*")
-        .eq("id", companyId)
-        .single();
+    // Handle different actions based on user role
+    if (userRole === "admin") {
+      // Admin can access all company data
+      if (action === "getCompanyDetails" && companyId) {
+        // Fetch specific company details
+        const { data: company, error: companyError } = await supabaseAdmin
+          .from("companies")
+          .select("*")
+          .eq("id", companyId)
+          .single();
 
-      if (companyError) {
+        if (companyError) {
+          return new Response(
+            JSON.stringify({ error: "Failed to fetch company details", details: companyError }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         return new Response(
-          JSON.stringify({ error: "Failed to fetch company details", details: companyError }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
+          JSON.stringify({ company }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } else {
+        // Default action for admin: Fetch all companies
+        const { data: companies, error: companiesError } = await supabaseAdmin
+          .from("companies")
+          .select("*")
+          .order("name", { ascending: true });
+
+        if (companiesError) {
+          return new Response(
+            JSON.stringify({ error: "Failed to fetch companies", details: companiesError }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ companies }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-
-      return new Response(
-        JSON.stringify({ company }),
-        { headers: { "Content-Type": "application/json" } }
-      );
     } else {
-      // Default action: Fetch all companies for admin user
-      const { data: companies, error: companiesError } = await supabaseAdmin
-        .from("companies")
-        .select("*")
-        .order("name", { ascending: true });
-
-      if (companiesError) {
-        return new Response(
-          JSON.stringify({ error: "Failed to fetch companies", details: companiesError }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
-        );
-      }
-
+      // Regular users can only access their own company data
+      // For future implementation, we would query the user_companies table to get the user's company
+      // and then return only that company's data
       return new Response(
-        JSON.stringify({ companies }),
-        { headers: { "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Regular users can only access their own company data. This endpoint is not yet implemented for regular users." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -111,7 +129,7 @@ serve(async (req: Request) => {
     console.error("Unexpected error:", error);
     return new Response(
       JSON.stringify({ error: "Internal server error", details: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
