@@ -4,12 +4,18 @@ import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader, UsersRound, Receipt, ArrowDownToLine, FileSpreadsheet } from "lucide-react";
+import { Loader, UsersRound, Receipt, ArrowDownToLine, FileSpreadsheet, PencilIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCNPJ } from "@/lib/formatters";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 
 interface Project {
   id: string;
@@ -28,6 +34,14 @@ const ProjectDashboardPage = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { session } = useAuth();
+  const { toast } = useToast();
+  
+  // State for edit dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  const [editedInitialDate, setEditedInitialDate] = useState("");
+  const [editedEndDate, setEditedEndDate] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchProjectDetails = async () => {
@@ -53,6 +67,13 @@ const ProjectDashboardPage = () => {
         
         console.log('Project details:', data);
         setProject(data.project || null);
+        
+        // Initialize edit form values
+        if (data.project) {
+          setEditedName(data.project.name);
+          setEditedInitialDate(data.project.initial_date);
+          setEditedEndDate(data.project.end_date || "");
+        }
       } catch (error) {
         console.error('Error fetching project details:', error);
       } finally {
@@ -62,6 +83,55 @@ const ProjectDashboardPage = () => {
     
     fetchProjectDetails();
   }, [projectId, session]);
+
+  const handleSaveProject = async () => {
+    if (!projectId || !session?.access_token) return;
+    
+    try {
+      setIsSaving(true);
+      
+      const { data, error } = await supabase.functions.invoke('project-management', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          method: 'PUT',
+          endpoint: `projects/${projectId}`,
+          name: editedName,
+          initial_date: editedInitialDate,
+          end_date: editedEndDate || null
+        }
+      });
+      
+      if (error) {
+        console.error('Error updating project:', error);
+        toast({
+          title: "Erro ao atualizar projeto",
+          description: "Não foi possível salvar as alterações.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setProject(data.project);
+      toast({
+        title: "Projeto atualizado",
+        description: "As alterações foram salvas com sucesso.",
+        variant: "success"
+      });
+      
+      setEditDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating project:', error);
+      toast({
+        title: "Erro ao atualizar projeto",
+        description: "Não foi possível salvar as alterações.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -87,17 +157,76 @@ const ProjectDashboardPage = () => {
   return (
     <DashboardLayout>
       <div className="p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">{project.name}</h1>
-          <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
-            <div>CNPJ: {formatCNPJ(project.cnpj)}</div>
-            <div>Início: {format(new Date(project.initial_date), 'dd/MM/yyyy', { locale: ptBR })}</div>
-            {project.end_date && (
-              <div>Término: {format(new Date(project.end_date), 'dd/MM/yyyy', { locale: ptBR })}</div>
-            )}
-            <div>Status: {project.status === 'active' ? 'Ativo' : 'Inativo'}</div>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">{project.name}</h1>
+              <Badge variant={project.status === 'active' ? 'success' : 'secondary'}>
+                {project.status === 'active' ? 'Ativo' : 'Inativo'}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
+              <div>CNPJ: {formatCNPJ(project.cnpj)}</div>
+              <div>Início: {format(new Date(project.initial_date), 'dd/MM/yyyy', { locale: ptBR })}</div>
+              {project.end_date && (
+                <div>Término: {format(new Date(project.end_date), 'dd/MM/yyyy', { locale: ptBR })}</div>
+              )}
+            </div>
           </div>
+          <Button 
+            variant="outline" 
+            className="flex items-center gap-2"
+            onClick={() => setEditDialogOpen(true)}
+          >
+            <PencilIcon className="h-4 w-4" />
+            Editar Projeto
+          </Button>
         </div>
+
+        {/* Edit Project Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Editar Projeto</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome do Projeto</Label>
+                <Input
+                  id="name"
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="initialDate">Data de Início</Label>
+                <Input
+                  id="initialDate"
+                  type="date"
+                  value={editedInitialDate}
+                  onChange={(e) => setEditedInitialDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endDate">Data de Término</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={editedEndDate}
+                  onChange={(e) => setEditedEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveProject} disabled={isSaving}>
+                {isSaving ? "Salvando..." : "Salvar alterações"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* KPI cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
