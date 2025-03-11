@@ -175,6 +175,56 @@ export type Database = {
         }
         Relationships: []
       }
+      project_buyers: {
+        Row: {
+          buyer_status: Database["public"]["Enums"]["buyer_status"]
+          contract_file_name: string | null
+          contract_file_path: string | null
+          contract_status: Database["public"]["Enums"]["contract_status"]
+          cpf: string
+          created_at: string
+          credit_analysis_status: Database["public"]["Enums"]["credit_analysis_status"]
+          full_name: string
+          id: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          buyer_status?: Database["public"]["Enums"]["buyer_status"]
+          contract_file_name?: string | null
+          contract_file_path?: string | null
+          contract_status?: Database["public"]["Enums"]["contract_status"]
+          cpf: string
+          created_at?: string
+          credit_analysis_status?: Database["public"]["Enums"]["credit_analysis_status"]
+          full_name: string
+          id?: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          buyer_status?: Database["public"]["Enums"]["buyer_status"]
+          contract_file_name?: string | null
+          contract_file_path?: string | null
+          contract_status?: Database["public"]["Enums"]["contract_status"]
+          cpf?: string
+          created_at?: string
+          credit_analysis_status?: Database["public"]["Enums"]["credit_analysis_status"]
+          full_name?: string
+          id?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_buyers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           cnpj: string
@@ -272,6 +322,9 @@ export type Database = {
       }
     }
     Enums: {
+      buyer_status: "aprovado" | "reprovado" | "a_analisar"
+      contract_status: "aprovado" | "reprovado" | "a_enviar"
+      credit_analysis_status: "aprovado" | "reprovado" | "a_analisar"
       document_status: "sent" | "approved" | "needs_revision" | "not_sent"
       project_status: "active" | "inactive"
       user_role: "company_user" | "admin"

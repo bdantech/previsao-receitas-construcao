@@ -337,3 +337,181 @@ export const projectManagementApi = {
     }
   }
 };
+
+// Project buyers API utilities
+export const projectBuyersApi = {
+  // For regular users (company-specific)
+  getBuyers: async (projectId?: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('project-buyers', {
+        headers,
+        body: { 
+          action: 'list',
+          projectId
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching project buyers:', error);
+        throw error;
+      }
+      
+      return data?.buyers || [];
+    } catch (error) {
+      console.error('Exception in getBuyers:', error);
+      throw error;
+    }
+  },
+  
+  getBuyer: async (buyerId: string) => {
+    const headers = await getAuthHeaders();
+    const { data, error } = await supabase.functions.invoke('project-buyers', {
+      headers,
+      body: { 
+        action: 'get',
+        buyerId
+      }
+    });
+    
+    if (error) {
+      console.error('Error fetching project buyer:', error);
+      throw error;
+    }
+    
+    return data?.buyer;
+  },
+  
+  createBuyer: async (projectId: string, buyerData: {
+    full_name: string,
+    cpf: string,
+    contract_file_path?: string,
+    contract_file_name?: string
+  }) => {
+    const headers = await getAuthHeaders();
+    const { data, error } = await supabase.functions.invoke('project-buyers', {
+      method: 'POST',
+      headers,
+      body: { 
+        action: 'create',
+        projectId,
+        buyerData
+      }
+    });
+    
+    if (error) {
+      console.error('Error creating project buyer:', error);
+      throw error;
+    }
+    
+    return data?.buyer;
+  },
+  
+  updateBuyer: async (buyerId: string, buyerData: {
+    full_name?: string,
+    cpf?: string,
+    contract_file_path?: string,
+    contract_file_name?: string,
+    contract_status?: 'aprovado' | 'reprovado' | 'a_enviar',
+    credit_analysis_status?: 'aprovado' | 'reprovado' | 'a_analisar'
+  }) => {
+    const headers = await getAuthHeaders();
+    const { data, error } = await supabase.functions.invoke('project-buyers', {
+      method: 'PUT',
+      headers,
+      body: { 
+        action: 'update',
+        buyerId,
+        buyerData
+      }
+    });
+    
+    if (error) {
+      console.error('Error updating project buyer:', error);
+      throw error;
+    }
+    
+    return data?.buyer;
+  },
+  
+  // Admin-specific methods
+  admin: {
+    getAllBuyers: async (filters?: {
+      companyId?: string,
+      projectId?: string,
+      buyerStatus?: string,
+      contractStatus?: string,
+      creditAnalysisStatus?: string,
+      fullName?: string,
+      cpf?: string
+    }) => {
+      try {
+        const headers = await getAuthHeaders();
+        const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+          headers,
+          body: { 
+            action: 'list',
+            companyId: filters?.companyId,
+            projectId: filters?.projectId,
+            filters
+          }
+        });
+        
+        if (error) {
+          console.error('Error fetching all project buyers:', error);
+          throw error;
+        }
+        
+        return data?.buyers || [];
+      } catch (error) {
+        console.error('Exception in getAllBuyers:', error);
+        throw error;
+      }
+    },
+    
+    getBuyer: async (buyerId: string) => {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+        headers,
+        body: { 
+          action: 'get',
+          buyerId
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching project buyer details:', error);
+        throw error;
+      }
+      
+      return data?.buyer;
+    },
+    
+    updateBuyer: async (buyerId: string, buyerData: {
+      full_name?: string,
+      cpf?: string,
+      contract_file_path?: string,
+      contract_file_name?: string,
+      contract_status?: 'aprovado' | 'reprovado' | 'a_enviar',
+      credit_analysis_status?: 'aprovado' | 'reprovado' | 'a_analisar'
+    }) => {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+        method: 'PUT',
+        headers,
+        body: { 
+          action: 'update',
+          buyerId,
+          buyerData
+        }
+      });
+      
+      if (error) {
+        console.error('Error updating project buyer:', error);
+        throw error;
+      }
+      
+      return data?.buyer;
+    }
+  }
+};
