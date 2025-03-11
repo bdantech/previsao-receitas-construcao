@@ -9,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import { Toaster } from "@/components/ui/toaster"
 import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminCompanyDetail from "./pages/AdminCompanyDetail";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
 
@@ -27,6 +28,7 @@ function App() {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/company" element={<CompanyPage />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
           
           {/* 404 */}
           <Route path="*" element={<NotFound />} />

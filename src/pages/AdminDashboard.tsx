@@ -1,15 +1,17 @@
 
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader } from "lucide-react";
+import { Loader, ArrowRight } from "lucide-react";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
+import { Button } from "@/components/ui/button";
 
 const AdminDashboard = () => {
   const { session, userRole, isLoading, signOut } = useAuth();
   const [companies, setCompanies] = useState<any[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCompanyData = async () => {
@@ -38,6 +40,10 @@ const AdminDashboard = () => {
 
     fetchCompanyData();
   }, [session, userRole]);
+
+  const handleViewCompany = (companyId: string) => {
+    navigate(`/admin/companies/${companyId}`);
+  };
 
   if (isLoading) {
     return (
@@ -94,11 +100,17 @@ const AdminDashboard = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Website
                     </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ações
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {companies.map((company) => (
-                    <tr key={company.id}>
+                    <tr 
+                      key={company.id} 
+                      className="hover:bg-gray-50 cursor-pointer"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {company.name}
                       </td>
@@ -112,12 +124,24 @@ const AdminDashboard = () => {
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             {company.website}
                           </a>
                         ) : (
                           "N/A"
                         )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewCompany(company.id)}
+                          className="text-blue-600 hover:text-blue-900 flex items-center"
+                        >
+                          Detalhes
+                          <ArrowRight className="ml-1 h-4 w-4" />
+                        </Button>
                       </td>
                     </tr>
                   ))}
