@@ -249,41 +249,16 @@ export const projectManagementApi = {
   
   // Get projects
   getProjects: async (filters?: { name?: string, status?: string }) => {
-    try {
-      // Get current session - don't refresh to avoid race conditions
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        console.error('No valid session available for getProjects');
-        throw new Error('Authentication required');
+    const headers = await getAuthHeaders();
+    const { data } = await supabase.functions.invoke('project-management', {
+      headers,
+      body: {
+        method: 'GET',
+        endpoint: 'projects',
+        ...filters
       }
-      
-      console.log('Using session for getProjects:', {
-        userId: session.user?.id,
-        expiresAt: session.expires_at
-      });
-      
-      const { data, error } = await supabase.functions.invoke('project-management', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: {
-          method: 'GET',
-          endpoint: 'projects',
-          ...filters
-        }
-      });
-      
-      if (error) {
-        console.error('Error in getProjects:', error);
-        throw error;
-      }
-      
-      return data?.projects || [];
-    } catch (error) {
-      console.error('Exception in getProjects:', error);
-      throw error;
-    }
+    });
+    return data?.projects || [];
   },
   
   // Create project
@@ -294,83 +269,30 @@ export const projectManagementApi = {
     initial_date: string,
     end_date?: string | null
   }) => {
-    try {
-      // Get current session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        console.error('No valid session available for createProject');
-        throw new Error('Authentication required');
-      }
-      
-      const { data, error } = await supabase.functions.invoke('project-management', {
+    const headers = await getAuthHeaders();
+    const { data } = await supabase.functions.invoke('project-management', {
+      method: 'POST',
+      headers,
+      body: {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: {
-          method: 'POST',
-          endpoint: 'projects',
-          ...project
-        }
-      });
-      
-      if (error) {
-        console.error('Error in createProject:', error);
-        throw error;
+        endpoint: 'projects',
+        ...project
       }
-      
-      return data?.project;
-    } catch (error) {
-      console.error('Exception in createProject:', error);
-      throw error;
-    }
+    });
+    return data?.project;
   },
   
   // Get single project
   getProject: async (id: string) => {
-    try {
-      console.log(`Getting fresh session for project ID: ${id}`);
-      
-      // Get current session - don't refresh to avoid race conditions
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        console.error('No valid session available for getProject');
-        throw new Error('Authentication required');
+    const headers = await getAuthHeaders();
+    const { data } = await supabase.functions.invoke('project-management', {
+      headers,
+      body: {
+        method: 'GET',
+        endpoint: `projects/${id}`
       }
-      
-      console.log('Using session for getProject:', {
-        userId: session.user?.id,
-        expiresAt: session.expires_at
-      });
-      
-      const { data, error } = await supabase.functions.invoke('project-management', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: {
-          method: 'GET',
-          endpoint: `projects/${id}`
-        }
-      });
-      
-      if (error) {
-        console.error('Error in getProject:', error);
-        throw error;
-      }
-      
-      if (!data?.project) {
-        console.error('No project data in response:', data);
-        return null;
-      }
-      
-      console.log('Project data received successfully:', data.project);
-      return data.project;
-    } catch (error) {
-      console.error('Exception in getProject:', error);
-      throw error;
-    }
+    });
+    return data?.project;
   },
   
   // Update project

@@ -1,4 +1,3 @@
-
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
@@ -12,8 +11,8 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminCompanyDetail from "./pages/AdminCompanyDetail";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
-import { ProjectDashboardPage } from "./pages/ProjectDashboardPage";
-import { NewReceivablePage } from "./pages/NewReceivablePage";
+import ProjectDashboardPage from "./pages/ProjectDashboardPage";
+import NewReceivablePage from "./pages/NewReceivablePage";
 
 function App() {
   return (
