@@ -515,3 +515,148 @@ export const projectBuyersApi = {
     }
   }
 };
+
+// Receivables API utilities
+export const receivablesApi = {
+  // Get receivables for company user
+  getReceivables: async (filters?: { projectId?: string, status?: string, buyerCpf?: string }) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('project-receivables', {
+        headers,
+        body: { 
+          method: 'GET',
+          endpoint: 'receivables',
+          ...filters
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching receivables:', error);
+        throw error;
+      }
+      
+      return data?.receivables || [];
+    } catch (error) {
+      console.error('Exception in getReceivables:', error);
+      throw error;
+    }
+  },
+  
+  getReceivable: async (id: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('project-receivables', {
+        headers,
+        body: { 
+          method: 'GET',
+          endpoint: `receivables/${id}`
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching receivable details:', error);
+        throw error;
+      }
+      
+      return data?.receivable;
+    } catch (error) {
+      console.error('Exception in getReceivable:', error);
+      throw error;
+    }
+  },
+  
+  createReceivable: async (receivable: {
+    projectId: string,
+    buyerCpf: string,
+    amount: number,
+    dueDate: string,
+    description?: string
+  }) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('project-receivables', {
+        method: 'POST',
+        headers,
+        body: { 
+          method: 'POST',
+          endpoint: 'receivables',
+          ...receivable
+        }
+      });
+      
+      if (error) {
+        console.error('Error creating receivable:', error);
+        throw error;
+      }
+      
+      return data?.receivable;
+    } catch (error) {
+      console.error('Exception in createReceivable:', error);
+      throw error;
+    }
+  },
+  
+  updateReceivable: async (id: string, updates: {
+    status?: string,
+    description?: string
+  }) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('project-receivables', {
+        method: 'PUT',
+        headers,
+        body: { 
+          method: 'PUT',
+          endpoint: `receivables/${id}`,
+          ...updates
+        }
+      });
+      
+      if (error) {
+        console.error('Error updating receivable:', error);
+        throw error;
+      }
+      
+      return data?.receivable;
+    } catch (error) {
+      console.error('Exception in updateReceivable:', error);
+      throw error;
+    }
+  },
+  
+  // Admin-specific methods
+  admin: {
+    getAllReceivables: async (filters?: {
+      companyId?: string,
+      projectId?: string,
+      status?: string,
+      buyerCpf?: string,
+      minAmount?: number,
+      maxAmount?: number,
+      fromDate?: string,
+      toDate?: string
+    }) => {
+      try {
+        const headers = await getAuthHeaders();
+        const { data, error } = await supabase.functions.invoke('admin-receivables', {
+          headers,
+          body: { 
+            method: 'GET',
+            filters
+          }
+        });
+        
+        if (error) {
+          console.error('Error fetching admin receivables:', error);
+          throw error;
+        }
+        
+        return data?.receivables || [];
+      } catch (error) {
+        console.error('Exception in getAllReceivables:', error);
+        throw error;
+      }
+    }
+  }
+};

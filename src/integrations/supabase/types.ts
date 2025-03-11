@@ -269,6 +269,53 @@ export type Database = {
           },
         ]
       }
+      receivables: {
+        Row: {
+          amount: number
+          buyer_cpf: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string
+          id: string
+          project_id: string
+          status: Database["public"]["Enums"]["receivable_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          buyer_cpf: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date: string
+          id?: string
+          project_id: string
+          status?: Database["public"]["Enums"]["receivable_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          buyer_cpf?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string
+          id?: string
+          project_id?: string
+          status?: Database["public"]["Enums"]["receivable_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receivables_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_companies: {
         Row: {
           company_id: string
@@ -316,6 +363,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      get_initial_receivable_status: {
+        Args: {
+          project_id: string
+          buyer_cpf: string
+        }
+        Returns: Database["public"]["Enums"]["receivable_status"]
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -327,6 +381,11 @@ export type Database = {
       credit_analysis_status: "aprovado" | "reprovado" | "a_analisar"
       document_status: "sent" | "approved" | "needs_revision" | "not_sent"
       project_status: "active" | "inactive"
+      receivable_status:
+        | "enviado"
+        | "elegivel_para_antecipacao"
+        | "reprovado"
+        | "antecipado"
       user_role: "company_user" | "admin"
     }
     CompositeTypes: {
