@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.32.0";
 
-console.log("Admin company data service active");
+console.log("User company data service active");
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -66,66 +66,53 @@ serve(async (req: Request) => {
 
     const userRole = profileData.role;
 
-    // This endpoint is for admin users only
-    if (userRole !== "admin") {
+    // This endpoint is for company users only
+    if (userRole !== "company_user") {
       return new Response(
-        JSON.stringify({ error: "Unauthorized. Admin access required." }),
+        JSON.stringify({ error: "This endpoint is for company users only" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Parse request body if it's a POST request
-    let requestBody = {};
-    if (req.method === "POST") {
-      try {
-        requestBody = await req.json();
-      } catch (error) {
-        console.error("Error parsing request body:", error);
-        requestBody = {};
-      }
-    }
+    // Get company associated with the user
+    const { data: userCompanies, error: userCompaniesError } = await supabaseAdmin
+      .from("user_companies")
+      .select("company_id")
+      .eq("user_id", user.id);
 
-    const { action, companyId } = requestBody as { action?: string; companyId?: string };
-
-    // Handle admin actions
-    if (action === "getCompanyDetails" && companyId) {
-      // Fetch specific company details
-      const { data: company, error: companyError } = await supabaseAdmin
-        .from("companies")
-        .select("*")
-        .eq("id", companyId)
-        .single();
-
-      if (companyError) {
-        return new Response(
-          JSON.stringify({ error: "Failed to fetch company details", details: companyError }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
+    if (userCompaniesError) {
       return new Response(
-        JSON.stringify({ company }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    } else {
-      // Default action: Fetch all companies
-      const { data: companies, error: companiesError } = await supabaseAdmin
-        .from("companies")
-        .select("*")
-        .order("name", { ascending: true });
-
-      if (companiesError) {
-        return new Response(
-          JSON.stringify({ error: "Failed to fetch companies", details: companiesError }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ companies }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Failed to fetch user's company", details: userCompaniesError }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    if (!userCompanies || userCompanies.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "User is not associated with any company" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get user's company data
+    const companyIds = userCompanies.map(uc => uc.company_id);
+    
+    const { data: companies, error: companiesError } = await supabaseAdmin
+      .from("companies")
+      .select("*")
+      .in("id", companyIds);
+
+    if (companiesError) {
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch company data", details: companiesError }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ companies }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (error) {
     console.error("Unexpected error:", error);
     return new Response(

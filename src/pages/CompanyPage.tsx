@@ -43,7 +43,8 @@ const CompanyPage = () => {
           setLoading(true);
           console.log('Fetching company data for edit page');
           
-          const { data, error } = await supabase.functions.invoke('company-data', {
+          const { data, error } = await supabase.functions.invoke('user-company-data', {
+            method: 'POST',
             headers: {
               Authorization: `Bearer ${session.access_token}`
             }

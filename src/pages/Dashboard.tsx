@@ -1,9 +1,11 @@
+
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { toast } from "@/hooks/use-toast";
 
 // Placeholder dashboard for company users
 const Dashboard = () => {
@@ -19,15 +21,21 @@ const Dashboard = () => {
           setLoadingCompanies(true);
           console.log('Fetching company data with token:', session.access_token);
           
-          const { data, error } = await supabase.functions.invoke('company-data', {
+          const { data, error } = await supabase.functions.invoke('user-company-data', {
+            method: 'POST',
             headers: {
               Authorization: `Bearer ${session.access_token}`
             }
           });
           
           if (error) {
-            console.error("Error invoking company-data function:", error);
+            console.error("Error invoking user-company-data function:", error);
             console.error("Error details:", error.message);
+            toast({
+              title: "Erro",
+              description: "Não foi possível carregar os dados da empresa",
+              variant: "destructive",
+            });
             throw error;
           }
           
@@ -35,6 +43,11 @@ const Dashboard = () => {
           
           if (!data.companies) {
             console.error("No companies array in response:", data);
+            toast({
+              title: "Erro",
+              description: "Formato de resposta inválido do servidor",
+              variant: "destructive",
+            });
             throw new Error("Invalid response format");
           }
           
