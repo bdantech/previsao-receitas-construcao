@@ -106,15 +106,15 @@ export const CompanyDocumentList: React.FC<CompanyDocumentListProps> = ({ compan
       const url = URL.createObjectURL(data);
       
       // Create a link element and trigger download
-      const a = document.createElement('a');
+      const a = window.document.createElement('a');
       a.href = url;
       a.download = document.file_name;
-      document.body.appendChild(a);
+      window.document.body.appendChild(a);
       a.click();
       
       // Clean up
       URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      window.document.body.removeChild(a);
     } catch (error) {
       console.error("Error downloading document:", error);
       toast({
