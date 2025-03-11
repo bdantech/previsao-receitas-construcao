@@ -263,16 +263,16 @@ serve(async (req) => {
           .eq('cpf', buyerCpf)
           .single()
         
-        if (buyerError) {
-          console.error('Buyer verification error:', buyerError)
-          return new Response(
-            JSON.stringify({ error: 'Buyer not found in project' }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400 
-            }
-          )
-        }
+        //if (buyerError) {
+          //console.error('Buyer verification error:', buyerError)
+          //return new Response(
+          //  JSON.stringify({ error: 'Buyer not found in project' }),
+          //  { 
+              //headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            //  status: 400 
+            //}
+          //)
+        //}
 
         // Create the receivable
         const { data: receivable, error: createError } = await adminSupabase
