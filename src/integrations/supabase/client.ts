@@ -12,6 +12,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 
 // Helper to get auth headers for function calls
 const getAuthHeaders = async () => {
+  // Get the current user session
   const { data } = await supabase.auth.getSession();
   const session = data?.session;
   
@@ -522,6 +523,9 @@ export const receivablesApi = {
   getReceivables: async (filters?: { projectId?: string, status?: string, buyerCpf?: string }) => {
     try {
       const headers = await getAuthHeaders();
+      
+      console.log('Fetching receivables with headers:', headers);
+      
       const { data, error } = await supabase.functions.invoke('project-receivables', {
         headers,
         body: { 
@@ -575,6 +579,10 @@ export const receivablesApi = {
   }) => {
     try {
       const headers = await getAuthHeaders();
+      
+      console.log('Creating receivable with headers:', headers);
+      console.log('Receivable data:', receivable);
+      
       const { data, error } = await supabase.functions.invoke('project-receivables', {
         method: 'POST',
         headers,

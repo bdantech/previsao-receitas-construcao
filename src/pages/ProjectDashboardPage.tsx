@@ -70,7 +70,6 @@ const ProjectDashboardPage = () => {
   const { session } = useAuth();
   const { toast } = useToast();
   
-  // State for edit dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [editedInitialDate, setEditedInitialDate] = useState("");
@@ -102,7 +101,6 @@ const ProjectDashboardPage = () => {
         console.log('Project details:', data);
         setProject(data.project || null);
         
-        // Initialize edit form values
         if (data.project) {
           setEditedName(data.project.name);
           setEditedInitialDate(data.project.initial_date);
@@ -118,7 +116,6 @@ const ProjectDashboardPage = () => {
     fetchProjectDetails();
   }, [projectId, session]);
 
-  // Fetch project buyers when tab changes to "compradores"
   useEffect(() => {
     if (activeTab === "compradores" && projectId && session?.access_token) {
       fetchProjectBuyers();
@@ -173,7 +170,10 @@ const ProjectDashboardPage = () => {
     try {
       setIsLoadingReceivables(true);
       
-      const receivablesData = await receivablesApi.getReceivables({ projectId });
+      console.log('Fetching receivables for project:', projectId);
+      const receivablesData = await receivablesApi.getReceivables({ 
+        projectId 
+      });
       
       console.log('Project receivables:', receivablesData);
       setReceivables(receivablesData || []);
@@ -316,7 +316,6 @@ const ProjectDashboardPage = () => {
           </Button>
         </div>
 
-        {/* Edit Project Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
@@ -361,7 +360,6 @@ const ProjectDashboardPage = () => {
           </DialogContent>
         </Dialog>
 
-        {/* KPI cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="pb-2">
@@ -402,7 +400,6 @@ const ProjectDashboardPage = () => {
           </Card>
         </div>
 
-        {/* Tabs */}
         <Tabs defaultValue="compradores" className="w-full" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4 bg-white">
             <TabsTrigger value="compradores" className="flex items-center gap-2">
@@ -552,7 +549,6 @@ const ProjectDashboardPage = () => {
         </Tabs>
       </div>
 
-      {/* Add Receivable Dialog */}
       <ReceivableDialog
         open={receivableDialogOpen}
         onOpenChange={setReceivableDialogOpen}

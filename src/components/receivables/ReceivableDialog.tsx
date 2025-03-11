@@ -27,13 +27,16 @@ export function ReceivableDialog({
   const [dueDate, setDueDate] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
 
     // Basic validation
     if (!buyerCpf || !amount || !dueDate) {
+      setErrorMessage("Preencha todos os campos obrigatórios.");
       toast({
         title: "Dados incompletos",
         description: "Preencha todos os campos obrigatórios.",
@@ -49,6 +52,7 @@ export function ReceivableDialog({
     const amountValue = parseFloat(amount.replace(/\./g, "").replace(",", "."));
 
     if (isNaN(amountValue)) {
+      setErrorMessage("O valor informado não é válido.");
       toast({
         title: "Valor inválido",
         description: "O valor informado não é válido.",
@@ -78,15 +82,28 @@ export function ReceivableDialog({
       setAmount("");
       setDueDate("");
       setDescription("");
+      setErrorMessage(null);
 
       // Close dialog and refresh data
       onOpenChange(false);
       onReceivableCreated();
     } catch (error) {
       console.error("Error creating receivable:", error);
+      
+      // More descriptive error message
+      let errorMsg = "Não foi possível criar o recebível. ";
+      
+      if (error instanceof Error) {
+        errorMsg += error.message;
+      } else {
+        errorMsg += "Verifique os dados e tente novamente.";
+      }
+      
+      setErrorMessage(errorMsg);
+      
       toast({
         title: "Erro ao criar recebível",
-        description: "Não foi possível criar o recebível. Tente novamente.",
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {
@@ -122,6 +139,11 @@ export function ReceivableDialog({
           <DialogTitle>Adicionar Recebível</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {errorMessage && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-md text-sm">
+              {errorMessage}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="buyerCpf">CPF do Comprador *</Label>
             <Input
