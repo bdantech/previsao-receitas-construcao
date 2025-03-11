@@ -1,10 +1,11 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { documentManagementApi, supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { CompanyDocument } from "@/types/document";
+import { useAuth } from "@/hooks/useAuth";
 
 export const useCompanyDocuments = (companyId: string) => {
+  const { session, isLoading: isAuthLoading } = useAuth();
   const [documents, setDocuments] = useState<CompanyDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
@@ -17,22 +18,15 @@ export const useCompanyDocuments = (companyId: string) => {
       return;
     }
 
+    if (!session?.access_token) {
+      console.log("No valid session");
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       console.log("Fetching documents for company:", companyId);
-      
-      // Ensure we have a fresh session
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) {
-        console.error("No valid session for document fetch");
-        toast({
-          title: "Sessão expirada",
-          description: "Por favor, faça login novamente",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
       
       const docs = await documentManagementApi.getCompanyDocuments(companyId);
       console.log("Retrieved documents:", docs);
@@ -53,14 +47,14 @@ export const useCompanyDocuments = (companyId: string) => {
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, session?.access_token]);
 
-  // Load documents on mount and when companyId changes
+  // Load documents when session and companyId are available
   useEffect(() => {
-    if (companyId) {
+    if (!isAuthLoading && session?.access_token && companyId) {
       fetchDocuments();
     }
-  }, [companyId, fetchDocuments]);
+  }, [companyId, session?.access_token, isAuthLoading, fetchDocuments]);
 
   // Handle file upload
   const handleFileUpload = async (documentId: string, documentTypeId: string, event: React.ChangeEvent<HTMLInputElement>) => {
