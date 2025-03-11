@@ -108,16 +108,11 @@ export const documentManagementApi = {
   getUserDocuments: async () => {
     try {
       console.log('Getting fresh session for user documents...');
-      // Force session refresh
-      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (refreshError) {
-        console.error('Session refresh error:', refreshError);
-        throw new Error('Session refresh failed: ' + refreshError.message);
-      }
+      // Get the current session instead of refreshing it
+      const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        console.error('No session after refresh');
+        console.error('No valid session available');
         throw new Error('No valid session');
       }
       

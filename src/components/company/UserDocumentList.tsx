@@ -23,6 +23,7 @@ export const UserDocumentList: React.FC = () => {
     try {
       setLoading(true);
       const documents = await documentManagementApi.getUserDocuments();
+      console.log("Fetched user documents:", documents);
       setDocuments(documents);
     } catch (error) {
       console.error("Error fetching documents:", error);
@@ -65,11 +66,11 @@ export const UserDocumentList: React.FC = () => {
         throw new Error("Document not found");
       }
       
-      // Update the document record
+      // Update the document record using document properties from the CompanyDocument type
       await documentManagementApi.submitDocument({
         documentTypeId,
-        resourceType: documentToUpdate.resource_type,
-        resourceId: documentToUpdate.resource_id,
+        resourceType: documentToUpdate.document_type.resource || 'user',
+        resourceId: session.user.id,  // Use the user's ID as the resource ID
         filePath,
         fileName: file.name,
         fileSize: file.size,

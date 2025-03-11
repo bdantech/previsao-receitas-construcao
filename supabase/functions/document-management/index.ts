@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -169,10 +170,11 @@ serve(async (req) => {
               reviewer:reviewed_by(id, email)
             `)
 
-          // Apply filter for company users - they can only see their company's documents
+          // Apply filter for company users - they can only see their documents
           if (!isAdmin) {
             // Set user_id filter - users can only see their documents
             query = query.eq('user_id', user.id);
+            console.log('Filtering documents by user_id:', user.id);
           }
 
           // Apply additional filters if provided
@@ -222,6 +224,7 @@ serve(async (req) => {
         // Apply filter for company users - they can only see their documents
         if (!isAdmin) {
           query = query.eq('user_id', user.id);
+          console.log('Filtering documents by user_id (service role):', user.id);
         }
 
         // Apply additional filters if provided
