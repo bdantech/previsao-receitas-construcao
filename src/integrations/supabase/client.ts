@@ -519,27 +519,44 @@ export const projectBuyersApi = {
 
 // Receivables API utilities
 export const receivablesApi = {
-  // Get receivables for company user
-  getReceivables: async (filters?: { projectId?: string, status?: string, buyerCpf?: string }) => {
+  getReceivables: async ({ projectId, status, buyerCpf }: { projectId?: string, status?: string, buyerCpf?: string } = {}) => {
     try {
-      const headers = await getAuthHeaders();
+      console.log('Getting fresh session for receivables...');
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
       
-      console.log('Fetching receivables with headers:', headers);
+      if (refreshError) {
+        console.error('Session refresh error:', refreshError);
+        throw new Error('Session refresh failed: ' + refreshError.message);
+      }
       
+      if (!session) {
+        console.error('No session after refresh');
+        throw new Error('No valid session');
+      }
+      
+      console.log('Using session for receivables:', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at
+      });
+
       const { data, error } = await supabase.functions.invoke('project-receivables', {
-        headers,
-        body: { 
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
           method: 'GET',
           endpoint: 'receivables',
-          ...filters
+          projectId,
+          status,
+          buyerCpf
         }
       });
-      
+
       if (error) {
         console.error('Error fetching receivables:', error);
         throw error;
       }
-      
+
       return data?.receivables || [];
     } catch (error) {
       console.error('Exception in getReceivables:', error);
@@ -555,34 +572,41 @@ export const receivablesApi = {
     description?: string
   }) => {
     try {
-      // Get fresh auth headers
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Getting fresh session for creating receivable...');
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
       
-      if (!session?.access_token) {
+      if (refreshError) {
+        console.error('Session refresh error:', refreshError);
+        throw new Error('Session refresh failed: ' + refreshError.message);
+      }
+      
+      if (!session) {
+        console.error('No session after refresh');
         throw new Error('No valid session');
       }
       
-      console.log('Creating receivable with headers:', {
-        Authorization: `Bearer ${session.access_token}`
+      console.log('Using session for creating receivable:', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at
       });
-      console.log('Receivable data:', receivable);
-      
+
       const { data, error } = await supabase.functions.invoke('project-receivables', {
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`
         },
-        body: { 
+        body: {
           method: 'POST',
           endpoint: 'receivables',
           ...receivable
         }
       });
-      
+
       if (error) {
         console.error('Error creating receivable:', error);
         throw error;
       }
-      
+
       return data?.receivable;
     } catch (error) {
       console.error('Exception in createReceivable:', error);

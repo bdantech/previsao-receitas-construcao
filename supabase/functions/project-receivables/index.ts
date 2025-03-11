@@ -20,12 +20,14 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
+      console.error('Missing environment variables')
       throw new Error('Missing environment variables')
     }
 
     // Get authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      console.error('No Authorization header')
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
         { 
@@ -39,9 +41,17 @@ serve(async (req) => {
     const requestData = await req.json()
     const { method, endpoint, ...params } = requestData
 
-    console.log('Project receivables request:', method, endpoint, params)
+    console.log('Project receivables request:', {
+      method,
+      endpoint,
+      params,
+      hasAuth: !!authHeader
+    })
 
-    // Initialize Supabase client with user's auth token
+    // Initialize service role client for reliable database access
+    const adminSupabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Initialize user client for authentication
     const supabaseClient = createClient(
       supabaseUrl,
       supabaseKey,
@@ -71,7 +81,7 @@ serve(async (req) => {
     console.log('User authenticated:', user.id)
 
     // Get user profile to determine role
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile, error: profileError } = await adminSupabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
@@ -87,255 +97,221 @@ serve(async (req) => {
 
     // Get all receivables for the user's projects
     if (endpoint === 'receivables' && method === 'GET') {
-      let query = supabaseClient
-        .from('receivables')
-        .select(`
-          id,
-          project_id,
-          buyer_cpf,
-          amount,
-          due_date,
-          description,
-          status,
-          created_at,
-          updated_at,
-          projects:project_id (
-            name
-          )
-        `)
-      
-      // Apply filters if provided
-      if (params.projectId) {
-        query = query.eq('project_id', params.projectId)
-      }
-      
-      if (params.status) {
-        query = query.eq('status', params.status)
-      }
-      
-      if (params.buyerCpf) {
-        query = query.ilike('buyer_cpf', `%${params.buyerCpf}%`)
-      }
-      
-      // If not admin, the RLS policies will restrict to only the user's company projects
-      
-      const { data: receivables, error: receivablesError } = await query
-        .order('due_date', { ascending: true })
-      
-      if (receivablesError) {
-        console.error('Receivables error:', receivablesError)
-        throw receivablesError
-      }
-
-      return new Response(
-        JSON.stringify({ receivables }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
+      try {
+        let query = adminSupabase
+          .from('receivables')
+          .select(`
+            id,
+            project_id,
+            buyer_cpf,
+            amount,
+            due_date,
+            description,
+            status,
+            created_at,
+            updated_at,
+            projects:project_id (
+              name
+            )
+          `)
+        
+        // Apply filters if provided
+        if (params.projectId) {
+          query = query.eq('project_id', params.projectId)
         }
-      )
+        
+        if (params.status) {
+          query = query.eq('status', params.status)
+        }
+        
+        if (params.buyerCpf) {
+          query = query.ilike('buyer_cpf', `%${params.buyerCpf}%`)
+        }
+        
+        // If not admin, restrict to user's company projects
+        if (!isAdmin) {
+          // Get user's company
+          const { data: userCompany, error: companyError } = await adminSupabase
+            .from('user_companies')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single()
+
+          if (companyError) {
+            console.error('Error getting user company:', companyError)
+            throw new Error('Failed to verify user company')
+          }
+
+          // Get company's projects
+          const { data: projects, error: projectsError } = await adminSupabase
+            .from('projects')
+            .select('id')
+            .eq('company_id', userCompany.company_id)
+
+          if (projectsError) {
+            console.error('Error getting company projects:', projectsError)
+            throw new Error('Failed to verify company projects')
+          }
+
+          const projectIds = projects.map(p => p.id)
+          query = query.in('project_id', projectIds)
+        }
+        
+        const { data: receivables, error: receivablesError } = await query
+          .order('due_date', { ascending: true })
+        
+        if (receivablesError) {
+          console.error('Receivables error:', receivablesError)
+          throw receivablesError
+        }
+
+        console.log(`Found ${receivables?.length || 0} receivables`)
+        return new Response(
+          JSON.stringify({ receivables }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        )
+      } catch (error) {
+        console.error('Error in GET receivables:', error)
+        return new Response(
+          JSON.stringify({ error: error.message || 'Failed to fetch receivables' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        )
+      }
     }
     
     // Create a new receivable
     if (endpoint === 'receivables' && method === 'POST') {
-      console.log('Creating receivable with data:', params)
-      
-      const { projectId, buyerCpf, amount, dueDate, description } = params
-      
-      if (!projectId || !buyerCpf || !amount || !dueDate) {
+      try {
+        console.log('Creating receivable with data:', params)
+        
+        const { projectId, buyerCpf, amount, dueDate, description } = params
+        
+        if (!projectId || !buyerCpf || !amount || !dueDate) {
+          return new Response(
+            JSON.stringify({ error: 'Required fields: projectId, buyerCpf, amount, dueDate' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          )
+        }
+
+        // If not admin, verify user belongs to company that owns the project
+        if (!isAdmin) {
+          const { data: projectCompany, error: projectError } = await adminSupabase
+            .from('projects')
+            .select('company_id')
+            .eq('id', projectId)
+            .single()
+
+          if (projectError) {
+            console.error('Project verification error:', projectError)
+            return new Response(
+              JSON.stringify({ error: 'Project not found or you lack access' }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 403 
+              }
+            )
+          }
+
+          const { data: userCompany, error: userCompanyError } = await adminSupabase
+            .from('user_companies')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .eq('company_id', projectCompany.company_id)
+            .single()
+
+          if (userCompanyError) {
+            console.error('User company verification error:', userCompanyError)
+            return new Response(
+              JSON.stringify({ error: 'You can only create receivables for your company projects' }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 403 
+              }
+            )
+          }
+        }
+        
+        // Check buyer status to determine initial receivable status
+        const { data: buyerData, error: buyerError } = await adminSupabase
+          .from('project_buyers')
+          .select('buyer_status')
+          .eq('project_id', projectId)
+          .eq('cpf', buyerCpf)
+          .single()
+        
+        if (buyerError) {
+          console.error('Buyer verification error:', buyerError)
+          return new Response(
+            JSON.stringify({ error: 'Buyer not found in project' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          )
+        }
+
+        // Create the receivable
+        const { data: receivable, error: createError } = await adminSupabase
+          .from('receivables')
+          .insert({
+            project_id: projectId,
+            buyer_cpf: buyerCpf,
+            amount,
+            due_date: dueDate,
+            description,
+            status: buyerData.buyer_status === 'aprovado' ? 'elegivel_para_antecipacao' : 'enviado',
+            created_by: user.id
+          })
+          .select()
+          .single()
+
+        if (createError) {
+          console.error('Create receivable error:', createError)
+          throw createError
+        }
+
+        console.log('Created receivable:', receivable)
         return new Response(
-          JSON.stringify({ error: 'Required fields: projectId, buyerCpf, amount, dueDate' }),
+          JSON.stringify({ receivable }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
+            status: 201 
+          }
+        )
+      } catch (error) {
+        console.error('Error in POST receivables:', error)
+        return new Response(
+          JSON.stringify({ error: error.message || 'Failed to create receivable' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
           }
         )
       }
-
-      // If not admin, verify user belongs to company that owns the project
-      if (!isAdmin) {
-        const { data: projectCompany, error: projectError } = await supabaseClient
-          .from('projects')
-          .select('company_id')
-          .eq('id', projectId)
-          .single()
-
-        if (projectError) {
-          console.error('Project verification error:', projectError)
-          return new Response(
-            JSON.stringify({ error: 'Project not found or you lack access' }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 403 
-            }
-          )
-        }
-
-        const { data: userCompany, error: userCompanyError } = await supabaseClient
-          .from('user_companies')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .eq('company_id', projectCompany.company_id)
-          .single()
-
-        if (userCompanyError) {
-          console.error('User company verification error:', userCompanyError)
-          return new Response(
-            JSON.stringify({ error: 'You can only create receivables for your company projects' }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 403 
-            }
-          )
-        }
-      }
-      
-      // Check buyer status to determine initial receivable status
-      const { data: buyerData, error: buyerError } = await supabaseClient
-        .from('project_buyers')
-        .select('buyer_status')
-        .eq('project_id', projectId)
-        .eq('cpf', buyerCpf)
-        .single()
-      
-      let initialStatus = 'enviado'
-      
-      if (!buyerError && buyerData) {
-        if (buyerData.buyer_status === 'aprovado') {
-          initialStatus = 'elegivel_para_antecipacao'
-        } else if (buyerData.buyer_status === 'reprovado') {
-          initialStatus = 'reprovado'
-        }
-      }
-      
-      // Create the receivable
-      const { data: receivable, error: createError } = await supabaseClient
-        .from('receivables')
-        .insert({
-          project_id: projectId,
-          buyer_cpf: buyerCpf,
-          amount,
-          due_date: dueDate,
-          description: description || null,
-          status: initialStatus,
-          created_by: user.id
-        })
-        .select()
-        .single()
-      
-      if (createError) {
-        console.error('Receivable creation error:', createError)
-        throw createError
-      }
-
-      return new Response(
-        JSON.stringify({ receivable }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 201 
-        }
-      )
     }
-    
-    // Get a single receivable
-    if (endpoint && endpoint.startsWith('receivables/') && method === 'GET') {
-      const receivableId = endpoint.split('/')[1]
-      
-      const { data: receivable, error: receivableError } = await supabaseClient
-        .from('receivables')
-        .select(`
-          id,
-          project_id,
-          buyer_cpf,
-          amount,
-          due_date,
-          description,
-          status,
-          created_at,
-          updated_at,
-          projects:project_id (
-            name,
-            company_id
-          )
-        `)
-        .eq('id', receivableId)
-        .single()
-      
-      if (receivableError) {
-        console.error('Receivable fetch error:', receivableError)
-        if (receivableError.code === 'PGRST116') {
-          return new Response(
-            JSON.stringify({ error: 'Receivable not found or you lack access' }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 404 
-            }
-          )
-        }
-        throw receivableError
-      }
 
-      return new Response(
-        JSON.stringify({ receivable }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      )
-    }
-    
-    // Update receivable endpoint (future use for status changes)
-    if (endpoint && endpoint.startsWith('receivables/') && method === 'PUT') {
-      const receivableId = endpoint.split('/')[1]
-      
-      const { status, description } = params
-      const updates: any = {}
-      
-      if (status !== undefined) updates.status = status
-      if (description !== undefined) updates.description = description
-      
-      const { data: receivable, error: updateError } = await supabaseClient
-        .from('receivables')
-        .update(updates)
-        .eq('id', receivableId)
-        .select()
-        .single()
-      
-      if (updateError) {
-        console.error('Receivable update error:', updateError)
-        if (updateError.code === 'PGRST116') {
-          return new Response(
-            JSON.stringify({ error: 'Receivable not found or you lack access' }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 404 
-            }
-          )
-        }
-        throw updateError
-      }
-
-      return new Response(
-        JSON.stringify({ receivable }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      )
-    }
-    
+    // If we get here, the operation or method is not supported
     return new Response(
-      JSON.stringify({ error: 'Endpoint not found' }),
+      JSON.stringify({ error: 'Operation not supported' }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 404 
+        status: 400 
       }
     )
 
   } catch (error) {
-    console.error("Error in project-receivables function:", error);
+    console.error('Error in project-receivables function:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'Internal server error' }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500 
