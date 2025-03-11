@@ -522,22 +522,21 @@ export const receivablesApi = {
   getReceivables: async ({ projectId, status, buyerCpf }: { projectId?: string, status?: string, buyerCpf?: string } = {}) => {
     try {
       console.log('Getting session for receivables...');
-      console.log('supabase.auth', supabase.auth);
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.headers.Authorization();
       
       if (!session) {
         console.error('No active session found');
         throw new Error('Authentication required');
       }
       
-      console.log('Using session for receivables:', {
-        userId: session.user?.id,
-        expiresAt: session.expires_at
-      });
+      //console.log('Using session for receivables:', {
+      //  userId: session.user?.id,
+      //  expiresAt: session.expires_at
+      //});
 
       const { data, error } = await supabase.functions.invoke('project-receivables', {
         headers: {
-          Authorization: `Bearer ${session.access_token}`
+          Authorization: session
         },
         body: {
           method: 'GET',
