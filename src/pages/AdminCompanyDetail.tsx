@@ -9,25 +9,37 @@ import { useToast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdminCompanyProjects } from "@/components/dashboard/AdminCompanyProjects";
+import { useAuth } from "@/hooks/useAuth";
 
 const AdminCompanyDetail = () => {
   const { companyId } = useParams();
   const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { getAuthHeader } = useAuth();
 
   useEffect(() => {
     const fetchCompanyDetails = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from("companies")
-          .select("*")
-          .eq("id", companyId)
-          .single();
+        
+        // Use the company-data edge function to get company details as admin
+        const { data, error } = await supabase.functions.invoke('company-data', {
+          method: 'POST',
+          headers: await getAuthHeader(),
+          body: {
+            action: 'getCompanyDetails',
+            companyId: companyId
+          }
+        });
 
         if (error) throw error;
-        setCompany(data);
+        
+        if (!data || !data.company) {
+          throw new Error('Company data not returned from server');
+        }
+        
+        setCompany(data.company);
       } catch (error: any) {
         console.error("Error fetching company details:", error);
         toast({
@@ -43,7 +55,7 @@ const AdminCompanyDetail = () => {
     if (companyId) {
       fetchCompanyDetails();
     }
-  }, [companyId, toast]);
+  }, [companyId, toast, getAuthHeader]);
 
   if (loading) {
     return (

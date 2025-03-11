@@ -74,7 +74,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // Parse request body if it's a POST request
+    // Parse request body if it exists
     let requestBody = {};
     if (req.method === "POST") {
       try {
@@ -89,20 +89,31 @@ serve(async (req: Request) => {
 
     // Handle admin actions
     if (action === "getCompanyDetails" && companyId) {
+      console.log(`Fetching details for company: ${companyId}`);
       // Fetch specific company details
       const { data: company, error: companyError } = await supabaseAdmin
         .from("companies")
         .select("*")
         .eq("id", companyId)
-        .single();
+        .maybeSingle();  // Using maybeSingle instead of single to avoid errors
 
       if (companyError) {
+        console.error("Error fetching company details:", companyError);
         return new Response(
           JSON.stringify({ error: "Failed to fetch company details", details: companyError }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
+      if (!company) {
+        console.error("Company not found:", companyId);
+        return new Response(
+          JSON.stringify({ error: "Company not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log("Company details found:", company.name);
       return new Response(
         JSON.stringify({ company }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
