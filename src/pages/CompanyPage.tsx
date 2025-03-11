@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { CompanyDocuments } from "@/components/company/CompanyDocuments";
 
 interface Company {
   id: string;
@@ -158,60 +159,64 @@ const CompanyPage = () => {
             <Loader className="h-8 w-8 animate-spin text-gray-500" />
           </div>
         ) : company ? (
-          <div className="bg-white shadow rounded-lg p-6 max-w-2xl">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome da Empresa</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  placeholder="Nome da empresa"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="cnpj">CNPJ</Label>
-                <Input
-                  id="cnpj"
-                  value={company.cnpj}
-                  readOnly
-                  className="bg-gray-50"
-                />
-                <p className="text-sm text-gray-500">O CNPJ não pode ser alterado</p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="website">Website (opcional)</Label>
-                <Input
-                  id="website"
-                  name="website"
-                  value={formData.website}
-                  onChange={handleInputChange}
-                  placeholder="https://www.empresa.com.br"
-                />
-              </div>
-              
-              <Button 
-                type="submit" 
-                disabled={updating}
-                className="w-full sm:w-auto"
-              >
-                {updating ? (
-                  <>
-                    <Loader className="h-4 w-4 mr-2 animate-spin" />
-                    Atualizando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Salvar Alterações
-                  </>
-                )}
-              </Button>
-            </form>
+          <div>
+            <div className="bg-white shadow rounded-lg p-6 max-w-2xl">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nome da Empresa</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="Nome da empresa"
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="cnpj">CNPJ</Label>
+                  <Input
+                    id="cnpj"
+                    value={company.cnpj}
+                    readOnly
+                    className="bg-gray-50"
+                  />
+                  <p className="text-sm text-gray-500">O CNPJ não pode ser alterado</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="website">Website (opcional)</Label>
+                  <Input
+                    id="website"
+                    name="website"
+                    value={formData.website}
+                    onChange={handleInputChange}
+                    placeholder="https://www.empresa.com.br"
+                  />
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  disabled={updating}
+                  className="w-full sm:w-auto"
+                >
+                  {updating ? (
+                    <>
+                      <Loader className="h-4 w-4 mr-2 animate-spin" />
+                      Atualizando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Salvar Alterações
+                    </>
+                  )}
+                </Button>
+              </form>
+            </div>
+            
+            {company && <CompanyDocuments companyId={company.id} />}
           </div>
         ) : (
           <div className="bg-white p-6 rounded-lg shadow-sm text-center">

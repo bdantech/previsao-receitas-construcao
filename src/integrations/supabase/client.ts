@@ -97,6 +97,14 @@ export const documentManagementApi = {
       }
     });
     return data;
+  },
+  
+  // Get company documents
+  getCompanyDocuments: async (companyId: string) => {
+    return documentManagementApi.getDocuments({
+      resourceType: 'company',
+      resourceId: companyId
+    });
   }
 };
 
