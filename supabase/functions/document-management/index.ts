@@ -171,43 +171,20 @@ serve(async (req) => {
 
           // Apply filter for company users - they can only see their company's documents
           if (!isAdmin) {
-            // Get user's companies
-            const { data: userCompanies, error: companiesError } = await supabaseClient
-              .from('user_companies')
-              .select('company_id')
-              .eq('user_id', user.id)
-
-            if (companiesError) {
-              console.error('Error fetching user companies:', companiesError)
-              throw new Error('Failed to fetch user companies')
-            }
-
-            if (!userCompanies || userCompanies.length === 0) {
-              console.log('User has no associated companies')
-              return new Response(
-                JSON.stringify({ documents: [] }),
-                { 
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                  status: 200 
-                }
-              )
-            }
-
-            const companyIds = userCompanies.map(uc => uc.company_id)
-            console.log('User belongs to companies:', companyIds)
-            query = query
-              .eq('resource_type', 'company')
-              .in('resource_id', companyIds)
+            // Set user_id filter - users can only see their documents
+            query = query.eq('user_id', user.id);
           }
 
           // Apply additional filters if provided
           const { filters } = requestData
           if (filters) {
-            const { resourceType, resourceId, status } = filters
+            const { resourceType, resourceId, status, userId } = filters
             console.log('Applying filters:', filters)
             if (resourceType) query = query.eq('resource_type', resourceType)
             if (resourceId) query = query.eq('resource_id', resourceId)
             if (status) query = query.eq('status', status)
+            // If admin requests documents for a specific user
+            if (isAdmin && userId) query = query.eq('user_id', userId)
           }
 
           // Execute the query
@@ -242,45 +219,21 @@ serve(async (req) => {
             reviewer:reviewed_by(id, email)
           `)
 
-        // Apply filter for company users - they can only see their company's documents
+        // Apply filter for company users - they can only see their documents
         if (!isAdmin) {
-          // Get user's companies
-          const { data: userCompanies, error: companiesError } = await adminSupabase
-            .from('user_companies')
-            .select('company_id')
-            .eq('user_id', user.id)
-
-          if (companiesError) {
-            console.error('Error fetching user companies:', companiesError)
-            throw new Error('Failed to fetch user companies')
-          }
-
-          if (!userCompanies || userCompanies.length === 0) {
-            console.log('User has no associated companies (service role check)')
-            return new Response(
-              JSON.stringify({ documents: [] }),
-              { 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200 
-              }
-            )
-          }
-
-          const companyIds = userCompanies.map(uc => uc.company_id)
-          console.log('User belongs to companies (service role):', companyIds)
-          query = query
-            .eq('resource_type', 'company')
-            .in('resource_id', companyIds)
+          query = query.eq('user_id', user.id);
         }
 
         // Apply additional filters if provided
         const { filters } = requestData
         if (filters) {
-          const { resourceType, resourceId, status } = filters
+          const { resourceType, resourceId, status, userId } = filters
           console.log('Applying filters (service role):', filters)
           if (resourceType) query = query.eq('resource_type', resourceType)
           if (resourceId) query = query.eq('resource_id', resourceId)
           if (status) query = query.eq('status', status)
+          // If admin requests documents for a specific user
+          if (isAdmin && userId) query = query.eq('user_id', userId)
         }
 
         // Execute the query
@@ -483,6 +436,7 @@ serve(async (req) => {
             file_size: fileSize,
             mime_type: mimeType,
             submitted_by: user.id,
+            user_id: user.id,
             submitted_at: new Date().toISOString()
           })
           .eq('id', existingDoc.id)
@@ -502,6 +456,7 @@ serve(async (req) => {
             file_size: fileSize,
             mime_type: mimeType,
             submitted_by: user.id,
+            user_id: user.id,
             submitted_at: new Date().toISOString()
           })
           .select()

@@ -52,7 +52,7 @@ export const documentManagementApi = {
   },
   
   // Documents
-  getDocuments: async (filters?: { resourceType?: string, resourceId?: string, status?: string }) => {
+  getDocuments: async (filters?: { resourceType?: string, resourceId?: string, status?: string, userId?: string }) => {
     const headers = await getAuthHeaders();
     const { data, error } = await supabase.functions.invoke('document-management', {
       headers,
@@ -104,7 +104,71 @@ export const documentManagementApi = {
     return data;
   },
   
-  // Get company documents
+  // Get user documents - new method that doesn't rely on company ID
+  getUserDocuments: async () => {
+    try {
+      console.log('Getting fresh session for user documents...');
+      // Force session refresh
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) {
+        console.error('Session refresh error:', refreshError);
+        throw new Error('Session refresh failed: ' + refreshError.message);
+      }
+      
+      if (!session) {
+        console.error('No session after refresh');
+        throw new Error('No valid session');
+      }
+      
+      console.log('Using session for user documents:', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at
+      });
+      
+      // Call Edge function with proper headers
+      const { data, error } = await supabase.functions.invoke('document-management', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: { 
+          action: 'getDocuments'
+          // No filters - will default to current user's documents
+        }
+      });
+
+      if (error) {
+        console.error('Error fetching user documents:', error);
+        throw error;
+      }
+
+      if (!data?.documents) {
+        console.error('No documents data in response:', data);
+        throw new Error('Invalid response format');
+      }
+
+      console.log('User documents response:', data);
+      
+      // Process documents and ensure they have consistent structure
+      return data.documents.map(doc => ({
+        ...doc,
+        file_path: doc.file_path || '',
+        file_name: doc.file_name || `Document ${doc.id}`,
+        document_type: {
+          id: doc.document_type?.id || '',
+          name: doc.document_type?.name || 'Unknown Document Type',
+          description: doc.document_type?.description || '',
+          required: doc.document_type?.required || false
+        },
+        status: doc.status || 'not_sent'
+      }));
+    } catch (error) {
+      console.error('Exception in getUserDocuments:', error);
+      throw error; // Let the component handle the error
+    }
+  },
+  
+  // Keep the original method for backward compatibility
   getCompanyDocuments: async (companyId: string) => {
     try {
       console.log('Getting fresh session...');
