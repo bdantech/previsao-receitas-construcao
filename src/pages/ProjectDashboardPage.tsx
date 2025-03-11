@@ -1,15 +1,14 @@
-
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader, UsersRound, Receipt, ArrowDownToLine, FileSpreadsheet, PencilIcon } from "lucide-react";
+import { Loader, UsersRound, Receipt, ArrowDownToLine, FileSpreadsheet, PencilIcon, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatCNPJ, formatCPF } from "@/lib/formatters";
+import { formatCNPJ, formatCPF, formatCurrency } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -17,6 +16,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { receivablesApi } from "@/integrations/supabase/client";
+import { ReceivableDialog } from "@/components/receivables/ReceivableDialog";
 
 interface Project {
   id: string;
@@ -41,13 +42,31 @@ interface ProjectBuyer {
   updated_at: string;
 }
 
+interface Receivable {
+  id: string;
+  project_id: string;
+  buyer_cpf: string;
+  amount: number;
+  due_date: string;
+  description?: string;
+  status: 'enviado' | 'elegivel_para_antecipacao' | 'reprovado' | 'antecipado';
+  created_at: string;
+  updated_at: string;
+  projects?: {
+    name: string;
+  };
+}
+
 const ProjectDashboardPage = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("compradores");
   const [projectBuyers, setProjectBuyers] = useState<ProjectBuyer[]>([]);
+  const [receivables, setReceivables] = useState<Receivable[]>([]);
   const [isLoadingBuyers, setIsLoadingBuyers] = useState(false);
+  const [isLoadingReceivables, setIsLoadingReceivables] = useState(false);
+  const [receivableDialogOpen, setReceivableDialogOpen] = useState(false);
   const { session } = useAuth();
   const { toast } = useToast();
   
@@ -103,6 +122,8 @@ const ProjectDashboardPage = () => {
   useEffect(() => {
     if (activeTab === "compradores" && projectId && session?.access_token) {
       fetchProjectBuyers();
+    } else if (activeTab === "recebiveis" && projectId && session?.access_token) {
+      fetchProjectReceivables();
     }
   }, [activeTab, projectId, session]);
 
@@ -146,20 +167,45 @@ const ProjectDashboardPage = () => {
     }
   };
 
+  const fetchProjectReceivables = async () => {
+    if (!projectId || !session?.access_token) return;
+
+    try {
+      setIsLoadingReceivables(true);
+      
+      const receivablesData = await receivablesApi.getReceivables({ projectId });
+      
+      console.log('Project receivables:', receivablesData);
+      setReceivables(receivablesData || []);
+    } catch (error) {
+      console.error('Error fetching receivables:', error);
+      toast({
+        title: "Erro ao carregar recebíveis",
+        description: "Não foi possível obter a lista de recebíveis deste projeto.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingReceivables(false);
+    }
+  };
+
+  const handleReceivableCreated = () => {
+    fetchProjectReceivables();
+  };
+
   const handleSaveProject = async () => {
     if (!projectId || !session?.access_token) return;
     
     try {
       setIsSaving(true);
       
-      // Fix: Don't include "projects/" in the endpoint parameter, but send the ID directly
       const { data, error } = await supabase.functions.invoke('project-management', {
         headers: {
           Authorization: `Bearer ${session.access_token}`
         },
         body: {
           method: 'PUT',
-          endpoint: `${projectId}`, // Fixed: removed "projects/" prefix
+          endpoint: `${projectId}`,
           name: editedName,
           initial_date: editedInitialDate,
           end_date: editedEndDate || null
@@ -180,7 +226,7 @@ const ProjectDashboardPage = () => {
       toast({
         title: "Projeto atualizado",
         description: "As alterações foram salvas com sucesso.",
-        variant: "default"  // Changed from "success" to "default"
+        variant: "default"
       });
       
       setEditDialogOpen(false);
@@ -204,6 +250,19 @@ const ProjectDashboardPage = () => {
         return <Badge variant="destructive">Reprovado</Badge>;
       default:
         return <Badge variant="secondary">Em análise</Badge>;
+    }
+  };
+
+  const getReceivableStatusBadge = (status: string) => {
+    switch (status) {
+      case 'elegivel_para_antecipacao':
+        return <Badge variant="success">Elegível para Antecipação</Badge>;
+      case 'reprovado':
+        return <Badge variant="destructive">Reprovado</Badge>;
+      case 'antecipado':
+        return <Badge variant="default" className="bg-blue-500">Antecipado</Badge>;
+      default:
+        return <Badge variant="secondary">Enviado</Badge>;
     }
   };
 
@@ -318,7 +377,9 @@ const ProjectDashboardPage = () => {
               <CardTitle className="text-sm font-medium text-gray-500">Recebíveis</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">R$ 0,00</div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(receivables.reduce((sum, r) => sum + Number(r.amount), 0))}
+              </div>
             </CardContent>
           </Card>
           
@@ -415,13 +476,50 @@ const ProjectDashboardPage = () => {
           
           <TabsContent value="recebiveis" className="mt-6">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Recebíveis</CardTitle>
+                <Button onClick={() => setReceivableDialogOpen(true)} className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Adicionar Recebível
+                </Button>
               </CardHeader>
               <CardContent>
-                <p className="text-center text-gray-500 py-8">
-                  Nenhum recebível cadastrado para este projeto ainda.
-                </p>
+                {isLoadingReceivables ? (
+                  <div className="flex justify-center py-8">
+                    <Loader className="h-6 w-6 animate-spin text-gray-500" />
+                  </div>
+                ) : receivables.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>CPF do Comprador</TableHead>
+                        <TableHead>Valor</TableHead>
+                        <TableHead>Data de Vencimento</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Descrição</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {receivables.map((receivable) => (
+                        <TableRow key={receivable.id}>
+                          <TableCell>{formatCPF(receivable.buyer_cpf)}</TableCell>
+                          <TableCell>{formatCurrency(receivable.amount)}</TableCell>
+                          <TableCell>
+                            {format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                          </TableCell>
+                          <TableCell>{getReceivableStatusBadge(receivable.status)}</TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {receivable.description || "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center text-gray-500 py-8">
+                    Nenhum recebível cadastrado para este projeto ainda.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -453,6 +551,14 @@ const ProjectDashboardPage = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Receivable Dialog */}
+      <ReceivableDialog
+        open={receivableDialogOpen}
+        onOpenChange={setReceivableDialogOpen}
+        projectId={projectId || ""}
+        onReceivableCreated={handleReceivableCreated}
+      />
     </DashboardLayout>
   );
 };

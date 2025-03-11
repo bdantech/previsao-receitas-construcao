@@ -1,4 +1,3 @@
-
 /**
  * Formats a CNPJ string (company registration number in Brazil)
  * Example: 12345678000199 -> 12.345.678/0001-99
@@ -42,3 +41,28 @@ export const formatCPF = (cpf: string): string => {
   // Return the original value if it's not an 11-digit number
   return cpf;
 };
+
+export function maskCPF(value: string): string {
+  const onlyNumbers = value.replace(/\D/g, '');
+  
+  if (onlyNumbers.length <= 3) {
+    return onlyNumbers;
+  }
+  
+  if (onlyNumbers.length <= 6) {
+    return `${onlyNumbers.slice(0, 3)}.${onlyNumbers.slice(3)}`;
+  }
+  
+  if (onlyNumbers.length <= 9) {
+    return `${onlyNumbers.slice(0, 3)}.${onlyNumbers.slice(3, 6)}.${onlyNumbers.slice(6)}`;
+  }
+  
+  return `${onlyNumbers.slice(0, 3)}.${onlyNumbers.slice(3, 6)}.${onlyNumbers.slice(6, 9)}-${onlyNumbers.slice(9, 11)}`;
+}
+
+export function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value);
+}
