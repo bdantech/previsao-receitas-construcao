@@ -292,7 +292,11 @@ serve(async (req) => {
     
     // Update project endpoint
     if (endpoint && method === 'PUT') {
-      const projectId = endpoint
+      const projectId = endpoint.startsWith('projects/') 
+        ? endpoint.split('/')[1]  // Handle case where "projects/" is still included for backward compatibility
+        : endpoint;               // Handle case where only the ID is provided
+      
+      console.log('Updating project with ID:', projectId);
       
       const { name, status, end_date } = params
       const updates = {}

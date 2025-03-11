@@ -90,13 +90,14 @@ const ProjectDashboardPage = () => {
     try {
       setIsSaving(true);
       
+      // Fix: Don't include "projects/" in the endpoint parameter, but send the ID directly
       const { data, error } = await supabase.functions.invoke('project-management', {
         headers: {
           Authorization: `Bearer ${session.access_token}`
         },
         body: {
           method: 'PUT',
-          endpoint: `projects/${projectId}`,
+          endpoint: `${projectId}`, // Fixed: removed "projects/" prefix
           name: editedName,
           initial_date: editedInitialDate,
           end_date: editedEndDate || null
