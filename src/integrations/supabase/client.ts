@@ -547,6 +547,49 @@ export const receivablesApi = {
     }
   },
   
+  createReceivable: async (receivable: {
+    projectId: string,
+    buyerCpf: string,
+    amount: number,
+    dueDate: string,
+    description?: string
+  }) => {
+    try {
+      // Get fresh auth headers
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No valid session');
+      }
+      
+      console.log('Creating receivable with headers:', {
+        Authorization: `Bearer ${session.access_token}`
+      });
+      console.log('Receivable data:', receivable);
+      
+      const { data, error } = await supabase.functions.invoke('project-receivables', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: { 
+          method: 'POST',
+          endpoint: 'receivables',
+          ...receivable
+        }
+      });
+      
+      if (error) {
+        console.error('Error creating receivable:', error);
+        throw error;
+      }
+      
+      return data?.receivable;
+    } catch (error) {
+      console.error('Exception in createReceivable:', error);
+      throw error;
+    }
+  },
+  
   getReceivable: async (id: string) => {
     try {
       const headers = await getAuthHeaders();
@@ -566,41 +609,6 @@ export const receivablesApi = {
       return data?.receivable;
     } catch (error) {
       console.error('Exception in getReceivable:', error);
-      throw error;
-    }
-  },
-  
-  createReceivable: async (receivable: {
-    projectId: string,
-    buyerCpf: string,
-    amount: number,
-    dueDate: string,
-    description?: string
-  }) => {
-    try {
-      const headers = await getAuthHeaders();
-      
-      console.log('Creating receivable with headers:', headers);
-      console.log('Receivable data:', receivable);
-      
-      const { data, error } = await supabase.functions.invoke('project-receivables', {
-        method: 'POST',
-        headers,
-        body: { 
-          method: 'POST',
-          endpoint: 'receivables',
-          ...receivable
-        }
-      });
-      
-      if (error) {
-        console.error('Error creating receivable:', error);
-        throw error;
-      }
-      
-      return data?.receivable;
-    } catch (error) {
-      console.error('Exception in createReceivable:', error);
       throw error;
     }
   },
