@@ -5,7 +5,7 @@ import { Navigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Loader } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DocumentList } from "@/components/company/DocumentList";
+import { CompanyDocumentList } from "@/components/company/CompanyDocumentList";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -81,7 +81,7 @@ const SettingsPage = () => {
             </CardHeader>
             <CardContent>
               {companyId ? (
-                <DocumentList companyId={companyId} />
+                <CompanyDocumentList companyId={companyId} />
               ) : (
                 <div className="text-center py-4 text-gray-500">
                   Nenhuma empresa encontrada
