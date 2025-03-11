@@ -28,6 +28,15 @@ const CompanyPage = () => {
   });
 
   useEffect(() => {
+    console.log('Current session:', {
+      hasSession: !!session,
+      accessToken: session?.access_token ? 'exists' : 'missing',
+      user: session?.user,
+      role: userRole
+    });
+  }, [session, userRole]);
+
+  useEffect(() => {
     const fetchCompanyData = async () => {
       if (session?.access_token) {
         try {

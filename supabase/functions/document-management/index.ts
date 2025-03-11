@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -16,11 +15,21 @@ serve(async (req) => {
   }
 
   try {
+    // Add debug logs for request
+    console.log('Headers:', {
+      auth: !!req.headers.get('Authorization'),
+      contentType: req.headers.get('Content-Type')
+    });
+
     // Get Supabase environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
 
     if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing environment variables:', {
+        hasUrl: !!supabaseUrl,
+        hasKey: !!supabaseKey
+      });
       throw new Error('Missing environment variables SUPABASE_URL or SUPABASE_ANON_KEY')
     }
 
@@ -55,7 +64,7 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     
     if (authError || !user) {
-      console.error('Auth error:', authError)
+      console.error('Auth error:', authError || 'No user found')
       return new Response(
         JSON.stringify({ error: authError?.message || 'Authentication required' }),
         { 

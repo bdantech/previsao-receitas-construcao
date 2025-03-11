@@ -107,30 +107,30 @@ export const documentManagementApi = {
   // Get company documents
   getCompanyDocuments: async (companyId: string) => {
     try {
-      console.log('Calling getCompanyDocuments for company ID:', companyId);
+      console.log('Getting fresh session...');
+      // Force session refresh
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
       
-      // Get fresh auth session
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('Error getting session:', sessionError);
-        throw new Error('Session error: ' + sessionError.message);
+      if (refreshError) {
+        console.error('Session refresh error:', refreshError);
+        throw new Error('Session refresh failed: ' + refreshError.message);
       }
       
-      if (!sessionData?.session?.access_token) {
-        console.error('No valid session found');
-        throw new Error('No valid session found');
+      if (!session) {
+        console.error('No session after refresh');
+        throw new Error('No valid session');
       }
       
-      const headers = {
-        Authorization: `Bearer ${sessionData.session.access_token}`
-      };
-      
-      console.log('Using auth token:', sessionData.session.access_token.substring(0, 15) + '...');
+      console.log('Using session:', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at
+      });
       
       // Call Edge function with proper headers
       const { data, error } = await supabase.functions.invoke('document-management', {
-        headers,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
         body: { 
           action: 'getDocuments',
           filters: {
