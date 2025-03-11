@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { receivablesApi } from "@/integrations/supabase/client";
+import { receivablesApi, supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { maskCPF } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
@@ -77,12 +77,19 @@ export function ReceivableDialog({
     try {
       setIsSubmitting(true);
 
-      await receivablesApi.createReceivable({
-        projectId,
-        buyerCpf: cleanCpf,
-        amount: amountValue,
-        dueDate,
-        description: description.trim() || undefined,
+      const response = await supabase.functions.invoke('project-receivables', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          method: 'POST',
+          endpoint: 'receivables',
+          projectId,
+          buyerCpf: cleanCpf,
+          amount: amountValue,
+          dueDate,
+          description: description.trim() || undefined,
+        }
       });
 
       toast({
