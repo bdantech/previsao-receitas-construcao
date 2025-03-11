@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { receivablesApi } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { maskCPF } from "@/lib/formatters";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ReceivableDialogProps {
   open: boolean;
@@ -29,10 +30,22 @@ export function ReceivableDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { toast } = useToast();
+  const { session } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    // Check authentication
+    if (!session) {
+      setErrorMessage("Você precisa estar autenticado para criar recebíveis.");
+      toast({
+        title: "Autenticação necessária",
+        description: "Você precisa estar autenticado para criar recebíveis.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Basic validation
     if (!buyerCpf || !amount || !dueDate) {
@@ -94,7 +107,12 @@ export function ReceivableDialog({
       let errorMsg = "Não foi possível criar o recebível. ";
       
       if (error instanceof Error) {
-        errorMsg += error.message;
+        // Check for specific authentication errors
+        if (error.message.includes("Auth session") || error.message.includes("Authentication required")) {
+          errorMsg = "Erro de autenticação. Por favor, faça login novamente e tente de novo.";
+        } else {
+          errorMsg += error.message;
+        }
       } else {
         errorMsg += "Verifique os dados e tente novamente.";
       }

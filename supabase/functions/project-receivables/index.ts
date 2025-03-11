@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -204,7 +205,8 @@ serve(async (req) => {
 
         // If not admin, verify user belongs to company that owns the project
         if (!isAdmin) {
-          const { data: projectCompany, error: projectError } = await adminSupabase
+          // Get project's company
+          const { data: projectData, error: projectError } = await adminSupabase
             .from('projects')
             .select('company_id')
             .eq('id', projectId)
@@ -221,15 +223,28 @@ serve(async (req) => {
             )
           }
 
-          const { data: userCompany, error: userCompanyError } = await adminSupabase
+          // Get user's company
+          const { data: userCompanies, error: userCompanyError } = await adminSupabase
             .from('user_companies')
             .select('company_id')
             .eq('user_id', user.id)
-            .eq('company_id', projectCompany.company_id)
-            .single()
 
           if (userCompanyError) {
             console.error('User company verification error:', userCompanyError)
+            return new Response(
+              JSON.stringify({ error: 'Failed to verify user company access' }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 500 
+              }
+            )
+          }
+
+          // Check if user belongs to the project's company
+          const hasAccess = userCompanies.some(uc => uc.company_id === projectData.company_id)
+          
+          if (!hasAccess) {
+            console.error('User does not have access to this project')
             return new Response(
               JSON.stringify({ error: 'You can only create receivables for your company projects' }),
               { 

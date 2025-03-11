@@ -521,17 +521,12 @@ export const projectBuyersApi = {
 export const receivablesApi = {
   getReceivables: async ({ projectId, status, buyerCpf }: { projectId?: string, status?: string, buyerCpf?: string } = {}) => {
     try {
-      console.log('Getting fresh session for receivables...');
-      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (refreshError) {
-        console.error('Session refresh error:', refreshError);
-        throw new Error('Session refresh failed: ' + refreshError.message);
-      }
+      console.log('Getting session for receivables...');
+      const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        console.error('No session after refresh');
-        throw new Error('No valid session');
+        console.error('No active session found');
+        throw new Error('Authentication required');
       }
       
       console.log('Using session for receivables:', {
@@ -572,17 +567,12 @@ export const receivablesApi = {
     description?: string
   }) => {
     try {
-      console.log('Getting fresh session for creating receivable...');
-      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (refreshError) {
-        console.error('Session refresh error:', refreshError);
-        throw new Error('Session refresh failed: ' + refreshError.message);
-      }
+      console.log('Getting session for creating receivable...');
+      const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        console.error('No session after refresh');
-        throw new Error('No valid session');
+        console.error('No active session found');
+        throw new Error('Authentication required');
       }
       
       console.log('Using session for creating receivable:', {
