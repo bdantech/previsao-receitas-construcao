@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { documentManagementApi, supabase } from "@/integrations/supabase/client";
 import { Loader, Upload, File, CheckCircle, AlertCircle, Download } from "lucide-react";
@@ -161,93 +160,124 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center my-8">
-        <Loader className="h-8 w-8 animate-spin text-gray-500" />
-      </div>
-    );
-  }
-
   return (
-    <div className="mt-8">
-      <h2 className="text-xl font-semibold mb-4">Documentos da Empresa</h2>
+    <div className="space-y-6">
+      <h2 className="text-xl font-semibold">Documentos da Empresa</h2>
       
-      {documents.length === 0 ? (
-        <div className="bg-white p-6 rounded-lg shadow-sm text-center">
-          <p className="text-gray-500">Nenhum documento encontrado para esta empresa.</p>
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Loader className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      ) : documents.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          Nenhum documento encontrado.
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Arquivo</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {documents.map((doc) => (
-                  <tr key={doc.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{doc.document_type.name}</div>
-                      {doc.document_type.description && (
-                        <div className="text-sm text-gray-500">{doc.document_type.description}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(doc.status)}
-                      {doc.review_notes && (
-                        <div className="mt-1 text-xs text-gray-500 max-w-xs">{doc.review_notes}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {doc.file_name !== "Pending Upload - " + doc.document_type.name ? (
-                        <div className="text-sm text-gray-900">{doc.file_name}</div>
-                      ) : (
-                        <div className="text-sm text-gray-500">Nenhum arquivo enviado</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {(doc.status === 'not_sent' || doc.status === 'needs_revision') ? (
-                        <div>
-                          <label htmlFor={`file-upload-${doc.id}`} className="cursor-pointer">
-                            <div className="relative">
-                              <Button size="sm" disabled={!!uploading[doc.id]}>
-                                {uploading[doc.id] ? (
-                                  <><Loader className="h-4 w-4 mr-2 animate-spin" /> Enviando...</>
-                                ) : (
-                                  <><Upload className="h-4 w-4 mr-2" /> Enviar Documento</>
-                                )}
-                              </Button>
-                              <input
-                                id={`file-upload-${doc.id}`}
-                                type="file"
-                                className="sr-only"
-                                onChange={(e) => handleFileUpload(doc.id, doc.document_type.id, e)}
-                                disabled={!!uploading[doc.id]}
-                              />
-                            </div>
-                          </label>
+        <div className="grid gap-4">
+          {documents.map((doc) => (
+            <div
+              key={doc.id}
+              className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
+            >
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <h3 className="font-medium">{doc.document_type.name}</h3>
+                  {doc.document_type.description && (
+                    <p className="text-sm text-gray-500">{doc.document_type.description}</p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(doc.status)}
+                    {doc.document_type.required && (
+                      <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
+                        Obrigatório
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {doc.file_path ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadDocument(doc)}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                      {(doc.status === "not_sent" || doc.status === "needs_revision") && (
+                        <div className="relative">
+                          <input
+                            type="file"
+                            onChange={(e) => handleFileUpload(doc.id, doc.document_type.id, e)}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            disabled={uploading[doc.id]}
+                          />
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={uploading[doc.id]}
+                          >
+                            {uploading[doc.id] ? (
+                              <Loader className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Upload className="h-4 w-4 mr-2" />
+                            )}
+                            Atualizar
+                          </Button>
                         </div>
-                      ) : doc.file_path && doc.file_path !== "" ? (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => downloadDocument(doc)}
+                      )}
+                    </>
+                  ) : (
+                    (doc.status === "not_sent" || doc.status === "needs_revision") && (
+                      <div className="relative">
+                        <input
+                          type="file"
+                          onChange={(e) => handleFileUpload(doc.id, doc.document_type.id, e)}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          disabled={uploading[doc.id]}
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={uploading[doc.id]}
                         >
-                          <Download className="h-4 w-4 mr-2" /> Baixar
+                          {uploading[doc.id] ? (
+                            <Loader className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Upload className="h-4 w-4 mr-2" />
+                          )}
+                          Enviar
                         </Button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+              
+              {doc.status === "needs_revision" && doc.review_notes && (
+                <div className="mt-3 text-sm bg-yellow-50 text-yellow-800 p-3 rounded">
+                  <p className="font-medium">Observações da revisão:</p>
+                  <p>{doc.review_notes}</p>
+                </div>
+              )}
+              
+              {doc.submitted_at && (
+                <div className="mt-3 text-xs text-gray-500">
+                  Enviado por {doc.submitted_by?.email} em{" "}
+                  {new Date(doc.submitted_at).toLocaleString()}
+                </div>
+              )}
+              
+              {doc.reviewed_at && (
+                <div className="mt-1 text-xs text-gray-500">
+                  Revisado por {doc.reviewer?.email} em{" "}
+                  {new Date(doc.reviewed_at).toLocaleString()}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
