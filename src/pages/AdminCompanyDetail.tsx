@@ -20,7 +20,7 @@ interface Company {
 
 const AdminCompanyDetail = () => {
   const { companyId } = useParams<{ companyId: string }>();
-  const { session, userRole, isLoading } = useAuth();
+  const { session, userRole, isLoading: authLoading } = useAuth();
   const [company, setCompany] = useState<Company | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
@@ -61,7 +61,7 @@ const AdminCompanyDetail = () => {
     fetchCompanyDetails();
   }, [session, userRole, companyId]);
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader className="h-8 w-8 animate-spin text-gray-500" />
@@ -111,11 +111,7 @@ const AdminCompanyDetail = () => {
         </div>
       </div>
       
-      {isLoading ? (
-        <div className="flex justify-center my-10">
-          <Loader className="h-8 w-8 animate-spin text-gray-500" />
-        </div>
-      ) : !company ? (
+      {!company ? (
         <div className="bg-white shadow sm:rounded-lg p-6 text-center text-gray-500">
           Empresa não encontrada ou você não tem permissão para visualizá-la.
         </div>
