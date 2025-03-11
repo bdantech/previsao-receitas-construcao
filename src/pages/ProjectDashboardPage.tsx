@@ -171,10 +171,15 @@ const ProjectDashboardPage = () => {
       setIsLoadingReceivables(true);
       
       console.log('Fetching receivables for project:', projectId);
-      const receivablesData = await receivablesApi.getReceivables({ 
-        projectId 
+      const receivablesData = await supabase.functions.invoke('project-receivables', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          action: 'list',
+          projectId: projectId
+        }
       });
-      
       console.log('Project receivables:', receivablesData);
       setReceivables(receivablesData || []);
     } catch (error) {
