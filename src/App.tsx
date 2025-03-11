@@ -1,6 +1,5 @@
-
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import Index from "./pages/Index";
 import AuthPage from "./pages/auth/AuthPage";
@@ -13,10 +12,11 @@ import AdminCompanyDetail from "./pages/AdminCompanyDetail";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
+import NewReceivablePage from "./pages/NewReceivablePage";
 
 function App() {
   return (
-    <BrowserRouter>
+    <Router>
       <AuthProvider>
         <Routes>
           {/* Public routes */}
@@ -31,13 +31,14 @@ function App() {
           <Route path="/company" element={<CompanyPage />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
+          <Route path="/project/:projectId/receivables/new" element={<NewReceivablePage />} />
           
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
         <Toaster />
       </AuthProvider>
-    </BrowserRouter>
+    </Router>
   );
 }
 
