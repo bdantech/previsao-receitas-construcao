@@ -75,7 +75,8 @@ serve(async (req: Request) => {
     }
 
     // Parse the request body for action parameters
-    const { companyId } = await req.json();
+    const requestBody = await req.json();
+    const { companyId } = requestBody;
     
     if (!companyId) {
       return new Response(
@@ -84,19 +85,29 @@ serve(async (req: Request) => {
       );
     }
 
-    // Fetch all projects for the specified company
+    console.log(`Fetching projects for company ID: ${companyId}`);
+
+    // Fetch all projects for the specified company with company information
     const { data: projects, error: projectsError } = await supabaseAdmin
       .from("projects")
-      .select("*")
+      .select(`
+        *,
+        companies:company_id (
+          name
+        )
+      `)
       .eq("company_id", companyId)
       .order("created_at", { ascending: false });
 
     if (projectsError) {
+      console.error("Error fetching projects:", projectsError);
       return new Response(
         JSON.stringify({ error: "Failed to fetch projects", details: projectsError }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    
+    console.log(`Found ${projects.length} projects for company ID: ${companyId}`);
 
     return new Response(
       JSON.stringify({ projects }),
