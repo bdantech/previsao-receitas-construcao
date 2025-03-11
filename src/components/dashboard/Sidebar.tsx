@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Building, Settings, FolderKanban, LayoutDashboard } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building, FolderKanban, LayoutDashboard } from "lucide-react";
 
 interface SidebarItemProps {
   icon: React.ElementType;
@@ -60,11 +59,6 @@ export const Sidebar = () => {
       icon: Building,
       label: "Minha Empresa",
       href: "/company"
-    },
-    {
-      icon: Settings,
-      label: "Configurações",
-      href: "/settings"
     }
   ];
 

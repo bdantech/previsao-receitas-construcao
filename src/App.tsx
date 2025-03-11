@@ -11,7 +11,6 @@ import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
-import SettingsPage from "./pages/SettingsPage";
 
 function App() {
   return (
@@ -27,7 +26,6 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/company" element={<CompanyPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           
           {/* 404 */}
