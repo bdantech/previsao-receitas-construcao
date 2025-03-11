@@ -3,6 +3,7 @@ import { FolderKanban } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ptBR } from "date-fns/locale";
+import { formatCNPJ } from "@/lib/formatters";
 
 interface Project {
   id: string;
@@ -63,7 +64,7 @@ export const ProjectsList = ({ projects }: ProjectsListProps) => {
                   <div className="text-sm font-medium text-gray-900">{project.name}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-500">{project.cnpj}</div>
+                  <div className="text-sm text-gray-500">{formatCNPJ(project.cnpj)}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-500">

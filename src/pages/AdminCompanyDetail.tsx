@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdminCompanyProjects } from "@/components/dashboard/AdminCompanyProjects";
 import { useAuth } from "@/hooks/useAuth";
+import { CompanyStatusBadge } from "@/components/company/CompanyStatusBadge";
+import { formatCNPJ } from "@/lib/formatters";
 
 const AdminCompanyDetail = () => {
   const { companyId } = useParams();
@@ -89,21 +91,21 @@ const AdminCompanyDetail = () => {
         
         <Card>
           <CardHeader>
-            <CardTitle>Company Details</CardTitle>
+            <CardTitle>Detalhes da Empresa</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium">CNPJ</p>
-                <p>{company.cnpj}</p>
+                <p>{formatCNPJ(company.cnpj)}</p>
               </div>
               <div>
                 <p className="text-sm font-medium">Website</p>
                 <p>{company.website || "N/A"}</p>
               </div>
               <div>
-                <p className="text-sm font-medium">Documents Status</p>
-                <p>{company.documents_status}</p>
+                <p className="text-sm font-medium">Status dos Documentos</p>
+                <CompanyStatusBadge status={company.documents_status} />
               </div>
             </div>
           </CardContent>
@@ -111,8 +113,8 @@ const AdminCompanyDetail = () => {
 
         <Tabs defaultValue="documents">
           <TabsList>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="documents">Documentos</TabsTrigger>
+            <TabsTrigger value="projects">Projetos</TabsTrigger>
           </TabsList>
           <TabsContent value="documents">
             <CompanyDocuments companyId={companyId!} />
