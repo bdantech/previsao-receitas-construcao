@@ -9,13 +9,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatCNPJ } from "@/lib/formatters";
+import { formatCNPJ, formatCPF } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 interface Project {
   id: string;
@@ -29,10 +30,24 @@ interface Project {
   };
 }
 
+interface ProjectBuyer {
+  id: string;
+  full_name: string;
+  cpf: string;
+  buyer_status: 'aprovado' | 'reprovado' | 'a_analisar';
+  contract_status: 'aprovado' | 'reprovado' | 'a_enviar';
+  credit_analysis_status: 'aprovado' | 'reprovado' | 'a_analisar';
+  created_at: string;
+  updated_at: string;
+}
+
 const ProjectDashboardPage = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("compradores");
+  const [projectBuyers, setProjectBuyers] = useState<ProjectBuyer[]>([]);
+  const [isLoadingBuyers, setIsLoadingBuyers] = useState(false);
   const { session } = useAuth();
   const { toast } = useToast();
   
@@ -84,6 +99,53 @@ const ProjectDashboardPage = () => {
     fetchProjectDetails();
   }, [projectId, session]);
 
+  // Fetch project buyers when tab changes to "compradores"
+  useEffect(() => {
+    if (activeTab === "compradores" && projectId && session?.access_token) {
+      fetchProjectBuyers();
+    }
+  }, [activeTab, projectId, session]);
+
+  const fetchProjectBuyers = async () => {
+    if (!projectId || !session?.access_token) return;
+
+    try {
+      setIsLoadingBuyers(true);
+      
+      const { data, error } = await supabase.functions.invoke('project-buyers', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          action: 'list',
+          projectId: projectId
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching project buyers:', error);
+        toast({
+          title: "Erro ao carregar compradores",
+          description: "Não foi possível obter a lista de compradores deste projeto.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      console.log('Project buyers:', data);
+      setProjectBuyers(data?.buyers || []);
+    } catch (error) {
+      console.error('Error fetching project buyers:', error);
+      toast({
+        title: "Erro ao carregar compradores",
+        description: "Ocorreu um erro ao buscar os compradores.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingBuyers(false);
+    }
+  };
+
   const handleSaveProject = async () => {
     if (!projectId || !session?.access_token) return;
     
@@ -131,6 +193,17 @@ const ProjectDashboardPage = () => {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const getBuyerStatusBadge = (status: string) => {
+    switch (status) {
+      case 'aprovado':
+        return <Badge variant="success">Aprovado</Badge>;
+      case 'reprovado':
+        return <Badge variant="destructive">Reprovado</Badge>;
+      default:
+        return <Badge variant="secondary">Em análise</Badge>;
     }
   };
 
@@ -236,7 +309,7 @@ const ProjectDashboardPage = () => {
               <CardTitle className="text-sm font-medium text-gray-500">Total de Compradores</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{projectBuyers.length}</div>
             </CardContent>
           </Card>
           
@@ -269,7 +342,7 @@ const ProjectDashboardPage = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="compradores" className="w-full">
+        <Tabs defaultValue="compradores" className="w-full" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4 bg-white">
             <TabsTrigger value="compradores" className="flex items-center gap-2">
               <UsersRound className="h-4 w-4" />
@@ -291,13 +364,51 @@ const ProjectDashboardPage = () => {
           
           <TabsContent value="compradores" className="mt-6">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Compradores</CardTitle>
+                <Button>
+                  Adicionar Comprador
+                </Button>
               </CardHeader>
               <CardContent>
-                <p className="text-center text-gray-500 py-8">
-                  Nenhum comprador cadastrado para este projeto ainda.
-                </p>
+                {isLoadingBuyers ? (
+                  <div className="flex justify-center py-8">
+                    <Loader className="h-6 w-6 animate-spin text-gray-500" />
+                  </div>
+                ) : projectBuyers.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>CPF</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Contrato</TableHead>
+                        <TableHead>Análise de Crédito</TableHead>
+                        <TableHead>Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {projectBuyers.map((buyer) => (
+                        <TableRow key={buyer.id}>
+                          <TableCell className="font-medium">{buyer.full_name}</TableCell>
+                          <TableCell>{formatCPF(buyer.cpf)}</TableCell>
+                          <TableCell>{getBuyerStatusBadge(buyer.buyer_status)}</TableCell>
+                          <TableCell>{getBuyerStatusBadge(buyer.contract_status)}</TableCell>
+                          <TableCell>{getBuyerStatusBadge(buyer.credit_analysis_status)}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm">
+                              Detalhes
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center text-gray-500 py-8">
+                    Nenhum comprador cadastrado para este projeto ainda.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
