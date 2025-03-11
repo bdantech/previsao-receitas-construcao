@@ -522,7 +522,7 @@ export const receivablesApi = {
   getReceivables: async ({ projectId, status, buyerCpf }: { projectId?: string, status?: string, buyerCpf?: string } = {}) => {
     try {
       console.log('Getting session for receivables...');
-      console.log(supabase.auth)
+      console.log('supabase.auth', supabase.auth);
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
