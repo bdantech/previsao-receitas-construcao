@@ -521,8 +521,9 @@ export const projectBuyersApi = {
 export const receivablesApi = {
   getReceivables: async ({ projectId, status, buyerCpf }: { projectId?: string, status?: string, buyerCpf?: string } = {}) => {
     try {
-      console.log('Getting session for receivables...');
+      console.log('Getting session for receivables..aaaaaa.');
       const headers = await getAuthHeaders();
+      console.log('headers',headers);
       
       //if (!session) {
       //  console.error('No active session found');
