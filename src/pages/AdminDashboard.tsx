@@ -6,9 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader, ArrowRight } from "lucide-react";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 
 const AdminDashboard = () => {
-  const { session, userRole, isLoading, signOut } = useAuth();
+  const { session, userRole, isLoading } = useAuth();
   const [companies, setCompanies] = useState<any[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const navigate = useNavigate();
@@ -17,29 +18,51 @@ const AdminDashboard = () => {
     const fetchCompanyData = async () => {
       if (session && userRole === 'admin') {
         try {
+          setLoadingCompanies(true);
+          console.log("Fetching company data with token:", session.access_token.substring(0, 10) + "...");
+          
           const { data, error } = await supabase.functions.invoke('company-data', {
+            method: 'POST',
             headers: {
               Authorization: `Bearer ${session.access_token}`
-            }
+            },
+            body: {} // Empty body for default admin action (fetch all companies)
           });
           
           if (error) {
             console.error("Function invocation error:", error);
+            toast({
+              title: "Error",
+              description: "Failed to fetch company data. Please try again.",
+              variant: "destructive"
+            });
             throw error;
           }
           
           console.log("Company data received:", data);
-          setCompanies(data.companies || []);
+          if (data && data.companies) {
+            setCompanies(data.companies);
+          } else {
+            console.error("Unexpected response format:", data);
+            toast({
+              title: "Error",
+              description: "Received invalid data format from server.",
+              variant: "destructive"
+            });
+          }
         } catch (error) {
           console.error("Error fetching company data:", error);
         } finally {
           setLoadingCompanies(false);
         }
+      } else if (!isLoading) {
+        // If authentication is complete but not admin or not logged in
+        setLoadingCompanies(false);
       }
     };
 
     fetchCompanyData();
-  }, [session, userRole]);
+  }, [session, userRole, isLoading]);
 
   const handleViewCompany = (companyId: string) => {
     navigate(`/admin/companies/${companyId}`);
@@ -67,7 +90,10 @@ const AdminDashboard = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Painel Administrativo</h2>
         <button 
-          onClick={signOut}
+          onClick={() => {
+            supabase.auth.signOut();
+            navigate('/admin/auth');
+          }}
           className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white hover:bg-gray-100 border border-gray-300 rounded-md"
         >
           Sair

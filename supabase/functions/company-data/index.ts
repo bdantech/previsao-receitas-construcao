@@ -66,10 +66,15 @@ serve(async (req: Request) => {
 
     const userRole = profileData.role;
 
-    // Parse request body
+    // Parse request body if it's a POST request
     let requestBody = {};
     if (req.method === "POST") {
-      requestBody = await req.json();
+      try {
+        requestBody = await req.json();
+      } catch (error) {
+        console.error("Error parsing request body:", error);
+        requestBody = {};
+      }
     }
 
     const { action, companyId } = requestBody as { action?: string; companyId?: string };
