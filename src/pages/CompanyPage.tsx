@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { CompanyDocuments } from "@/components/company/CompanyDocuments";
 
 interface Company {
   id: string;
@@ -210,10 +210,6 @@ const CompanyPage = () => {
                 )}
               </Button>
             </form>
-
-            <div className="mt-8">
-              {company.id && <CompanyDocuments companyId={company.id} />}
-            </div>
           </>
         ) : (
           <div className="text-center py-8 text-gray-500">
