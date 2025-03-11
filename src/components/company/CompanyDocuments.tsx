@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { documentManagementApi, supabase } from "@/integrations/supabase/client";
 import { Loader, Upload, File, CheckCircle, AlertCircle, Download } from "lucide-react";
@@ -108,9 +109,9 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
   };
 
   // Download document
-  const downloadDocument = async (document: Document) => {
+  const downloadDocument = async (doc: Document) => {
     try {
-      if (!document.file_path) {
+      if (!doc.file_path) {
         toast({
           title: "Erro",
           description: "Não há arquivo para download",
@@ -121,19 +122,19 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
       
       const { data, error } = await supabase.storage
         .from('documents')
-        .download(document.file_path);
+        .download(doc.file_path);
       
       if (error) throw error;
       
       // Create a download link
       const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
+      const a = window.document.createElement('a');
       a.href = url;
-      a.download = document.file_name;
-      document.body.appendChild(a);
+      a.download = doc.file_name;
+      window.document.body.appendChild(a);
       a.click();
       URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      window.document.body.removeChild(a);
     } catch (error) {
       console.error("Error downloading document:", error);
       toast({
