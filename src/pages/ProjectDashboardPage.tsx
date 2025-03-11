@@ -117,7 +117,7 @@ const ProjectDashboardPage = () => {
       toast({
         title: "Projeto atualizado",
         description: "As alterações foram salvas com sucesso.",
-        variant: "success"
+        variant: "default"  // Changed from "success" to "default"
       });
       
       setEditDialogOpen(false);
