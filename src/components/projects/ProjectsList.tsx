@@ -1,9 +1,11 @@
 
-import { FolderKanban } from "lucide-react";
+import { FolderKanban, LayoutDashboard } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ptBR } from "date-fns/locale";
 import { formatCNPJ } from "@/lib/formatters";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 interface Project {
   id: string;
@@ -55,6 +57,9 @@ export const ProjectsList = ({ projects }: ProjectsListProps) => {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Ações
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -85,6 +90,14 @@ export const ProjectsList = ({ projects }: ProjectsListProps) => {
                   >
                     {project.status === 'active' ? 'Ativo' : 'Inativo'}
                   </Badge>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <Button asChild variant="outline" size="sm">
+                    <Link to={`/project-dashboard/${project.id}`}>
+                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                      Dashboard
+                    </Link>
+                  </Button>
                 </td>
               </tr>
             ))}

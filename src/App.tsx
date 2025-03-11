@@ -12,6 +12,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminCompanyDetail from "./pages/AdminCompanyDetail";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
+import ProjectDashboardPage from "./pages/ProjectDashboardPage";
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           {/* Protected routes */}
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/project-dashboard/:projectId" element={<ProjectDashboardPage />} />
           <Route path="/company" element={<CompanyPage />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
