@@ -176,12 +176,13 @@ const ProjectDashboardPage = () => {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: {
-          action: 'list',
+          method: 'GET',
+          endpoint: 'receivables',
           projectId: projectId
         }
       });
       console.log('Project receivables:', receivablesData);
-      setReceivables(receivablesData || []);
+      setReceivables(receivablesData?.data?.receivables || []);
     } catch (error) {
       console.error('Error fetching receivables:', error);
       toast({
