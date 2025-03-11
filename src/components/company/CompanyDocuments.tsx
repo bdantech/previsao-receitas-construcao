@@ -111,14 +111,14 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
     }
   };
 
-  // Download document - Fixed to use window.document instead of Document interface
+  // Download document
   const downloadDocument = async (doc: CompanyDocument) => {
     try {
       if (!doc.file_path) {
         toast({
-          title: "Erro",
-          description: "Não há arquivo para download",
-          variant: "destructive",
+          title: "Aviso",
+          description: "Este documento ainda não possui um arquivo para download",
+          variant: "default",
         });
         return;
       }
@@ -129,7 +129,7 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
       
       if (error) throw error;
       
-      // Create a download link - Use window.document to avoid type conflict
+      // Create a download link
       const url = URL.createObjectURL(data);
       const a = window.document.createElement('a');
       a.href = url;
@@ -162,6 +162,11 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
       default:
         return <span className="inline-flex items-center gap-1 text-gray-700 bg-gray-100 px-2 py-1 rounded text-xs">{status}</span>;
     }
+  };
+
+  // Helper function to determine if a document has a file
+  const hasFile = (doc: CompanyDocument) => {
+    return doc.file_path && doc.file_path.trim().length > 0;
   };
 
   return (
@@ -200,7 +205,7 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  {doc.file_path ? (
+                  {hasFile(doc) ? (
                     <>
                       <Button
                         variant="outline"

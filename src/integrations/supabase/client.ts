@@ -109,8 +109,20 @@ export const documentManagementApi = {
   getCompanyDocuments: async (companyId: string) => {
     try {
       console.log('Calling getCompanyDocuments for company ID:', companyId);
-      const headers = await getAuthHeaders();
-      console.log('Auth headers:', JSON.stringify(headers));
+      
+      // Get fresh auth session
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (!sessionData?.session?.access_token) {
+        console.error('No valid session found');
+        return [];
+      }
+      
+      const headers = {
+        Authorization: `Bearer ${sessionData.session.access_token}`
+      };
+      
+      console.log('Using auth token:', sessionData.session.access_token.substring(0, 15) + '...');
       
       const { data, error } = await supabase.functions.invoke('document-management', {
         headers,
@@ -129,7 +141,14 @@ export const documentManagementApi = {
       }
 
       console.log('Documents response:', data);
-      return data?.documents || [];
+      
+      // Handle documents with missing file paths
+      const documents = data?.documents || [];
+      return documents.map(doc => ({
+        ...doc,
+        file_path: doc.file_path || '',
+        file_name: doc.file_name || `Document ${doc.id}`
+      }));
     } catch (error) {
       console.error('Exception in getCompanyDocuments:', error);
       throw error;
