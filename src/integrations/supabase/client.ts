@@ -521,23 +521,18 @@ export const projectBuyersApi = {
 export const receivablesApi = {
   getReceivables: async ({ projectId, status, buyerCpf }: { projectId?: string, status?: string, buyerCpf?: string } = {}) => {
     try {
-      console.log('Getting session for receivables...');
-      const session = await supabase.auth.headers.Authorization;
+      console.log('Getting auth headers for receivables...');
+      const headers = await getAuthHeaders();
       
-      if (!session) {
+      if (!headers.Authorization) {
         console.error('No active session found');
         throw new Error('Authentication required');
       }
       
-      //console.log('Using session for receivables:', {
-      //  userId: session.user?.id,
-      //  expiresAt: session.expires_at
-      //});
+      console.log('Using auth headers for receivables');
 
       const { data, error } = await supabase.functions.invoke('project-receivables', {
-        headers: {
-          Authorization: session
-        },
+        headers,
         body: {
           method: 'GET',
           endpoint: 'receivables',
@@ -567,24 +562,19 @@ export const receivablesApi = {
     description?: string
   }) => {
     try {
-      console.log('Getting session for creating receivable...');
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Getting auth headers for creating receivable...');
+      const headers = await getAuthHeaders();
       
-      if (!session) {
+      if (!headers.Authorization) {
         console.error('No active session found');
         throw new Error('Authentication required');
       }
       
-      console.log('Using session for creating receivable:', {
-        userId: session.user?.id,
-        expiresAt: session.expires_at
-      });
+      console.log('Using auth headers for creating receivable');
 
       const { data, error } = await supabase.functions.invoke('project-receivables', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
+        headers,
         body: {
           method: 'POST',
           endpoint: 'receivables',

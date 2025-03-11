@@ -314,6 +314,194 @@ serve(async (req) => {
       }
     }
 
+    // GET a single receivable
+    if (endpoint.startsWith('receivables/') && method === 'GET') {
+      try {
+        const receivableId = endpoint.split('/')[1]
+        
+        if (!receivableId) {
+          return new Response(
+            JSON.stringify({ error: 'Receivable ID is required' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          )
+        }
+        
+        let query = adminSupabase
+          .from('receivables')
+          .select(`
+            id,
+            project_id,
+            buyer_cpf,
+            amount,
+            due_date,
+            description,
+            status,
+            created_at,
+            updated_at,
+            projects:project_id (
+              name,
+              company_id
+            )
+          `)
+          .eq('id', receivableId)
+          .single()
+        
+        const { data: receivable, error: receivableError } = await query
+        
+        if (receivableError) {
+          console.error('Receivable error:', receivableError)
+          throw receivableError
+        }
+        
+        // If not admin, verify user has access to this receivable
+        if (!isAdmin) {
+          // Get user's company
+          const { data: userCompany, error: companyError } = await adminSupabase
+            .from('user_companies')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single()
+
+          if (companyError) {
+            console.error('Error getting user company:', companyError)
+            throw new Error('Failed to verify user company')
+          }
+          
+          // Get the project's company
+          const projectCompanyId = receivable.projects?.company_id
+          
+          if (userCompany.company_id !== projectCompanyId) {
+            return new Response(
+              JSON.stringify({ error: 'You do not have access to this receivable' }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 403 
+              }
+            )
+          }
+        }
+        
+        return new Response(
+          JSON.stringify({ receivable }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        )
+      } catch (error) {
+        console.error('Error in GET single receivable:', error)
+        return new Response(
+          JSON.stringify({ error: error.message || 'Failed to fetch receivable' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        )
+      }
+    }
+    
+    // Update a receivable
+    if (endpoint.startsWith('receivables/') && method === 'PUT') {
+      try {
+        const receivableId = endpoint.split('/')[1]
+        
+        if (!receivableId) {
+          return new Response(
+            JSON.stringify({ error: 'Receivable ID is required' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          )
+        }
+        
+        // Get the receivable first to check permissions
+        const { data: receivable, error: getError } = await adminSupabase
+          .from('receivables')
+          .select(`
+            id,
+            project_id,
+            projects:project_id (
+              company_id
+            )
+          `)
+          .eq('id', receivableId)
+          .single()
+        
+        if (getError) {
+          console.error('Error getting receivable:', getError)
+          throw getError
+        }
+        
+        // If not admin, verify user has access to this receivable
+        if (!isAdmin) {
+          // Get user's company
+          const { data: userCompany, error: companyError } = await adminSupabase
+            .from('user_companies')
+            .select('company_id')
+            .eq('user_id', user.id)
+            .single()
+
+          if (companyError) {
+            console.error('Error getting user company:', companyError)
+            throw new Error('Failed to verify user company')
+          }
+          
+          // Get the project's company
+          const projectCompanyId = receivable.projects?.company_id
+          
+          if (userCompany.company_id !== projectCompanyId) {
+            return new Response(
+              JSON.stringify({ error: 'You do not have access to this receivable' }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 403 
+              }
+            )
+          }
+        }
+        
+        // Prepare updates
+        const updates: Record<string, any> = {}
+        
+        if (params.status) updates.status = params.status
+        if (params.description !== undefined) updates.description = params.description
+        
+        // Update the receivable
+        const { data: updatedReceivable, error: updateError } = await adminSupabase
+          .from('receivables')
+          .update(updates)
+          .eq('id', receivableId)
+          .select()
+          .single()
+        
+        if (updateError) {
+          console.error('Error updating receivable:', updateError)
+          throw updateError
+        }
+        
+        return new Response(
+          JSON.stringify({ receivable: updatedReceivable }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        )
+      } catch (error) {
+        console.error('Error in PUT receivable:', error)
+        return new Response(
+          JSON.stringify({ error: error.message || 'Failed to update receivable' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        )
+      }
+    }
+
     // If we get here, the operation or method is not supported
     return new Response(
       JSON.stringify({ error: 'Operation not supported' }),
