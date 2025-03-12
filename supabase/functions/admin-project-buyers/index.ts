@@ -184,10 +184,8 @@ serve(async (req) => {
       
       console.log('Executing query:', query, queryParams);
       
-      // Convert params array to JSONB format
-      const jsonParams = JSON.stringify(queryParams.map(param => 
-        typeof param === 'string' ? param : JSON.stringify(param)
-      ));
+      // Convert params array to JSONB format while preserving string values
+      const jsonParams = JSON.stringify(queryParams);
       console.log('Params as JSON:', jsonParams);
       
       const { data: result, error: buyersError } = await serviceClient

@@ -6,18 +6,17 @@ SECURITY DEFINER
 AS $$
 DECLARE
     result jsonb;
-    param_value text;
     param_array text[];
 BEGIN
-    -- Convert params to an array if it's not already
-    IF jsonb_typeof(params) = 'array' THEN
-        -- Convert each JSON value to text
-        SELECT array_agg(value::text)
-        INTO param_array
-        FROM jsonb_array_elements(params);
-    ELSE
-        param_array := ARRAY[params::text];
-    END IF;
+    -- Convert params to text array, preserving string values
+    SELECT array_agg(
+        CASE 
+            WHEN jsonb_typeof(value) IN ('string', 'null') THEN value #>> '{}'
+            ELSE value::text
+        END
+    )
+    INTO param_array
+    FROM jsonb_array_elements(params);
 
     -- Execute the query with the parameters
     EXECUTE format('SELECT array_to_json(array_agg(row_to_json(t)))::jsonb FROM (%s) t', query_text)
