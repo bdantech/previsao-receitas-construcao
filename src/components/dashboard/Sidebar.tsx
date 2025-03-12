@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Building, FolderKanban, LayoutDashboard } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building, FolderKanban, LayoutDashboard, LogOut } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SidebarItemProps {
   icon: React.ElementType;
@@ -39,9 +41,27 @@ const SidebarItem = ({
 export const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   
   const toggleSidebar = () => {
     setIsCollapsed(prev => !prev);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      navigate('/auth');
+      toast({
+        description: "Logout realizado com sucesso",
+      });
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        variant: "destructive",
+        description: "Erro ao realizar logout",
+      });
+    }
   };
 
   const sidebarItems = [
@@ -69,7 +89,6 @@ export const Sidebar = () => {
         isCollapsed ? "w-[70px]" : "w-[250px]"
       )}
     >
-      {/* Logo Area */}
       <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
         {!isCollapsed ? (
           <div className="flex items-center space-x-1">
@@ -91,7 +110,6 @@ export const Sidebar = () => {
         </Button>
       </div>
 
-      {/* Navigation */}
       <div className="flex-1 px-3 py-4">
         <nav className="space-y-1">
           {sidebarItems.map((item) => (
@@ -105,6 +123,20 @@ export const Sidebar = () => {
             />
           ))}
         </nav>
+      </div>
+
+      <div className="px-3 py-4 border-t border-sidebar-border">
+        <Button 
+          variant="ghost" 
+          className={cn(
+            "w-full justify-start gap-3 px-3 py-2",
+            "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          )}
+          onClick={handleLogout}
+        >
+          <LogOut className="h-5 w-5" />
+          {!isCollapsed && <span>Sair</span>}
+        </Button>
       </div>
     </div>
   );
