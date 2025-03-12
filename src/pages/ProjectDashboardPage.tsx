@@ -260,10 +260,8 @@ const ProjectDashboardPage = () => {
         return <Badge variant="success">Aprovado</Badge>;
       case 'reprovado':
         return <Badge variant="destructive">Reprovado</Badge>;
-      case 'a_analisar':
-        return <Badge variant="warning">Em Análise</Badge>;
       default:
-        return <Badge variant="secondary">A Enviar</Badge>;
+        return <Badge variant="secondary">Em análise</Badge>;
     }
   };
 
@@ -343,7 +341,7 @@ const ProjectDashboardPage = () => {
           buyerData: {
             contract_file_path: uploadResponse.data.path,
             contract_file_name: file.name,
-            contract_status: 'a_analisar'
+            contract_status: 'aprovado'
           }
         }
       });
@@ -410,10 +408,6 @@ const ProjectDashboardPage = () => {
         variant: "destructive"
       });
     }
-  };
-
-  const isContractUploadDisabled = (buyer: ProjectBuyer) => {
-    return ['aprovado', 'reprovado'].includes(buyer.contract_status);
   };
 
   if (isLoading) {
@@ -724,18 +718,16 @@ const ProjectDashboardPage = () => {
                     <Button onClick={downloadContract} className="w-full">
                       Baixar Contrato
                     </Button>
-                    {!isContractUploadDisabled(selectedBuyer) && (
-                      <div className="space-y-2">
-                        <Label htmlFor="newContract">Substituir contrato</Label>
-                        <Input
-                          id="newContract"
-                          type="file"
-                          accept=".pdf,.doc,.docx"
-                          onChange={handleContractUpload}
-                          disabled={isUploadingContract}
-                        />
-                      </div>
-                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="newContract">Substituir contrato</Label>
+                      <Input
+                        id="newContract"
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleContractUpload}
+                        disabled={isUploadingContract}
+                      />
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -745,7 +737,7 @@ const ProjectDashboardPage = () => {
                       type="file"
                       accept=".pdf,.doc,.docx"
                       onChange={handleContractUpload}
-                      disabled={isUploadingContract || isContractUploadDisabled(selectedBuyer)}
+                      disabled={isUploadingContract}
                     />
                   </div>
                 )}
