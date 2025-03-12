@@ -312,6 +312,9 @@ const ProjectDashboardPage = () => {
       console.log("Uploading contract to path:", filePath);
       
       const uploadResponse = await supabase.functions.invoke('document-management', {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        },
         body: {
           action: 'uploadFile',
           bucket: 'documents',
