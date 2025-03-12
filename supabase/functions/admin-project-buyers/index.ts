@@ -184,7 +184,7 @@ serve(async (req) => {
       
       console.log('Executing query:', query, queryParams);
       
-      const { data: buyers, error: buyersError } = await serviceClient
+      const { data: result, error: buyersError } = await serviceClient
         .rpc('execute_sql', {
           params: queryParams,
           query_text: query
@@ -194,9 +194,17 @@ serve(async (req) => {
         console.error('Project buyers query error:', buyersError);
         throw buyersError;
       }
+
+      if (result?.error) {
+        console.error('SQL execution error:', result);
+        throw new Error(result.error);
+      }
+
+      const buyers = Array.isArray(result) ? result : [];
+      console.log('Buyers found:', buyers.length);
       
       return new Response(
-        JSON.stringify({ buyers: buyers || [] }),
+        JSON.stringify({ buyers }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
@@ -222,7 +230,7 @@ serve(async (req) => {
           pb.id = $1
       `;
       
-      const { data: buyerResults, error: buyerError } = await serviceClient
+      const { data: result, error: buyerError } = await serviceClient
         .rpc('execute_sql', {
           params: [buyerId],
           query_text: query
@@ -232,8 +240,15 @@ serve(async (req) => {
         console.error('Project buyer fetch error:', buyerError)
         throw buyerError
       }
+
+      if (result?.error) {
+        console.error('SQL execution error:', result);
+        throw new Error(result.error);
+      }
+
+      const buyers = Array.isArray(result) ? result : [];
       
-      if (!buyerResults || buyerResults.length === 0) {
+      if (!buyers.length) {
         return new Response(
           JSON.stringify({ error: 'Project buyer not found' }),
           { 
@@ -243,7 +258,7 @@ serve(async (req) => {
         )
       }
       
-      const buyer = buyerResults[0];
+      const buyer = buyers[0];
 
       return new Response(
         JSON.stringify({ buyer }),

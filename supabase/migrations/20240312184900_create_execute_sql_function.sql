@@ -7,11 +7,11 @@ AS $$
 DECLARE
     result jsonb;
 BEGIN
-    EXECUTE query_text
+    EXECUTE format('SELECT array_to_json(array_agg(row_to_json(t)))::jsonb FROM (%s) t', query_text)
     INTO result
     USING params;
     
-    RETURN result;
+    RETURN coalesce(result, '[]'::jsonb);
 EXCEPTION WHEN OTHERS THEN
     RETURN jsonb_build_object(
         'error', SQLERRM,
