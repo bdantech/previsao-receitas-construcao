@@ -50,7 +50,7 @@ serve(async (req) => {
     if (authError || !user) {
       console.error('Auth error:', authError);
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'Unauthorized', details: authError }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401 
@@ -108,7 +108,7 @@ serve(async (req) => {
       } catch (error) {
         console.error('Error uploading file:', error);
         return new Response(
-          JSON.stringify({ error: 'Failed to upload file' }),
+          JSON.stringify({ error: 'Failed to upload file', details: error.message }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500 
