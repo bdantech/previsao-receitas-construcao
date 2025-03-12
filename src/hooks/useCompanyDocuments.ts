@@ -29,6 +29,7 @@ export const useCompanyDocuments = (companyId: string) => {
       setLoading(true);
       console.log("Fetching documents for company:", companyId);
       
+      // Use the service role client for admin users and regular client for company users
       const docs = await documentManagementApi.getCompanyDocuments(companyId);
       console.log("Retrieved documents:", docs);
       
@@ -60,7 +61,7 @@ export const useCompanyDocuments = (companyId: string) => {
   // Handle file upload
   const handleFileUpload = async (documentId: string, documentTypeId: string, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !companyId) return;
+    if (!file || !companyId || !session?.access_token) return;
 
     try {
       setUploading(prev => ({ ...prev, [documentId]: true }));
@@ -68,6 +69,7 @@ export const useCompanyDocuments = (companyId: string) => {
       // Upload file to Supabase Storage
       const filePath = `companies/${companyId}/documents/${documentTypeId}/${Date.now()}_${file.name}`;
       
+      console.log("Uploading file to path:", filePath);
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
         .upload(filePath, file, {
@@ -75,9 +77,14 @@ export const useCompanyDocuments = (companyId: string) => {
           upsert: true
         });
       
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw uploadError;
+      }
       
-      // Update document in database
+      console.log("File uploaded successfully:", uploadData);
+      
+      // Update document in database using the document-management edge function
       await documentManagementApi.submitDocument({
         documentTypeId,
         resourceType: 'company',
@@ -99,7 +106,7 @@ export const useCompanyDocuments = (companyId: string) => {
       console.error("Error uploading document:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível enviar o documento",
+        description: "Não foi possível enviar o documento: " + (error.message || ''),
         variant: "destructive",
       });
     } finally {
@@ -123,7 +130,10 @@ export const useCompanyDocuments = (companyId: string) => {
         .from('documents')
         .download(doc.file_path);
       
-      if (error) throw error;
+      if (error) {
+        console.error("Download error:", error);
+        throw error;
+      }
       
       // Create a download link
       const url = URL.createObjectURL(data);

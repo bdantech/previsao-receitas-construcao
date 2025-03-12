@@ -307,8 +307,9 @@ const ProjectDashboardPage = () => {
         throw uploadError;
       }
       
+      console.log('File uploaded successfully to:', uploadData.path);
+      
       const { data, error } = await supabase.functions.invoke('project-buyers', {
-        method: 'PUT',
         headers: {
           Authorization: `Bearer ${session?.access_token}`
         },
@@ -328,6 +329,7 @@ const ProjectDashboardPage = () => {
         throw error;
       }
       
+      console.log('Buyer updated successfully:', data);
       await fetchProjectBuyers();
       
       toast({
@@ -340,7 +342,7 @@ const ProjectDashboardPage = () => {
       console.error('Error in contract upload process:', error);
       toast({
         title: "Erro ao enviar contrato",
-        description: "Não foi possível enviar o contrato.",
+        description: "Não foi possível enviar o contrato. " + (error.message || ''),
         variant: "destructive"
       });
     } finally {
