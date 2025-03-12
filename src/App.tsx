@@ -1,4 +1,3 @@
-
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
@@ -14,32 +13,45 @@ import AdminBuyersPage from "./pages/AdminBuyersPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/admin/auth" element={<AdminAuth />} />
-          
-          {/* Protected routes */}
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/projects" element={<ProjectsPage />} />
-          <Route path="/project-dashboard/:projectId" element={<ProjectDashboardPage />} />
-          <Route path="/company" element={<CompanyPage />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
-          <Route path="/admin/buyers" element={<AdminBuyersPage />} />
-          
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        <Toaster />
-      </AuthProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/admin/auth" element={<AdminAuth />} />
+            
+            {/* Protected routes */}
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/project-dashboard/:projectId" element={<ProjectDashboardPage />} />
+            <Route path="/company" element={<CompanyPage />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
+            <Route path="/admin/buyers" element={<AdminBuyersPage />} />
+            
+            {/* 404 */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <Toaster />
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 
