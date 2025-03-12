@@ -186,10 +186,8 @@ serve(async (req) => {
       
       const { data: buyers, error: buyersError } = await serviceClient
         .rpc('execute_sql', {
-          params: {
-            params: queryParams,
-            query_text: query
-          }
+          params: queryParams,
+          query_text: query
         });
       
       if (buyersError) {
@@ -226,10 +224,8 @@ serve(async (req) => {
       
       const { data: buyerResults, error: buyerError } = await serviceClient
         .rpc('execute_sql', {
-          params: {
-            params: [buyerId],
-            query_text: query
-          }
+          params: [buyerId],
+          query_text: query
         });
       
       if (buyerError) {
