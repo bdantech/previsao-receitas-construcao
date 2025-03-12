@@ -184,13 +184,10 @@ serve(async (req) => {
       
       console.log('Executing query:', query, queryParams);
       
-      // Convert params array to JSONB format while preserving string values
-      const jsonParams = JSON.stringify(queryParams);
-      console.log('Params as JSON:', jsonParams);
-      
+      // Pass params directly as an array for JSONB conversion
       const { data: result, error: buyersError } = await serviceClient
         .rpc('execute_sql', {
-          params: jsonParams,
+          params: queryParams,
           query_text: query
         });
       
@@ -254,13 +251,10 @@ serve(async (req) => {
           pb.id = $1
       `;
       
-      // Convert params array to JSONB format for single buyer query
-      const singleBuyerParams = JSON.stringify([buyerId]);
-      console.log('Single buyer params as JSON:', singleBuyerParams);
-      
+      // Pass params directly as an array for JSONB conversion
       const { data: result, error: buyerError } = await serviceClient
         .rpc('execute_sql', {
-          params: singleBuyerParams,
+          params: [buyerId],
           query_text: query
         });
       
