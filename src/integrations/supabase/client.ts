@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database } from '@/integrations/supabase/types';
+import { Database } from './supabase/types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -66,7 +66,7 @@ export const authApi = {
   },
 
   async updatePassword(password: string) {
-    const { data, error } = await supabase.auth.updateUser({
+    const { data, error } = await supabase.auth.update({
       password,
     });
 
@@ -192,6 +192,7 @@ export const projectsApi = {
 
 // Project Buyers API
 export const projectBuyersApi = {
+  // Regular user buyer operations
   async createBuyer(projectId, buyerData) {
     const { data, error } = await supabase.functions.invoke('project-buyers', {
       body: {
@@ -242,6 +243,7 @@ export const projectBuyersApi = {
     return data.buyer;
   },
   
+  // Admin operations
   admin: {
     async getAllBuyers() {
       const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
@@ -277,125 +279,6 @@ export const projectBuyersApi = {
       
       if (error) throw new Error(error.message);
       return data.buyer;
-    }
-  }
-};
-
-// Document Management API
-export const documentManagementApi = {
-  async getCompanyDocuments(companyId: string) {
-    const { data, error } = await supabase.functions.invoke('document-management', {
-      body: {
-        action: 'getCompanyDocuments',
-        companyId
-      }
-    });
-    
-    if (error) throw new Error(error.message);
-    return data.documents;
-  },
-  
-  async uploadDocument(documentData: any, file: File) {
-    const { data, error } = await supabase.functions.invoke('document-management', {
-      body: {
-        action: 'uploadDocument',
-        documentData
-      }
-    });
-    
-    if (error) throw new Error(error.message);
-    return data.document;
-  },
-  
-  async updateDocumentStatus(documentId: string, status: string, reviewNotes?: string) {
-    const { data, error } = await supabase.functions.invoke('document-management', {
-      body: {
-        action: 'updateDocumentStatus',
-        documentId,
-        status,
-        reviewNotes
-      }
-    });
-    
-    if (error) throw new Error(error.message);
-    return data.document;
-  }
-};
-
-// Receivables API
-export const receivablesApi = {
-  async getProjectReceivables(projectId: string) {
-    const { data, error } = await supabase.functions.invoke('project-receivables', {
-      body: {
-        action: 'list',
-        projectId
-      }
-    });
-    
-    if (error) throw new Error(error.message);
-    return data.receivables;
-  },
-  
-  async createReceivable(receivableData: any) {
-    const { data, error } = await supabase.functions.invoke('project-receivables', {
-      body: {
-        action: 'create',
-        receivableData
-      }
-    });
-    
-    if (error) throw new Error(error.message);
-    return data.receivable;
-  },
-  
-  async updateReceivable(receivableId: string, receivableData: any) {
-    const { data, error } = await supabase.functions.invoke('project-receivables', {
-      body: {
-        action: 'update',
-        receivableId,
-        receivableData
-      }
-    });
-    
-    if (error) throw new Error(error.message);
-    return data.receivable;
-  },
-  
-  admin: {
-    async getAllReceivables() {
-      const { data, error } = await supabase.functions.invoke('admin-receivables', {
-        body: {
-          action: 'list'
-        }
-      });
-      
-      if (error) throw new Error(error.message);
-      return data.receivables;
-    },
-    
-    async getReceivable(receivableId: string) {
-      const { data, error } = await supabase.functions.invoke('admin-receivables', {
-        body: {
-          action: 'get',
-          receivableId
-        }
-      });
-      
-      if (error) throw new Error(error.message);
-      return data.receivable;
-    },
-    
-    async updateReceivableStatus(receivableId: string, status: string) {
-      const { data, error } = await supabase.functions.invoke('admin-receivables', {
-        body: {
-          action: 'updateStatus',
-          receivableId,
-          status
-        }
-      });
-      
-      if (error) throw new Error(error.message);
-      return data.receivable;
     }
   }
 };
