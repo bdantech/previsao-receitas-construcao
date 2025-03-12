@@ -103,85 +103,67 @@ serve(async (req) => {
     console.log('Admin user verified:', user.id)
 
     if (action === 'list') {
-      // Direct database query without using execute_sql function
-      let query = serviceClient
+      let baseQuery = serviceClient
         .from('project_buyers')
         .select(`
           *,
           projects:project_id (
             name,
+            company_id,
             companies:company_id (
               id,
               name
             )
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
 
-      // Apply filters if provided
       if (companyId) {
-        query = query.eq('projects.companies.id', companyId);
-      }
-      
-      if (projectId) {
-        query = query.eq('project_id', projectId);
-      }
-      
-      if (filters) {
-        if (filters.buyerStatus) {
-          query = query.eq('buyer_status', filters.buyerStatus);
-        }
-        
-        if (filters.contractStatus) {
-          query = query.eq('contract_status', filters.contractStatus);
-        }
-        
-        if (filters.creditAnalysisStatus) {
-          query = query.eq('credit_analysis_status', filters.creditAnalysisStatus);
-        }
-        
-        if (filters.fullName) {
-          query = query.ilike('full_name', `%${filters.fullName}%`);
-        }
-        
-        if (filters.cpf) {
-          query = query.ilike('cpf', `%${filters.cpf}%`);
-        }
-      }
+        const { data, error } = await baseQuery
+          .eq('projects.company_id', companyId)
 
-      const { data: buyers, error: buyersError } = await query;
+        if (error) {
+          console.error('Project buyers query error:', error)
+          throw error
+        }
 
-      if (buyersError) {
-        console.error('Project buyers query error:', buyersError);
+        const transformedBuyers = data.map(buyer => ({
+          ...buyer,
+          project_name: buyer.projects?.name || '',
+          company_name: buyer.projects?.companies?.name || '',
+          company_id: buyer.projects?.companies?.id || ''
+        }))
+
         return new Response(
-          JSON.stringify({ 
-            error: 'Failed to fetch buyers',
-            details: buyersError
-          }),
+          JSON.stringify({ buyers: transformedBuyers }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500 
+            status: 200 
           }
-        );
-      }
+        )
+      } else {
+        const { data, error } = await baseQuery
 
-      // Transform the data to match the expected format
-      const transformedBuyers = buyers.map(buyer => ({
-        ...buyer,
-        project_name: buyer.projects?.name || '',
-        company_name: buyer.projects?.companies?.name || '',
-        company_id: buyer.projects?.companies?.id || ''
-      }));
-
-      console.log('Buyers found:', transformedBuyers.length);
-      
-      return new Response(
-        JSON.stringify({ buyers: transformedBuyers }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
+        if (error) {
+          console.error('Project buyers query error:', error)
+          throw error
         }
-      );
+
+        const transformedBuyers = data.map(buyer => ({
+          ...buyer,
+          project_name: buyer.projects?.name || '',
+          company_name: buyer.projects?.companies?.name || '',
+          company_id: buyer.projects?.companies?.id || ''
+        }))
+
+        return new Response(
+          JSON.stringify({ buyers: transformedBuyers }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        )
+      }
     }
 
     if (action === 'get' && buyerId) {
@@ -293,7 +275,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error("Error in admin-project-buyers function:", error);
+    console.error("Error in admin-project-buyers function:", error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
