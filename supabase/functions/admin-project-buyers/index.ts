@@ -1,20 +1,17 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
-// Configuração CORS para permitir chamadas do frontend
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
-  // Tratamento para requisições OPTIONS (preflight CORS)
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Obter URL da Supabase e chave anônima das variáveis de ambiente
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -23,7 +20,6 @@ serve(async (req) => {
       throw new Error('Missing environment variables')
     }
 
-    // Obter o token de autorização do cabeçalho
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
@@ -35,7 +31,6 @@ serve(async (req) => {
       )
     }
 
-    // Parse request body
     const requestData = await req.json()
     const { 
       action, 
@@ -48,7 +43,6 @@ serve(async (req) => {
 
     console.log('Admin project buyers request:', action, companyId, projectId, buyerId)
 
-    // Usar o token para autenticar o cliente do Supabase
     const supabaseClient = createClient(
       supabaseUrl,
       supabaseKey,
@@ -61,13 +55,11 @@ serve(async (req) => {
       }
     )
 
-    // Service client for operations that need admin privileges
     const serviceClient = createClient(
       supabaseUrl,
       supabaseServiceKey
     )
 
-    // Autenticação e informações do usuário
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
     
     if (authError) {
@@ -87,7 +79,6 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id)
 
-    // Verify that the user is an admin
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('role')
@@ -111,88 +102,55 @@ serve(async (req) => {
 
     console.log('Admin user verified:', user.id)
 
-    // LIST all project buyers with optional filtering
     if (action === 'list') {
-      // For improved performance, we'll construct a SQL query
-      // that joins the necessary tables and applies filters
-      let query = `
-        SELECT 
-          pb.*,
-          p.name as project_name,
-          c.name as company_name,
-          c.id as company_id
-        FROM 
-          project_buyers pb
-        JOIN 
-          projects p ON pb.project_id = p.id
-        JOIN 
-          companies c ON p.company_id = c.id
-        WHERE 1=1
-      `;
-      
-      const queryParams: any[] = [];
-      let paramCounter = 1;
-      
+      // Direct database query without using execute_sql function
+      let query = serviceClient
+        .from('project_buyers')
+        .select(`
+          *,
+          projects:project_id (
+            name,
+            companies:company_id (
+              id,
+              name
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
       // Apply filters if provided
       if (companyId) {
-        query += ` AND c.id = $${paramCounter}`;
-        queryParams.push(companyId);
-        paramCounter++;
+        query = query.eq('projects.companies.id', companyId);
       }
       
       if (projectId) {
-        query += ` AND p.id = $${paramCounter}`;
-        queryParams.push(projectId);
-        paramCounter++;
+        query = query.eq('project_id', projectId);
       }
       
-      // Add filters for buyer_status, contract_status, or credit_analysis_status if provided
       if (filters) {
         if (filters.buyerStatus) {
-          query += ` AND pb.buyer_status = $${paramCounter}`;
-          queryParams.push(filters.buyerStatus);
-          paramCounter++;
+          query = query.eq('buyer_status', filters.buyerStatus);
         }
         
         if (filters.contractStatus) {
-          query += ` AND pb.contract_status = $${paramCounter}`;
-          queryParams.push(filters.contractStatus);
-          paramCounter++;
+          query = query.eq('contract_status', filters.contractStatus);
         }
         
         if (filters.creditAnalysisStatus) {
-          query += ` AND pb.credit_analysis_status = $${paramCounter}`;
-          queryParams.push(filters.creditAnalysisStatus);
-          paramCounter++;
+          query = query.eq('credit_analysis_status', filters.creditAnalysisStatus);
         }
         
         if (filters.fullName) {
-          query += ` AND pb.full_name ILIKE $${paramCounter}`;
-          queryParams.push(`%${filters.fullName}%`);
-          paramCounter++;
+          query = query.ilike('full_name', `%${filters.fullName}%`);
         }
         
         if (filters.cpf) {
-          query += ` AND pb.cpf LIKE $${paramCounter}`;
-          queryParams.push(`%${filters.cpf}%`);
-          paramCounter++;
+          query = query.ilike('cpf', `%${filters.cpf}%`);
         }
       }
-      
-      // Order by created_at desc by default
-      query += ` ORDER BY pb.created_at DESC`;
-      
-      console.log('Executing query:', query, queryParams);
-      
-      // Pass params directly as an array for JSONB conversion
-      const { data: result, error: buyersError } = await serviceClient
-        .rpc('execute_sql', {
-          params: queryParams,
-          query_text: query
-        });
-      
-      console.log('RPC result:', { data: result, error: buyersError });
-      
+
+      const { data: buyers, error: buyersError } = await query;
+
       if (buyersError) {
         console.error('Project buyers query error:', buyersError);
         return new Response(
@@ -207,33 +165,25 @@ serve(async (req) => {
         );
       }
 
-      if (result?.error) {
-        console.error('SQL execution error:', result);
-        return new Response(
-          JSON.stringify({ 
-            error: 'SQL execution failed',
-            details: result.error
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500 
-          }
-        );
-      }
+      // Transform the data to match the expected format
+      const transformedBuyers = buyers.map(buyer => ({
+        ...buyer,
+        project_name: buyer.projects?.name || '',
+        company_name: buyer.projects?.companies?.name || '',
+        company_id: buyer.projects?.companies?.id || ''
+      }));
 
-      const buyers = Array.isArray(result) ? result : [];
-      console.log('Buyers found:', buyers.length);
+      console.log('Buyers found:', transformedBuyers.length);
       
       return new Response(
-        JSON.stringify({ buyers }),
+        JSON.stringify({ buyers: transformedBuyers }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
         }
       );
     }
-    
-    // GET single project buyer (with company and project details)
+
     if (action === 'get' && buyerId) {
       const query = `
         SELECT 
@@ -251,7 +201,6 @@ serve(async (req) => {
           pb.id = $1
       `;
       
-      // Pass params directly as an array for JSONB conversion
       const { data: result, error: buyerError } = await serviceClient
         .rpc('execute_sql', {
           params: [buyerId],
@@ -310,8 +259,7 @@ serve(async (req) => {
         }
       )
     }
-    
-    // UPDATE project buyer (admin can update any buyer)
+
     if (action === 'update' && buyerId && buyerData) {
       console.log('Admin updating project buyer with data:', buyerData)
       
@@ -335,7 +283,7 @@ serve(async (req) => {
         }
       )
     }
-    
+
     return new Response(
       JSON.stringify({ error: 'Invalid action or missing parameters' }),
       { 

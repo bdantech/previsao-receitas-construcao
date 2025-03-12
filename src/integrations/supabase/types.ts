@@ -363,6 +363,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      execute_sql: {
+        Args: {
+          params: Json
+          query_text: string
+        }
+        Returns: Json
+      }
       get_initial_receivable_status: {
         Args: {
           project_id: string
