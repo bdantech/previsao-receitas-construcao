@@ -447,17 +447,27 @@ export const projectBuyersApi = {
       cpf?: string
     }) => {
       try {
-        console.log('Getting fresh session for admin buyers...');
-        const { data: { session } } = await supabase.auth.getSession();
+        // Get current session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (!session) {
-          console.error('No valid session available');
-          throw new Error('Authentication required');
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          throw new Error('Failed to get session');
         }
         
+        if (!session) {
+          throw new Error('No active session');
+        }
+
+        // Ensure we have a valid access token
+        if (!session.access_token) {
+          throw new Error('No access token available');
+        }
+
         console.log('Using session for admin buyers:', {
           userId: session.user?.id,
-          expiresAt: session.expires_at
+          expiresAt: session.expires_at,
+          hasAccessToken: !!session.access_token
         });
         
         const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
@@ -475,8 +485,13 @@ export const projectBuyersApi = {
           throw error;
         }
         
+        if (!data?.buyers) {
+          console.error('Invalid response format:', data);
+          throw new Error('Invalid response format');
+        }
+        
         console.log('Admin buyers response:', data);
-        return data?.buyers || [];
+        return data.buyers;
       } catch (error) {
         console.error('Exception in getAllBuyers:', error);
         throw error;

@@ -32,8 +32,21 @@ export default function AdminBuyersPage() {
     queryFn: async () => {
       try {
         if (!session?.access_token) {
-          throw new Error('No authentication token available');
+          console.error('No access token available');
+          throw new Error('Authentication required');
         }
+
+        if (userRole !== 'admin') {
+          console.error('User is not an admin');
+          throw new Error('Admin access required');
+        }
+
+        console.log('Fetching buyers with session:', {
+          hasAccessToken: !!session.access_token,
+          userRole,
+          userId: session.user.id
+        });
+
         const data = await projectBuyersApi.admin.getAllBuyers();
         console.log('Buyers data:', data);
         return data;
@@ -42,7 +55,7 @@ export default function AdminBuyersPage() {
         throw error;
       }
     },
-    enabled: !!session?.access_token && userRole === 'admin',
+    enabled: !!session?.access_token && userRole === 'admin' && !isLoadingAuth,
   });
 
   const getStatusDisplay = (status: string) => {
@@ -62,6 +75,7 @@ export default function AdminBuyersPage() {
       <AdminDashboardLayout>
         <div className="flex items-center justify-center p-8">
           <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          <span className="ml-2 text-gray-500">Verificando autenticação...</span>
         </div>
       </AdminDashboardLayout>
     );
