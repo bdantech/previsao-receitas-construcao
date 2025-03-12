@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -186,7 +185,12 @@ serve(async (req) => {
       console.log('Executing query:', query, queryParams);
       
       const { data: buyers, error: buyersError } = await serviceClient
-        .rpc('execute_sql', { query_text: query, params: queryParams });
+        .rpc('execute_sql', {
+          params: {
+            params: queryParams,
+            query_text: query
+          }
+        });
       
       if (buyersError) {
         console.error('Project buyers query error:', buyersError);
@@ -221,7 +225,12 @@ serve(async (req) => {
       `;
       
       const { data: buyerResults, error: buyerError } = await serviceClient
-        .rpc('execute_sql', { query_text: query, params: [buyerId] });
+        .rpc('execute_sql', {
+          params: {
+            params: [buyerId],
+            query_text: query
+          }
+        });
       
       if (buyerError) {
         console.error('Project buyer fetch error:', buyerError)
