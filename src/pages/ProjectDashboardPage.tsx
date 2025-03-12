@@ -342,8 +342,7 @@ const ProjectDashboardPage = () => {
           buyerId: selectedBuyer.id,
           buyerData: {
             contract_file_path: uploadResponse.data.path,
-            contract_file_name: file.name,
-            contract_status: 'aprovado'
+            contract_file_name: file.name
           }
         }
       });
