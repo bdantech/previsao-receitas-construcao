@@ -317,10 +317,10 @@ const ProjectDashboardPage = () => {
         },
         body: {
           action: 'uploadFile',
-          bucket: 'documents',
-          filePath, 
-          fileBase64,
-          contentType: file.type
+          file: fileBase64,
+          fileName: file.name,
+          resourceType: 'projects',
+          resourceId: projectId
         }
       });
       
