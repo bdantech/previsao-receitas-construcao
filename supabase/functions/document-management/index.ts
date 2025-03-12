@@ -34,22 +34,12 @@ serve(async (req) => {
       );
     }
 
-    // Extract the token from the Authorization header
-    const token = authHeader.replace('Bearer ', '');
-
-    // Initialize the Supabase clients
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false
-      }
-    });
-    
+    // Initialize the admin Supabase client
     const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // First verify the user is authenticated using the token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Extract the token and verify the user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await adminSupabase.auth.getUser(token);
     
     if (authError || !user) {
       console.error('Auth error:', authError);
