@@ -6,15 +6,17 @@ SECURITY DEFINER
 AS $$
 DECLARE
     result jsonb;
-    param_value jsonb;
-    i integer;
-    param_array jsonb[];
+    param_value text;
+    param_array text[];
 BEGIN
     -- Convert params to an array if it's not already
     IF jsonb_typeof(params) = 'array' THEN
-        param_array := ARRAY(SELECT jsonb_array_elements(params));
+        -- Convert each JSON value to text
+        SELECT array_agg(value::text)
+        INTO param_array
+        FROM jsonb_array_elements(params);
     ELSE
-        param_array := ARRAY[params];
+        param_array := ARRAY[params::text];
     END IF;
 
     -- Execute the query with the parameters
