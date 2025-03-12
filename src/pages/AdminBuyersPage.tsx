@@ -15,6 +15,7 @@ import { formatCPF } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function AdminBuyersPage() {
   const { session, userRole, isLoading: isLoadingAuth } = useAuth();
@@ -47,9 +48,29 @@ export default function AdminBuyersPage() {
           userId: session.user.id
         });
 
-        const data = await projectBuyersApi.admin.getAllBuyers();
+        // Make the API call directly with the session token
+        const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: {
+            action: 'list'
+          }
+        });
+
+        if (error) {
+          console.error('Error fetching buyers:', error);
+          throw error;
+        }
+
+        if (!data?.buyers) {
+          console.error('Invalid response format:', data);
+          throw new Error('Invalid response format');
+        }
+
         console.log('Buyers data:', data);
-        return data;
+        return data.buyers;
       } catch (error) {
         console.error('Error fetching buyers:', error);
         throw error;
