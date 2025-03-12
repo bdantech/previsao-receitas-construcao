@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/toaster"
 import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminCompanyDetail from "./pages/AdminCompanyDetail";
+import AdminBuyersPage from "./pages/AdminBuyersPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
@@ -31,6 +32,7 @@ function App() {
           <Route path="/company" element={<CompanyPage />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
+          <Route path="/admin/buyers" element={<AdminBuyersPage />} />
           
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
