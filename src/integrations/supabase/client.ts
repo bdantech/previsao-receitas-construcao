@@ -447,22 +447,35 @@ export const projectBuyersApi = {
       cpf?: string
     }) => {
       try {
-        const headers = await getAuthHeaders();
+        console.log('Getting fresh session for admin buyers...');
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.error('No valid session available');
+          throw new Error('Authentication required');
+        }
+        
+        console.log('Using session for admin buyers:', {
+          userId: session.user?.id,
+          expiresAt: session.expires_at
+        });
+        
         const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
-          headers,
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
           body: { 
             action: 'list',
-            companyId: filters?.companyId,
-            projectId: filters?.projectId,
             filters
           }
         });
         
         if (error) {
-          console.error('Error fetching all project buyers:', error);
+          console.error('Error fetching admin buyers:', error);
           throw error;
         }
         
+        console.log('Admin buyers response:', data);
         return data?.buyers || [];
       } catch (error) {
         console.error('Exception in getAllBuyers:', error);

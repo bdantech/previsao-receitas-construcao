@@ -12,12 +12,28 @@ import {
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatCPF } from "@/lib/formatters";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 
 export default function AdminBuyersPage() {
-  const { data: buyers, isLoading, error } = useQuery({
+  const { session, userRole, isLoading: isLoadingAuth } = useAuth();
+  const navigate = useNavigate();
+
+  // Protect the route
+  useEffect(() => {
+    if (!isLoadingAuth && (!session || userRole !== 'admin')) {
+      navigate('/admin/auth');
+    }
+  }, [session, userRole, isLoadingAuth, navigate]);
+
+  const { data: buyers, isLoading: isLoadingBuyers, error } = useQuery({
     queryKey: ['admin-buyers'],
     queryFn: async () => {
       try {
+        if (!session?.access_token) {
+          throw new Error('No authentication token available');
+        }
         const data = await projectBuyersApi.admin.getAllBuyers();
         console.log('Buyers data:', data);
         return data;
@@ -26,6 +42,7 @@ export default function AdminBuyersPage() {
         throw error;
       }
     },
+    enabled: !!session?.access_token && userRole === 'admin',
   });
 
   const getStatusDisplay = (status: string) => {
@@ -39,6 +56,22 @@ export default function AdminBuyersPage() {
     return statusMap[status] || { label: status, className: 'text-gray-600' };
   };
 
+  // Show loading state while checking authentication
+  if (isLoadingAuth) {
+    return (
+      <AdminDashboardLayout>
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      </AdminDashboardLayout>
+    );
+  }
+
+  // If not authenticated or not admin, the useEffect will handle redirection
+  if (!session || userRole !== 'admin') {
+    return null;
+  }
+
   return (
     <AdminDashboardLayout>
       <div className="space-y-4">
@@ -46,7 +79,7 @@ export default function AdminBuyersPage() {
           <h1 className="text-2xl font-bold tracking-tight">Compradores</h1>
         </div>
         
-        {isLoading && (
+        {isLoadingBuyers && (
           <div className="flex items-center justify-center p-8">
             <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
           </div>
@@ -60,7 +93,7 @@ export default function AdminBuyersPage() {
           </Alert>
         )}
         
-        {!isLoading && !error && buyers && (
+        {!isLoadingBuyers && !error && buyers && (
           <div className="border rounded-lg">
             <Table>
               <TableHeader>
