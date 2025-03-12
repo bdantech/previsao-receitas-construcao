@@ -430,9 +430,6 @@ const ProjectDashboardPage = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Compradores</CardTitle>
-                <Button>
-                  Adicionar Comprador
-                </Button>
               </CardHeader>
               <CardContent>
                 {isLoadingBuyers ? (
