@@ -6,16 +6,29 @@ SECURITY DEFINER
 AS $$
 DECLARE
     result jsonb;
+    param_value jsonb;
+    i integer;
+    param_array jsonb[];
 BEGIN
+    -- Convert params to an array if it's not already
+    IF jsonb_typeof(params) = 'array' THEN
+        param_array := ARRAY(SELECT jsonb_array_elements(params));
+    ELSE
+        param_array := ARRAY[params];
+    END IF;
+
+    -- Execute the query with the parameters
     EXECUTE format('SELECT array_to_json(array_agg(row_to_json(t)))::jsonb FROM (%s) t', query_text)
     INTO result
-    USING params;
+    USING VARIADIC param_array;
     
     RETURN coalesce(result, '[]'::jsonb);
 EXCEPTION WHEN OTHERS THEN
     RETURN jsonb_build_object(
         'error', SQLERRM,
-        'detail', SQLSTATE
+        'detail', SQLSTATE,
+        'query', query_text,
+        'params', params
     );
 END;
 $$;

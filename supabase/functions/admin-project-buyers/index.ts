@@ -184,20 +184,44 @@ serve(async (req) => {
       
       console.log('Executing query:', query, queryParams);
       
+      // Convert params array to JSONB format
+      const jsonParams = JSON.stringify(queryParams);
+      console.log('Params as JSON:', jsonParams);
+      
       const { data: result, error: buyersError } = await serviceClient
         .rpc('execute_sql', {
-          params: queryParams,
+          params: jsonParams,
           query_text: query
         });
       
+      console.log('RPC result:', { data: result, error: buyersError });
+      
       if (buyersError) {
         console.error('Project buyers query error:', buyersError);
-        throw buyersError;
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to fetch buyers',
+            details: buyersError
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
       }
 
       if (result?.error) {
         console.error('SQL execution error:', result);
-        throw new Error(result.error);
+        return new Response(
+          JSON.stringify({ 
+            error: 'SQL execution failed',
+            details: result.error
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
       }
 
       const buyers = Array.isArray(result) ? result : [];
@@ -230,20 +254,44 @@ serve(async (req) => {
           pb.id = $1
       `;
       
+      // Convert params array to JSONB format for single buyer query
+      const singleBuyerParams = JSON.stringify([buyerId]);
+      console.log('Single buyer params as JSON:', singleBuyerParams);
+      
       const { data: result, error: buyerError } = await serviceClient
         .rpc('execute_sql', {
-          params: [buyerId],
+          params: singleBuyerParams,
           query_text: query
         });
       
+      console.log('Single buyer RPC result:', { data: result, error: buyerError });
+      
       if (buyerError) {
-        console.error('Project buyer fetch error:', buyerError)
-        throw buyerError
+        console.error('Project buyer fetch error:', buyerError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to fetch buyer',
+            details: buyerError
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
       }
 
       if (result?.error) {
         console.error('SQL execution error:', result);
-        throw new Error(result.error);
+        return new Response(
+          JSON.stringify({ 
+            error: 'SQL execution failed',
+            details: result.error
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
       }
 
       const buyers = Array.isArray(result) ? result : [];
