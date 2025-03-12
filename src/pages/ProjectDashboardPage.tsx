@@ -36,7 +36,7 @@ interface ProjectBuyer {
   full_name: string;
   cpf: string;
   buyer_status: 'aprovado' | 'reprovado' | 'a_analisar';
-  contract_status: 'aprovado' | 'reprovado' | 'a_enviar';
+  contract_status: 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar';
   credit_analysis_status: 'aprovado' | 'reprovado' | 'a_analisar';
   created_at: string;
   updated_at: string;
@@ -260,8 +260,10 @@ const ProjectDashboardPage = () => {
         return <Badge variant="success">Aprovado</Badge>;
       case 'reprovado':
         return <Badge variant="destructive">Reprovado</Badge>;
+      case 'a_analisar':
+        return <Badge variant="warning">Em Análise</Badge>;
       default:
-        return <Badge variant="secondary">Em análise</Badge>;
+        return <Badge variant="secondary">A Enviar</Badge>;
     }
   };
 
@@ -307,7 +309,9 @@ const ProjectDashboardPage = () => {
         reader.readAsDataURL(file);
       });
       
-      const filePath = `projects/${projectId}/contracts/${selectedBuyer.id}_${Date.now()}_${file.name}`;
+      // Sanitize the file name by removing spaces and special characters
+      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const filePath = `projects/${projectId}/contracts/${selectedBuyer.id}_${Date.now()}_${sanitizedFileName}`;
       
       console.log("Uploading contract to path:", filePath);
       
@@ -317,10 +321,10 @@ const ProjectDashboardPage = () => {
         },
         body: {
           action: 'uploadFile',
-          bucket: 'documents',
-          filePath, 
-          fileBase64,
-          contentType: file.type
+          file: fileBase64,
+          fileName: file.name,
+          resourceType: 'projects',
+          resourceId: projectId
         }
       });
       
@@ -340,8 +344,7 @@ const ProjectDashboardPage = () => {
           buyerId: selectedBuyer.id,
           buyerData: {
             contract_file_path: uploadResponse.data.path,
-            contract_file_name: file.name,
-            contract_status: 'a_analisar'
+            contract_file_name: file.name
           }
         }
       });
