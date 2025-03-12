@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader, UsersRound, Receipt, ArrowDownToLine, FileSpreadsheet, PencilIcon, Plus } from "lucide-react";
+import { Loader, UsersRound, Receipt, ArrowDownToLine, FileSpreadsheet, PencilIcon, Plus, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
@@ -40,6 +40,8 @@ interface ProjectBuyer {
   credit_analysis_status: 'aprovado' | 'reprovado' | 'a_analisar';
   created_at: string;
   updated_at: string;
+  contract_file_path?: string;
+  contract_file_name?: string;
 }
 
 interface Receivable {
@@ -75,6 +77,10 @@ const ProjectDashboardPage = () => {
   const [editedInitialDate, setEditedInitialDate] = useState("");
   const [editedEndDate, setEditedEndDate] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [contractDialogOpen, setContractDialogOpen] = useState(false);
+  const [selectedBuyer, setSelectedBuyer] = useState<ProjectBuyer | null>(null);
+  const [isUploadingContract, setIsUploadingContract] = useState(false);
 
   useEffect(() => {
     const fetchProjectDetails = async () => {
@@ -272,6 +278,114 @@ const ProjectDashboardPage = () => {
     }
   };
 
+  const handleContractClick = (buyer: ProjectBuyer) => {
+    setSelectedBuyer(buyer);
+    setContractDialogOpen(true);
+  };
+
+  const handleContractUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || !event.target.files[0] || !projectId || !selectedBuyer) {
+      return;
+    }
+
+    const file = event.target.files[0];
+    
+    try {
+      setIsUploadingContract(true);
+      
+      const filePath = `projects/${projectId}/contracts/${selectedBuyer.id}_${Date.now()}_${file.name}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+      
+      if (uploadError) {
+        console.error('Error uploading contract:', uploadError);
+        throw uploadError;
+      }
+      
+      const { data, error } = await supabase.functions.invoke('project-buyers', {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: { 
+          action: 'update',
+          buyerId: selectedBuyer.id,
+          buyerData: {
+            contract_file_path: uploadData.path,
+            contract_file_name: file.name,
+            contract_status: 'aprovado'
+          }
+        }
+      });
+      
+      if (error) {
+        console.error('Error updating buyer:', error);
+        throw error;
+      }
+      
+      await fetchProjectBuyers();
+      
+      toast({
+        title: "Contrato enviado",
+        description: "O contrato foi enviado com sucesso.",
+      });
+      
+      setContractDialogOpen(false);
+    } catch (error) {
+      console.error('Error in contract upload process:', error);
+      toast({
+        title: "Erro ao enviar contrato",
+        description: "Não foi possível enviar o contrato.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploadingContract(false);
+    }
+  };
+
+  const downloadContract = async () => {
+    if (!selectedBuyer?.contract_file_path) {
+      toast({
+        title: "Nenhum contrato disponível",
+        description: "Este comprador ainda não possui um contrato para download.",
+        variant: "default",
+      });
+      return;
+    }
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .download(selectedBuyer.contract_file_path);
+      
+      if (error) {
+        console.error('Error downloading contract:', error);
+        throw error;
+      }
+      
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = selectedBuyer.contract_file_name || 'contrato.pdf';
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading contract:', error);
+      toast({
+        title: "Erro ao baixar contrato",
+        description: "Não foi possível baixar o contrato.",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -457,8 +571,14 @@ const ProjectDashboardPage = () => {
                           <TableCell>{getBuyerStatusBadge(buyer.contract_status)}</TableCell>
                           <TableCell>{getBuyerStatusBadge(buyer.credit_analysis_status)}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="sm">
-                              Detalhes
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleContractClick(buyer)}
+                              className="flex items-center gap-2"
+                            >
+                              <Upload className="h-4 w-4" />
+                              Contrato
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -551,6 +671,62 @@ const ProjectDashboardPage = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={contractDialogOpen} onOpenChange={setContractDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Gerenciar Contrato</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {selectedBuyer && (
+              <>
+                <div className="space-y-2">
+                  <p><strong>Comprador:</strong> {selectedBuyer.full_name}</p>
+                  <p><strong>CPF:</strong> {formatCPF(selectedBuyer.cpf)}</p>
+                  <p><strong>Status do contrato:</strong> {getBuyerStatusBadge(selectedBuyer.contract_status)}</p>
+                </div>
+                
+                {selectedBuyer.contract_file_path ? (
+                  <div className="space-y-4">
+                    <p>
+                      <strong>Contrato atual:</strong> {selectedBuyer.contract_file_name}
+                    </p>
+                    <Button onClick={downloadContract} className="w-full">
+                      Baixar Contrato
+                    </Button>
+                    <div className="space-y-2">
+                      <Label htmlFor="newContract">Substituir contrato</Label>
+                      <Input
+                        id="newContract"
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleContractUpload}
+                        disabled={isUploadingContract}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="contract">Enviar contrato</Label>
+                    <Input
+                      id="contract"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleContractUpload}
+                      disabled={isUploadingContract}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setContractDialogOpen(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ReceivableDialog
         open={receivableDialogOpen}
