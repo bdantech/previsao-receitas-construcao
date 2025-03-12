@@ -384,7 +384,7 @@ export type Database = {
     }
     Enums: {
       buyer_status: "aprovado" | "reprovado" | "a_analisar"
-      contract_status: "aprovado" | "reprovado" | "a_enviar"
+      contract_status: "aprovado" | "reprovado" | "a_enviar" | "a_analisar"
       credit_analysis_status: "aprovado" | "reprovado" | "a_analisar"
       document_status: "sent" | "approved" | "needs_revision" | "not_sent"
       project_status: "active" | "inactive"

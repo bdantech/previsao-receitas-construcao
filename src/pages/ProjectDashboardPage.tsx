@@ -36,7 +36,7 @@ interface ProjectBuyer {
   full_name: string;
   cpf: string;
   buyer_status: 'aprovado' | 'reprovado' | 'a_analisar';
-  contract_status: 'aprovado' | 'reprovado' | 'a_enviar';
+  contract_status: 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar';
   credit_analysis_status: 'aprovado' | 'reprovado' | 'a_analisar';
   created_at: string;
   updated_at: string;
@@ -260,8 +260,10 @@ const ProjectDashboardPage = () => {
         return <Badge variant="success">Aprovado</Badge>;
       case 'reprovado':
         return <Badge variant="destructive">Reprovado</Badge>;
+      case 'a_analisar':
+        return <Badge variant="warning">Em Análise</Badge>;
       default:
-        return <Badge variant="secondary">Em análise</Badge>;
+        return <Badge variant="secondary">A Enviar</Badge>;
     }
   };
 
