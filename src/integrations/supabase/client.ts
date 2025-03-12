@@ -470,13 +470,16 @@ export const projectBuyersApi = {
           hasAccessToken: !!session.access_token
         });
         
+        // Match the edge function's expected format
         const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+          method: 'GET',
           headers: {
-            Authorization: `Bearer ${session.access_token}`
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
           },
-          body: { 
-            action: 'list',
-            filters
+          body: {
+            action: 'list',  // Required by edge function
+            filters: filters || {}  // Optional filters
           }
         });
         
