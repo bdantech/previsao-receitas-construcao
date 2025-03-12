@@ -16,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { receivablesApi } from "@/integrations/supabase/client";
 import { ReceivableDialog } from "@/components/receivables/ReceivableDialog";
 
 interface Project {
@@ -309,7 +308,6 @@ const ProjectDashboardPage = () => {
         reader.readAsDataURL(file);
       });
       
-      // Sanitize the file name by removing spaces and special characters
       const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
       const filePath = `projects/${projectId}/contracts/${selectedBuyer.id}_${Date.now()}_${sanitizedFileName}`;
       
@@ -359,7 +357,7 @@ const ProjectDashboardPage = () => {
       
       toast({
         title: "Contrato enviado",
-        description: "O contrato foi enviado com sucesso.",
+        description: "O contrato foi enviado e está em análise.",
       });
       
       setContractDialogOpen(false);

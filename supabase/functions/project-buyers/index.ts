@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -144,7 +143,6 @@ serve(async (req) => {
           }
         }
       } else if (!isAdmin) {
-        // If no specific project is provided, company users can only see buyers from their companies' projects
         const { data: userCompanies, error: companyError } = await serviceClient
           .from('user_companies')
           .select('company_id')
@@ -423,6 +421,8 @@ serve(async (req) => {
       }
       
       // Update the buyer record
+      // The contract_status will be automatically updated to 'a_analisar'
+      // by the database trigger when a contract is uploaded
       const { data: updatedBuyer, error: buyerError } = await serviceClient
         .from('project_buyers')
         .update(buyerData)
