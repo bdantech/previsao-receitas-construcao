@@ -309,7 +309,9 @@ const ProjectDashboardPage = () => {
         reader.readAsDataURL(file);
       });
       
-      const filePath = `projects/${projectId}/contracts/${selectedBuyer.id}_${Date.now()}_${file.name}`;
+      // Sanitize the file name by removing spaces and special characters
+      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const filePath = `projects/${projectId}/contracts/${selectedBuyer.id}_${Date.now()}_${sanitizedFileName}`;
       
       console.log("Uploading contract to path:", filePath);
       
