@@ -66,30 +66,51 @@ export const useCompanyDocuments = (companyId: string) => {
     try {
       setUploading(prev => ({ ...prev, [documentId]: true }));
       
-      // Upload file to Supabase Storage
+      // Convert file to base64 for secure transmission through the edge function
+      const reader = new FileReader();
+      
+      // Create a promise to handle the FileReader async operation
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            resolve(reader.result);
+          } else {
+            reject(new Error('Failed to convert file to base64'));
+          }
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      
+      // Generate file path
       const filePath = `companies/${companyId}/documents/${documentTypeId}/${Date.now()}_${file.name}`;
       
       console.log("Uploading file to path:", filePath);
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
       
-      if (uploadError) {
-        console.error("Upload error:", uploadError);
-        throw uploadError;
+      // Upload file using the document-management edge function to bypass RLS
+      const uploadResponse = await supabase.functions.invoke('document-management', {
+        body: {
+          action: 'uploadFile',
+          bucket: 'documents',
+          filePath: filePath, 
+          fileBase64: fileBase64,
+          contentType: file.type
+        }
+      });
+      
+      if (uploadResponse.error) {
+        console.error("Upload error:", uploadResponse.error);
+        throw new Error(uploadResponse.error);
       }
       
-      console.log("File uploaded successfully:", uploadData);
+      console.log("File uploaded successfully:", uploadResponse);
       
       // Update document in database using the document-management edge function
       await documentManagementApi.submitDocument({
         documentTypeId,
         resourceType: 'company',
         resourceId: companyId,
-        filePath: uploadData.path,
+        filePath: uploadResponse.data.path,
         fileName: file.name,
         fileSize: file.size,
         mimeType: file.type

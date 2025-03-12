@@ -293,21 +293,40 @@ const ProjectDashboardPage = () => {
     try {
       setIsUploadingContract(true);
       
+      const reader = new FileReader();
+      
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            resolve(reader.result);
+          } else {
+            reject(new Error('Failed to convert file to base64'));
+          }
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      
       const filePath = `projects/${projectId}/contracts/${selectedBuyer.id}_${Date.now()}_${file.name}`;
       
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
+      console.log("Uploading contract to path:", filePath);
       
-      if (uploadError) {
-        console.error('Error uploading contract:', uploadError);
-        throw uploadError;
+      const uploadResponse = await supabase.functions.invoke('document-management', {
+        body: {
+          action: 'uploadFile',
+          bucket: 'documents',
+          filePath, 
+          fileBase64,
+          contentType: file.type
+        }
+      });
+      
+      if (uploadResponse.error) {
+        console.error('Error uploading contract:', uploadResponse.error);
+        throw new Error(uploadResponse.error.message || 'Upload failed');
       }
       
-      console.log('File uploaded successfully to:', uploadData.path);
+      console.log('File uploaded successfully to:', uploadResponse.data.path);
       
       const { data, error } = await supabase.functions.invoke('project-buyers', {
         headers: {
@@ -317,7 +336,7 @@ const ProjectDashboardPage = () => {
           action: 'update',
           buyerId: selectedBuyer.id,
           buyerData: {
-            contract_file_path: uploadData.path,
+            contract_file_path: uploadResponse.data.path,
             contract_file_name: file.name,
             contract_status: 'aprovado'
           }

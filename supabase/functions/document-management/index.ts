@@ -25,13 +25,15 @@ serve(async (req) => {
     // Get Supabase environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
       console.error('Missing environment variables:', {
         hasUrl: !!supabaseUrl,
-        hasKey: !!supabaseKey
+        hasKey: !!supabaseKey,
+        hasServiceKey: !!supabaseServiceKey
       });
-      throw new Error('Missing environment variables SUPABASE_URL or SUPABASE_ANON_KEY')
+      throw new Error('Missing environment variables for Supabase configuration')
     }
 
     // Get authorization header
@@ -59,6 +61,12 @@ serve(async (req) => {
           },
         },
       }
+    )
+    
+    // Initialize service role client for admin operations
+    const serviceClient = createClient(
+      supabaseUrl,
+      supabaseServiceKey
     )
 
     // Verify the user
@@ -114,7 +122,7 @@ serve(async (req) => {
     // Handle different operations based on action
     if (action === 'getDocumentTypes') {
       // Get all document types (both admin and company users can view)
-      const { data, error } = await supabaseClient
+      const { data, error } = await serviceClient
         .from('document_types')
         .select('*')
         .order('name')
@@ -133,7 +141,7 @@ serve(async (req) => {
       const { documentType } = requestData
       const { name, resource, description, required } = documentType
 
-      const { data, error } = await supabaseClient
+      const { data, error } = await serviceClient
         .from('document_types')
         .insert({
           name,
@@ -156,63 +164,8 @@ serve(async (req) => {
     }
     else if (action === 'getDocuments') {
       try {
-        // Initialize service role client
-        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-        if (!supabaseServiceKey) {
-          console.error('Service role key not available')
-          // Fall back to using the authenticated client if service role is not available
-          let query = supabaseClient
-            .from('documents')
-            .select(`
-              *,
-              document_type:document_type_id(id, name, resource, description, required),
-              submitter:submitted_by(id, email),
-              reviewer:reviewed_by(id, email)
-            `)
-
-          // Apply filter for company users - they can only see their documents
-          if (!isAdmin) {
-            // Set user_id filter - users can only see their documents
-            query = query.eq('user_id', user.id);
-            console.log('Filtering documents by user_id:', user.id);
-          }
-
-          // Apply additional filters if provided
-          const { filters } = requestData
-          if (filters) {
-            const { resourceType, resourceId, status, userId } = filters
-            console.log('Applying filters:', filters)
-            if (resourceType) query = query.eq('resource_type', resourceType)
-            if (resourceId) query = query.eq('resource_id', resourceId)
-            if (status) query = query.eq('status', status)
-            // If admin requests documents for a specific user
-            if (isAdmin && userId) query = query.eq('user_id', userId)
-          }
-
-          // Execute the query
-          const { data: documents, error: documentsError } = await query.order('created_at', { ascending: false })
-
-          if (documentsError) {
-            console.error('Error fetching documents:', documentsError)
-            throw new Error('Failed to fetch documents')
-          }
-
-          console.log(`Found ${documents?.length || 0} documents`)
-          return new Response(
-            JSON.stringify({ documents: documents || [] }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200 
-            }
-          )
-        }
-
-        // If service role is available, use it for more reliable queries
-        console.log('Using service role for document query')
-        const adminSupabase = createClient(supabaseUrl, supabaseServiceKey)
-
         // Define base query
-        let query = adminSupabase
+        let query = serviceClient
           .from('documents')
           .select(`
             *,
@@ -223,15 +176,38 @@ serve(async (req) => {
 
         // Apply filter for company users - they can only see their documents
         if (!isAdmin) {
-          query = query.eq('user_id', user.id);
-          console.log('Filtering documents by user_id (service role):', user.id);
+          // Get user's companies
+          const { data: userCompanies, error: companiesError } = await serviceClient
+            .from('user_companies')
+            .select('company_id')
+            .eq('user_id', user.id)
+          
+          if (companiesError) {
+            console.error('Error fetching user companies:', companiesError)
+            throw new Error('Failed to fetch user companies')
+          }
+          
+          if (!userCompanies || userCompanies.length === 0) {
+            // User doesn't belong to any company, return empty array
+            return new Response(
+              JSON.stringify({ documents: [] }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200 
+              }
+            )
+          }
+          
+          const companyIds = userCompanies.map(uc => uc.company_id)
+          query = query.in('resource_id', companyIds).eq('resource_type', 'company')
+          console.log('Filtering documents by company_ids:', companyIds);
         }
 
         // Apply additional filters if provided
         const { filters } = requestData
         if (filters) {
           const { resourceType, resourceId, status, userId } = filters
-          console.log('Applying filters (service role):', filters)
+          console.log('Applying filters:', filters)
           if (resourceType) query = query.eq('resource_type', resourceType)
           if (resourceId) query = query.eq('resource_id', resourceId)
           if (status) query = query.eq('status', status)
@@ -247,7 +223,7 @@ serve(async (req) => {
           throw new Error('Failed to fetch documents')
         }
 
-        console.log(`Found ${documents?.length || 0} documents (service role)`)
+        console.log(`Found ${documents?.length || 0} documents`)
         return new Response(
           JSON.stringify({ documents: documents || [] }),
           { 
@@ -282,7 +258,7 @@ serve(async (req) => {
           )
         }
 
-        const { data, error } = await supabaseClient
+        const { data, error } = await serviceClient
           .from('documents')
           .update({
             status,
@@ -316,7 +292,7 @@ serve(async (req) => {
         }
 
         // Verify the document belongs to one of the user's companies and has appropriate status
-        const { data: document, error: getError } = await supabaseClient
+        const { data: document, error: getError } = await serviceClient
           .from('documents')
           .select('*')
           .eq('id', id)
@@ -334,7 +310,7 @@ serve(async (req) => {
         }
 
         // Verify user belongs to the document's company
-        const { data: userCompanies, error: companyError } = await supabaseClient
+        const { data: userCompanies, error: companyError } = await serviceClient
           .from('user_companies')
           .select('company_id')
           .eq('user_id', user.id)
@@ -351,7 +327,7 @@ serve(async (req) => {
         }
 
         // Update the document
-        const { data, error } = await supabaseClient
+        const { data, error } = await serviceClient
           .from('documents')
           .update({
             status: 'sent',
@@ -390,7 +366,7 @@ serve(async (req) => {
 
       // If user is not admin, verify they belong to the company
       if (!isAdmin && resourceType === 'company') {
-        const { data: userCompanies, error: companyError } = await supabaseClient
+        const { data: userCompanies, error: companyError } = await serviceClient
           .from('user_companies')
           .select('company_id')
           .eq('user_id', user.id)
@@ -408,7 +384,7 @@ serve(async (req) => {
       }
 
       // Find existing document with status 'not_sent'
-      const { data: existingDoc, error: findError } = await supabaseClient
+      const { data: existingDoc, error: findError } = await serviceClient
         .from('documents')
         .select('id')
         .eq('document_type_id', documentTypeId)
@@ -430,7 +406,7 @@ serve(async (req) => {
       let result;
       if (existingDoc) {
         // Update existing document
-        result = await supabaseClient
+        result = await serviceClient
           .from('documents')
           .update({
             status: 'sent',
@@ -447,7 +423,7 @@ serve(async (req) => {
           .single()
       } else {
         // Create new document if no existing one found
-        result = await supabaseClient
+        result = await serviceClient
           .from('documents')
           .insert({
             document_type_id: documentTypeId,
@@ -473,6 +449,106 @@ serve(async (req) => {
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 201 
+        }
+      )
+    }
+    else if (action === 'getCompanyDocuments') {
+      const { companyId } = requestData;
+      
+      if (!companyId) {
+        return new Response(
+          JSON.stringify({ error: 'Company ID is required' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        )
+      }
+      
+      // Check if user has access to the company
+      if (!isAdmin) {
+        const { data: userCompanies, error: companyError } = await serviceClient
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .eq('company_id', companyId)
+        
+        if (companyError || !userCompanies.length) {
+          return new Response(
+            JSON.stringify({ error: 'You do not have permission to access documents for this company' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 403 
+            }
+          )
+        }
+      }
+      
+      // Get company documents
+      const { data: documents, error } = await serviceClient
+        .from('documents')
+        .select(`
+          *,
+          document_type:document_type_id(id, name, resource, description, required)
+        `)
+        .eq('resource_type', 'company')
+        .eq('resource_id', companyId)
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error('Error fetching company documents:', error)
+        throw error
+      }
+      
+      return new Response(
+        JSON.stringify(documents || []),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
+    }
+    else if (action === 'uploadFile') {
+      // This is a new helper action to handle file uploads using the service role client
+      // This bypasses RLS policies for storage
+      const { bucket, filePath, fileBase64, contentType } = requestData;
+      
+      if (!bucket || !filePath || !fileBase64) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required file upload parameters' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        )
+      }
+      
+      // Convert base64 to Uint8Array
+      const base64Data = fileBase64.split(';base64,').pop();
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      // Upload file using service role client to bypass RLS
+      const { data, error } = await serviceClient.storage
+        .from(bucket)
+        .upload(filePath, bytes, {
+          contentType: contentType || 'application/octet-stream',
+          upsert: true
+        });
+      
+      if (error) {
+        console.error('Error uploading file:', error);
+        throw error;
+      }
+      
+      return new Response(
+        JSON.stringify({ success: true, path: data.path }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
         }
       )
     }
