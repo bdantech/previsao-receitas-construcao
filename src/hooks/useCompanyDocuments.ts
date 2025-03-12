@@ -1,186 +1,103 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
 
-import { useState, useCallback, useEffect } from "react";
-import { documentManagementApi, supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
-import { CompanyDocument } from "@/types/document";
-import { useAuth } from "@/hooks/useAuth";
+interface Document {
+  id: string;
+  document_type_id: string;
+  resource_type: string;
+  resource_id: string;
+  status: string;
+  file_path: string;
+  file_name: string;
+  submitted_by: string | null;
+  submitted_at: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+}
 
-export const useCompanyDocuments = (companyId: string) => {
-  const { session, isLoading: isAuthLoading } = useAuth();
-  const [documents, setDocuments] = useState<CompanyDocument[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+export const useCompanyDocuments = () => {
+  const { getAuthHeader } = useAuth();
 
-  // Fetch company documents
-  const fetchDocuments = useCallback(async () => {
-    if (!companyId) {
-      console.log("No company ID provided");
-      setLoading(false);
-      return;
-    }
-
-    if (!session?.access_token) {
-      console.log("No valid session");
-      setLoading(false);
-      return;
-    }
-
+  const uploadFile = async (file: File, resourceType: string, resourceId: string) => {
     try {
-      setLoading(true);
-      console.log("Fetching documents for company:", companyId);
+      const headers = getAuthHeader();
       
-      // Use the service role client for admin users and regular client for company users
-      const docs = await documentManagementApi.getCompanyDocuments(companyId);
-      console.log("Retrieved documents:", docs);
-      
-      if (Array.isArray(docs)) {
-        setDocuments(docs);
-      } else {
-        console.error("Unexpected document format:", docs);
-        setDocuments([]);
-      }
-    } catch (error) {
-      console.error("Error fetching documents:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os documentos",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId, session?.access_token]);
-
-  // Load documents when session and companyId are available
-  useEffect(() => {
-    if (!isAuthLoading && session?.access_token && companyId) {
-      fetchDocuments();
-    }
-  }, [companyId, session?.access_token, isAuthLoading, fetchDocuments]);
-
-  // Handle file upload
-  const handleFileUpload = async (documentId: string, documentTypeId: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !companyId || !session?.access_token) return;
-
-    try {
-      setUploading(prev => ({ ...prev, [documentId]: true }));
-      
-      // Convert file to base64 for secure transmission through the edge function
-      const reader = new FileReader();
-      
-      // Create a promise to handle the FileReader async operation
-      const fileBase64 = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-          if (typeof reader.result === 'string') {
-            resolve(reader.result);
-          } else {
-            reject(new Error('Failed to convert file to base64'));
-          }
-        };
-        reader.onerror = () => reject(reader.error);
+      // Convert file to base64
+      const base64File = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
         reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
       });
-      
-      // Generate file path
-      const filePath = `companies/${companyId}/documents/${documentTypeId}/${Date.now()}_${file.name}`;
-      
-      console.log("Uploading file to path:", filePath);
-      
-      // Upload file using the document-management edge function to bypass RLS
-      const uploadResponse = await supabase.functions.invoke('document-management', {
+
+      const { data, error } = await supabase.functions.invoke('document-management', {
         body: {
           action: 'uploadFile',
-          bucket: 'documents',
-          filePath: filePath, 
-          fileBase64: fileBase64,
-          contentType: file.type
-        }
+          file: base64File,
+          fileName: file.name,
+          resourceType,
+          resourceId
+        },
+        headers: headers
       });
-      
-      if (uploadResponse.error) {
-        console.error("Upload error:", uploadResponse.error);
-        throw new Error(uploadResponse.error);
+
+      if (error) {
+        console.error('Error uploading file:', error);
+        throw error;
       }
-      
-      console.log("File uploaded successfully:", uploadResponse);
-      
-      // Update document in database using the document-management edge function
-      await documentManagementApi.submitDocument({
-        documentTypeId,
-        resourceType: 'company',
-        resourceId: companyId,
-        filePath: uploadResponse.data.path,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type
-      });
-      
-      // Refresh document list
-      await fetchDocuments();
-      
-      toast({
-        title: "Sucesso",
-        description: "Documento enviado com sucesso",
-      });
+
+      return data;
     } catch (error) {
-      console.error("Error uploading document:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível enviar o documento: " + (error.message || ''),
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(prev => ({ ...prev, [documentId]: false }));
+      console.error('Upload error:', error);
+      throw error;
     }
   };
 
-  // Download document
-  const downloadDocument = async (doc: CompanyDocument) => {
+  const getDocuments = async (resourceType: string, resourceId: string): Promise<Document[]> => {
     try {
-      if (!doc.file_path) {
-        toast({
-          title: "Aviso",
-          description: "Este documento ainda não possui um arquivo para download",
-          variant: "default",
-        });
-        return;
-      }
-      
-      const { data, error } = await supabase.storage
+      const { data, error } = await supabase
         .from('documents')
-        .download(doc.file_path);
-      
+        .select('*')
+        .eq('resource_type', resourceType)
+        .eq('resource_id', resourceId);
+
       if (error) {
-        console.error("Download error:", error);
+        console.error('Error fetching documents:', error);
         throw error;
       }
-      
-      // Create a download link
-      const url = URL.createObjectURL(data);
-      const a = window.document.createElement('a');
-      a.href = url;
-      a.download = doc.file_name;
-      window.document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(url);
-      window.document.body.removeChild(a);
+
+      return data || [];
     } catch (error) {
-      console.error("Error downloading document:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível baixar o documento",
-        variant: "destructive",
-      });
+      console.error('Error:', error);
+      return [];
+    }
+  };
+
+  const updateDocumentStatus = async (documentId: string, status: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .update({ status })
+        .eq('id', documentId)
+        .select();
+
+      if (error) {
+        console.error('Error updating document status:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error updating document status:', error);
+      throw error;
     }
   };
 
   return {
-    documents,
-    loading,
-    uploading,
-    fetchDocuments,
-    handleFileUpload,
-    downloadDocument
+    getDocuments,
+    updateDocumentStatus,
+    uploadFile,
   };
 };
