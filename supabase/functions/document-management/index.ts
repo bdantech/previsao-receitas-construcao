@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
 
@@ -35,17 +34,22 @@ serve(async (req) => {
       );
     }
 
+    // Extract the token from the Authorization header
+    const token = authHeader.replace('Bearer ', '');
+
     // Initialize the Supabase clients
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      }
     });
     
     const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // First verify the user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // First verify the user is authenticated using the token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
       console.error('Auth error:', authError);
