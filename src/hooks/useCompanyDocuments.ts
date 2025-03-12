@@ -216,15 +216,15 @@ export const useCompanyDocuments = (companyId?: string) => {
 
       if (error) throw error;
 
-      // Create a download link
+      // Create a download link - fixed to use window.document instead of the document parameter
       const blob = new Blob([data], { type: 'application/octet-stream' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = window.document.createElement('a');
       a.href = url;
       a.download = document.file_name || 'document';
-      document.body.appendChild(a);
+      window.document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      window.document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading document:', error);
