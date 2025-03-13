@@ -116,6 +116,7 @@ serve(async (req) => {
       .select(`
         id,
         project_id,
+        buyer_name,
         buyer_cpf,
         amount,
         due_date,

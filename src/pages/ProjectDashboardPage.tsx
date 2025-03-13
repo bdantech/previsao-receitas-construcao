@@ -637,6 +637,7 @@ const ProjectDashboardPage = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Nome do Comprador</TableHead>
                         <TableHead>CPF do Comprador</TableHead>
                         <TableHead>Valor</TableHead>
                         <TableHead>Data de Vencimento</TableHead>
@@ -647,6 +648,7 @@ const ProjectDashboardPage = () => {
                     <TableBody>
                       {receivables.map((receivable) => (
                         <TableRow key={receivable.id}>
+                          <TableCell className="font-medium">{receivable.buyer_name || "—"}</TableCell>
                           <TableCell>{formatCPF(receivable.buyer_cpf)}</TableCell>
                           <TableCell>{formatCurrency(receivable.amount)}</TableCell>
                           <TableCell>

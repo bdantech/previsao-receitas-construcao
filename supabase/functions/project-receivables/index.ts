@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -103,6 +104,7 @@ serve(async (req) => {
           .select(`
             id,
             project_id,
+            buyer_name,
             buyer_cpf,
             amount,
             due_date,
@@ -190,11 +192,11 @@ serve(async (req) => {
       try {
         console.log('Creating receivable with data:', params)
         
-        const { projectId, buyerCpf, amount, dueDate, description } = params
+        const { projectId, buyerName, buyerCpf, amount, dueDate, description } = params
         
-        if (!projectId || !buyerCpf || !amount || !dueDate) {
+        if (!projectId || !buyerName || !buyerCpf || !amount || !dueDate) {
           return new Response(
-            JSON.stringify({ error: 'Required fields: projectId, buyerCpf, amount, dueDate' }),
+            JSON.stringify({ error: 'Required fields: projectId, buyerName, buyerCpf, amount, dueDate' }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 400 
@@ -282,6 +284,7 @@ serve(async (req) => {
           .from('receivables')
           .insert({
             project_id: projectId,
+            buyer_name: buyerName,
             buyer_cpf: buyerCpf,
             amount,
             due_date: dueDate,

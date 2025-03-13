@@ -273,6 +273,7 @@ export type Database = {
         Row: {
           amount: number
           buyer_cpf: string
+          buyer_name: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -285,6 +286,7 @@ export type Database = {
         Insert: {
           amount: number
           buyer_cpf: string
+          buyer_name?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -297,6 +299,7 @@ export type Database = {
         Update: {
           amount?: number
           buyer_cpf?: string
+          buyer_name?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null

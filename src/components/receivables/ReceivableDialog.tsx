@@ -23,6 +23,7 @@ export function ReceivableDialog({
   projectId,
   onReceivableCreated
 }: ReceivableDialogProps) {
+  const [buyerName, setBuyerName] = useState("");
   const [buyerCpf, setBuyerCpf] = useState("");
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -48,7 +49,7 @@ export function ReceivableDialog({
     }
 
     // Basic validation
-    if (!buyerCpf || !amount || !dueDate) {
+    if (!buyerName || !buyerCpf || !amount || !dueDate) {
       setErrorMessage("Preencha todos os campos obrigatórios.");
       toast({
         title: "Dados incompletos",
@@ -85,6 +86,7 @@ export function ReceivableDialog({
           method: 'POST',
           endpoint: 'receivables',
           projectId,
+          buyerName,
           buyerCpf: cleanCpf,
           amount: amountValue,
           dueDate,
@@ -98,6 +100,7 @@ export function ReceivableDialog({
       });
 
       // Reset form
+      setBuyerName("");
       setBuyerCpf("");
       setAmount("");
       setDueDate("");
@@ -169,6 +172,16 @@ export function ReceivableDialog({
               {errorMessage}
             </div>
           )}
+          <div className="space-y-2">
+            <Label htmlFor="buyerName">Nome do Comprador *</Label>
+            <Input
+              id="buyerName"
+              value={buyerName}
+              onChange={(e) => setBuyerName(e.target.value)}
+              placeholder="Nome completo"
+              required
+            />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="buyerCpf">CPF do Comprador *</Label>
             <Input
