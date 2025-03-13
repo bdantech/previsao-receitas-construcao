@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -46,6 +47,7 @@ interface ProjectBuyer {
 interface Receivable {
   id: string;
   project_id: string;
+  buyer_name?: string; // Adding the buyer_name property as optional
   buyer_cpf: string;
   amount: number;
   due_date: string;
