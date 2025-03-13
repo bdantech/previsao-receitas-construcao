@@ -585,32 +585,34 @@ export const projectBuyersApi = {
     }) => {
       try {
         // Get current session
-        // const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        // if (sessionError) {
-        //   console.error('Session error:', sessionError);
-        //   throw new Error('Failed to get session');
-        // }
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          throw new Error('Failed to get session');
+        }
         
-        // if (!session) {
-        //   throw new Error('No active session');
-        // }
+        if (!session) {
+          throw new Error('No active session');
+        }
 
-        // // Ensure we have a valid access token
-        // if (!session.access_token) {
-        //   throw new Error('No access token available');
-        // }
+        // Ensure we have a valid access token
+        if (!session.access_token) {
+          throw new Error('No access token available');
+        }
 
-        // console.log('Using session for admin buyer update:', {
-        //   userId: session.user?.id,
-        //   expiresAt: session.expires_at,
-        //   hasAccessToken: !!session.access_token
-        // });
-
-        const headers = await getAuthHeaders();
+        console.log('Using session for admin buyers:', {
+          userId: session.user?.id,
+          expiresAt: session.expires_at,
+          hasAccessToken: !!session.access_token
+        });
+        
         // Call the edge function with the session token
         const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
-          headers,
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          },
           body: {
             action: 'update',
             buyerId,
