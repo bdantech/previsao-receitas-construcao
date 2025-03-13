@@ -110,7 +110,6 @@ export default function AdminBuyersPage() {
     try {
       // Find the selected buyer to get company and project IDs
       const selectedBuyer = buyers?.find(buyer => buyer.id === selectedBuyerId);
-      console.log('selectedBuyer',selectedBuyer)
       if (!selectedBuyer) {
         toast.error("Comprador não encontrado");
         return;

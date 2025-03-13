@@ -610,8 +610,7 @@ export const projectBuyersApi = {
         // Call the edge function with the session token
         const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
           headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${session.access_token}`
           },
           body: {
             action: 'update',
