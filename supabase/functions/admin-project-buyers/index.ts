@@ -31,7 +31,7 @@ serve(async (req) => {
       )
     }
 
-    const requestData = await req.json()
+    const requestData = await req.body.json()
     const { 
       action, 
       companyId, 
@@ -41,6 +41,7 @@ serve(async (req) => {
       filters
     } = requestData
 
+    console.log('requestData', requestData);
     console.log('Admin project buyers request:', action, companyId, projectId, buyerId)
 
     // Initialize the admin client with service role key
