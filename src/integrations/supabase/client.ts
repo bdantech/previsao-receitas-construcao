@@ -549,31 +549,34 @@ export const projectBuyersApi = {
       return data?.buyer;
     },
     
-    updateBuyer: async (buyerId: string, buyerData: {
-      full_name?: string,
-      cpf?: string,
-      contract_file_path?: string,
-      contract_file_name?: string,
+    updateBuyer: async (buyerId: string, updateData: { 
       contract_status?: 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar',
-      credit_analysis_status?: 'aprovado' | 'reprovado' | 'a_analisar'
+      credit_analysis_status?: 'aprovado' | 'reprovado' | 'a_analisar',
+      companyId: string,
+      projectId: string
     }) => {
       const headers = await getAuthHeaders();
       const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
         //method: 'POST',
         headers,
-        body: { 
+        body: {
           action: 'update',
           buyerId,
-          buyerData
+          buyerData: {
+            contract_status: updateData.contract_status,
+            credit_analysis_status: updateData.credit_analysis_status
+          },
+          companyId: updateData.companyId,
+          projectId: updateData.projectId
         }
       });
-      
+
       if (error) {
-        console.error('Error updating project buyer:', error);
+        console.error('Error updating buyer:', error);
         throw error;
       }
-      
-      return data?.buyer;
+
+      return data;
     }
   }
 };

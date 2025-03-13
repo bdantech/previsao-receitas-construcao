@@ -249,6 +249,19 @@ serve(async (req) => {
     if (action === 'update' && buyerId && buyerData) {
       console.log('Admin updating project buyer with data:', buyerData)
       
+      // Validate required fields
+      if (!companyId || !projectId) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Missing required fields: companyId and projectId are required'
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        );
+      }
+
       // Validate contract_status if it's being updated
       if (buyerData.contract_status) {
         const validContractStatuses = ['aprovado', 'reprovado', 'a_enviar', 'a_analisar'];
@@ -282,21 +295,50 @@ serve(async (req) => {
           );
         }
       }
-      
+
+      // Verify the buyer belongs to the specified company and project
       const { data: buyer, error: buyerError } = await serviceClient
+        .from('project_buyers')
+        .select('project_id, projects!inner(company_id)')
+        .eq('id', buyerId)
+        .single();
+
+      if (buyerError || !buyer) {
+        console.error('Error fetching buyer:', buyerError);
+        return new Response(
+          JSON.stringify({ error: 'Buyer not found' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404 
+          }
+        );
+      }
+
+      if (buyer.project_id !== projectId || buyer.projects.company_id !== companyId) {
+        return new Response(
+          JSON.stringify({ error: 'Buyer does not belong to the specified company and project' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403 
+          }
+        );
+      }
+      
+      // Update the buyer
+      const { data: updatedBuyer, error: updateError } = await serviceClient
         .from('project_buyers')
         .update(buyerData)
         .eq('id', buyerId)
         .select()
         .single()
       
-      if (buyerError) {
-        console.error('Project buyer update error:', buyerError)
-        throw buyerError
+      if (updateError) {
+        console.error('Project buyer update error:', updateError)
+        throw updateError
       }
 
       return new Response(
-        JSON.stringify({ buyer }),
+        JSON.stringify({ buyer: updatedBuyer }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 

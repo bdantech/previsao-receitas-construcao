@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { projectBuyersApi } from "@/integrations/supabase/client";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
@@ -109,9 +108,24 @@ export default function AdminBuyersPage() {
     if (!selectedBuyerId || !selectedStatus) return;
 
     try {
+      // Find the selected buyer to get company and project IDs
+      const selectedBuyer = buyers?.find(buyer => buyer.id === selectedBuyerId);
+      if (!selectedBuyer) {
+        toast.error("Comprador não encontrado");
+        return;
+      }
+
       const updateData = statusType === 'contract' 
-        ? { contract_status: selectedStatus as 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar' }
-        : { credit_analysis_status: selectedStatus as 'aprovado' | 'reprovado' | 'a_analisar' };
+        ? { 
+            contract_status: selectedStatus as 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar',
+            companyId: selectedBuyer.company_id,
+            projectId: selectedBuyer.project_id
+          }
+        : { 
+            credit_analysis_status: selectedStatus as 'aprovado' | 'reprovado' | 'a_analisar',
+            companyId: selectedBuyer.company_id,
+            projectId: selectedBuyer.project_id
+          };
 
       await projectBuyersApi.admin.updateBuyer(selectedBuyerId, updateData);
       
