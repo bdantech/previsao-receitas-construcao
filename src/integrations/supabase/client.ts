@@ -559,7 +559,7 @@ export const projectBuyersApi = {
     }) => {
       const headers = await getAuthHeaders();
       const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
-        method: 'POST',
+        //method: 'POST',
         headers,
         body: { 
           action: 'update',
