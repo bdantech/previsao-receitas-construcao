@@ -416,23 +416,53 @@ export const projectBuyersApi = {
     contract_status?: 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar',
     credit_analysis_status?: 'aprovado' | 'reprovado' | 'a_analisar'
   }) => {
-    const headers = await getAuthHeaders();
-    const { data, error } = await supabase.functions.invoke('project-buyers', {
-      method: 'PUT',
-      headers,
-      body: { 
-        action: 'update',
-        buyerId,
-        buyerData
+    try {
+      // Get current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Failed to get session');
       }
-    });
-    
-    if (error) {
-      console.error('Error updating project buyer:', error);
+      
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Ensure we have a valid access token
+      if (!session.access_token) {
+        throw new Error('No access token available');
+      }
+
+      console.log('Using session for admin buyer update:', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at,
+        hasAccessToken: !!session.access_token
+      });
+
+      const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: { 
+          action: 'update',
+          buyerId,
+          buyerData
+        }
+      });
+      
+      if (error) {
+        console.error('Error updating project buyer:', error);
+        throw error;
+      }
+      
+      return data?.buyer;
+    } catch (error) {
+      console.error('Exception in updateBuyer:', error);
       throw error;
     }
-    
-    return data?.buyer;
   },
   
   // Admin-specific methods
@@ -529,7 +559,7 @@ export const projectBuyersApi = {
     }) => {
       const headers = await getAuthHeaders();
       const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
-        method: 'PUT',
+        method: 'POST',
         headers,
         body: { 
           action: 'update',
