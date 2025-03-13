@@ -47,7 +47,7 @@ interface ProjectBuyer {
 interface Receivable {
   id: string;
   project_id: string;
-  buyer_name?: string; // Adding the buyer_name property as optional
+  buyer_name?: string;
   buyer_cpf: string;
   amount: number;
   due_date: string;
@@ -283,8 +283,10 @@ const ProjectDashboardPage = () => {
   };
 
   const handleContractClick = (buyer: ProjectBuyer) => {
-    setSelectedBuyer(buyer);
-    setContractDialogOpen(true);
+    if (buyer.contract_status === 'a_enviar') {
+      setSelectedBuyer(buyer);
+      setContractDialogOpen(true);
+    }
   };
 
   const handleContractUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -604,6 +606,10 @@ const ProjectDashboardPage = () => {
                               size="sm"
                               onClick={() => handleContractClick(buyer)}
                               className="flex items-center gap-2"
+                              disabled={buyer.contract_status !== 'a_enviar'}
+                              title={buyer.contract_status !== 'a_enviar' ? 
+                                "Não é possível modificar o contrato no status atual" : 
+                                "Enviar contrato"}
                             >
                               <Upload className="h-4 w-4" />
                               Contrato
