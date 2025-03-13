@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProjectsList } from '@/components/projects/ProjectsList';
@@ -67,7 +66,7 @@ export const AdminCompanyProjects = ({ companyId, companyName }: AdminCompanyPro
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
-          <ProjectsList projects={projects} />
+          <ProjectsList projects={projects} showDashboard={false} />
         )}
       </CardContent>
     </Card>

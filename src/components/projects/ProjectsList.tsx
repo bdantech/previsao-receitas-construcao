@@ -1,4 +1,3 @@
-
 import { FolderKanban, LayoutDashboard } from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -21,9 +20,10 @@ interface Project {
 
 interface ProjectsListProps {
   projects: Project[];
+  showDashboard?: boolean;
 }
 
-export const ProjectsList = ({ projects }: ProjectsListProps) => {
+export const ProjectsList = ({ projects, showDashboard = true }: ProjectsListProps) => {
   if (projects.length === 0) {
     return (
       <div className="text-center py-10 bg-white rounded-lg shadow">
@@ -92,12 +92,14 @@ export const ProjectsList = ({ projects }: ProjectsListProps) => {
                   </Badge>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={`/project-dashboard/${project.id}`}>
-                      <LayoutDashboard className="w-4 h-4 mr-2" />
-                      Dashboard
-                    </Link>
-                  </Button>
+                  {showDashboard && (
+                    <Button asChild variant="outline" size="sm">
+                      <Link to={`/project-dashboard/${project.id}`}>
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        Dashboard
+                      </Link>
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}
