@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { projectBuyersApi } from "@/integrations/supabase/client";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
@@ -9,17 +10,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileText, PenSquare } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatCPF } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function AdminBuyersPage() {
   const { session, userRole, isLoading: isLoadingAuth } = useAuth();
   const navigate = useNavigate();
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [statusType, setStatusType] = useState<'contract' | 'credit'>('contract');
+  const [selectedBuyerId, setSelectedBuyerId] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
 
   // Protect the route
   useEffect(() => {
@@ -28,7 +36,7 @@ export default function AdminBuyersPage() {
     }
   }, [session, userRole, isLoadingAuth, navigate]);
 
-  const { data: buyers, isLoading: isLoadingBuyers, error } = useQuery({
+  const { data: buyers, isLoading: isLoadingBuyers, error, refetch } = useQuery({
     queryKey: ['admin-buyers'],
     queryFn: async () => {
       try {
@@ -87,7 +95,66 @@ export default function AdminBuyersPage() {
       'a_enviar': { label: 'A Enviar', className: 'text-blue-600' },
     };
 
-    return statusMap[status] || { label: status, className: 'text-gray-600' };
+    return statusMap[status] || { label: status, className: 'text-gray-500' };
+  };
+
+  const openStatusDialog = (buyerId: string, type: 'contract' | 'credit', currentStatus: string) => {
+    setSelectedBuyerId(buyerId);
+    setStatusType(type);
+    setSelectedStatus(currentStatus);
+    setStatusDialogOpen(true);
+  };
+
+  const handleStatusChange = async () => {
+    if (!selectedBuyerId || !selectedStatus) return;
+
+    try {
+      const updateData = statusType === 'contract' 
+        ? { contract_status: selectedStatus as 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar' }
+        : { credit_analysis_status: selectedStatus as 'aprovado' | 'reprovado' | 'a_analisar' };
+
+      await projectBuyersApi.admin.updateBuyer(selectedBuyerId, updateData);
+      
+      toast.success("Status atualizado com sucesso");
+      setStatusDialogOpen(false);
+      refetch(); // Refresh the buyers list
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast.error("Erro ao atualizar status");
+    }
+  };
+
+  const downloadContract = async (buyer: any) => {
+    if (!buyer.contract_file_path) {
+      toast.error("Este comprador não possui contrato para download");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .download(buyer.contract_file_path);
+
+      if (error) {
+        throw error;
+      }
+
+      // Create a download link
+      const blob = new Blob([data], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = buyer.contract_file_name || 'contrato.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success("Download do contrato iniciado");
+    } catch (error) {
+      console.error('Error downloading contract:', error);
+      toast.error("Erro ao baixar o contrato");
+    }
   };
 
   // Show loading state while checking authentication
@@ -140,12 +207,13 @@ export default function AdminBuyersPage() {
                   <TableHead>Status Comprador</TableHead>
                   <TableHead>Status Contrato</TableHead>
                   <TableHead>Status Análise</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {buyers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-gray-500 py-4">
+                    <TableCell colSpan={8} className="text-center text-gray-500 py-4">
                       Nenhum comprador encontrado
                     </TableCell>
                   </TableRow>
@@ -170,6 +238,38 @@ export default function AdminBuyersPage() {
                         <TableCell className={creditStatus.className}>
                           {creditStatus.label}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => openStatusDialog(buyer.id, 'contract', buyer.contract_status)}
+                              title="Alterar status do contrato"
+                            >
+                              <PenSquare className="h-4 w-4 mr-1" />
+                              Contrato
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => openStatusDialog(buyer.id, 'credit', buyer.credit_analysis_status)}
+                              title="Alterar status da análise de crédito"
+                            >
+                              <PenSquare className="h-4 w-4 mr-1" />
+                              Crédito
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => downloadContract(buyer)}
+                              disabled={!buyer.contract_file_path}
+                              title={buyer.contract_file_path ? "Baixar contrato" : "Sem contrato disponível"}
+                            >
+                              <FileText className="h-4 w-4 mr-1" />
+                              Contrato
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })
@@ -179,6 +279,81 @@ export default function AdminBuyersPage() {
           </div>
         )}
       </div>
+
+      {/* Status Change Dialog */}
+      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {statusType === 'contract' ? 'Alterar Status do Contrato' : 'Alterar Status da Análise de Crédito'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <div className="font-medium">Selecione o novo status:</div>
+              <div className="grid grid-cols-1 gap-2">
+                {statusType === 'contract' ? (
+                  <>
+                    <Button 
+                      variant={selectedStatus === 'a_enviar' ? 'default' : 'outline'}
+                      onClick={() => setSelectedStatus('a_enviar')}
+                    >
+                      A Enviar
+                    </Button>
+                    <Button 
+                      variant={selectedStatus === 'a_analisar' ? 'default' : 'outline'}
+                      onClick={() => setSelectedStatus('a_analisar')}
+                    >
+                      A Analisar
+                    </Button>
+                    <Button 
+                      variant={selectedStatus === 'aprovado' ? 'success' : 'outline'}
+                      onClick={() => setSelectedStatus('aprovado')}
+                    >
+                      Aprovar
+                    </Button>
+                    <Button 
+                      variant={selectedStatus === 'reprovado' ? 'destructive' : 'outline'}
+                      onClick={() => setSelectedStatus('reprovado')}
+                    >
+                      Reprovar
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button 
+                      variant={selectedStatus === 'a_analisar' ? 'default' : 'outline'}
+                      onClick={() => setSelectedStatus('a_analisar')}
+                    >
+                      A Analisar
+                    </Button>
+                    <Button 
+                      variant={selectedStatus === 'aprovado' ? 'success' : 'outline'}
+                      onClick={() => setSelectedStatus('aprovado')}
+                    >
+                      Aprovar
+                    </Button>
+                    <Button 
+                      variant={selectedStatus === 'reprovado' ? 'destructive' : 'outline'}
+                      onClick={() => setSelectedStatus('reprovado')}
+                    >
+                      Reprovar
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleStatusChange}>
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminDashboardLayout>
   );
 }
