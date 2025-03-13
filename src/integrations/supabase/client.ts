@@ -442,7 +442,6 @@ export const projectBuyersApi = {
 
       // Call the edge function with the session token
       const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
-        method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`
         },
@@ -555,28 +554,57 @@ export const projectBuyersApi = {
       companyId: string,
       projectId: string
     }) => {
-      const headers = await getAuthHeaders();
-      const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
-        //method: 'POST',
-        headers,
-        body: {
-          action: 'update',
-          buyerId,
-          buyerData: {
-            contract_status: updateData.contract_status,
-            credit_analysis_status: updateData.credit_analysis_status
-          },
-          companyId: 'aa6104d2-b790-43de-9654-9ac850d0c06d',
-          projectId: 'da631f9c-9310-4dcc-b740-21756de8ea34'
+      try {
+        // Get current session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          throw new Error('Failed to get session');
         }
-      });
+        
+        if (!session) {
+          throw new Error('No active session');
+        }
 
-      if (error) {
-        console.error('Error updating buyer:', error);
+        // Ensure we have a valid access token
+        if (!session.access_token) {
+          throw new Error('No access token available');
+        }
+
+        console.log('Using session for admin buyer update:', {
+          userId: session.user?.id,
+          expiresAt: session.expires_at,
+          hasAccessToken: !!session.access_token
+        });
+
+        // Call the edge function with the session token
+        const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: {
+            action: 'update',
+            buyerId,
+            buyerData: {
+              contract_status: updateData.contract_status,
+              credit_analysis_status: updateData.credit_analysis_status
+            },
+            companyId: updateData.companyId,
+            projectId: updateData.projectId
+          }
+        });
+
+        if (error) {
+          console.error('Error updating buyer:', error);
+          throw error;
+        }
+
+        return data;
+      } catch (error) {
+        console.error('Exception in updateBuyer:', error);
         throw error;
       }
-
-      return data;
     }
   }
 };
