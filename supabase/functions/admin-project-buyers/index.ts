@@ -31,7 +31,7 @@ serve(async (req) => {
       )
     }
 
-    const requestData = await req.body.json()
+    const requestData = await req.json()
     const { 
       action, 
       companyId, 
