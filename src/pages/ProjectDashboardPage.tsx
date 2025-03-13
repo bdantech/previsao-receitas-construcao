@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -18,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { ReceivableDialog } from "@/components/receivables/ReceivableDialog";
+import { ReceivableBulkImportDialog } from "@/components/receivables/ReceivableBulkImportDialog";
 
 interface Project {
   id: string;
@@ -70,6 +70,7 @@ const ProjectDashboardPage = () => {
   const [isLoadingBuyers, setIsLoadingBuyers] = useState(false);
   const [isLoadingReceivables, setIsLoadingReceivables] = useState(false);
   const [receivableDialogOpen, setReceivableDialogOpen] = useState(false);
+  const [bulkImportDialogOpen, setBulkImportDialogOpen] = useState(false);
   const { session } = useAuth();
   const { toast } = useToast();
   
@@ -625,10 +626,20 @@ const ProjectDashboardPage = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Recebíveis</CardTitle>
-                <Button onClick={() => setReceivableDialogOpen(true)} className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Adicionar Recebível
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setBulkImportDialogOpen(true)} 
+                    className="flex items-center gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Importar Excel
+                  </Button>
+                  <Button onClick={() => setReceivableDialogOpen(true)} className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Adicionar Recebível
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoadingReceivables ? (
@@ -762,6 +773,13 @@ const ProjectDashboardPage = () => {
         onOpenChange={setReceivableDialogOpen}
         projectId={projectId || ""}
         onReceivableCreated={handleReceivableCreated}
+      />
+
+      <ReceivableBulkImportDialog
+        open={bulkImportDialogOpen}
+        onOpenChange={setBulkImportDialogOpen}
+        projectId={projectId || ""}
+        onReceivablesImported={handleReceivableCreated}
       />
     </DashboardLayout>
   );
