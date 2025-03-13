@@ -6,7 +6,7 @@ const Index = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
       <div className="text-center max-w-3xl">
         <h1 className="text-4xl sm:text-5xl font-bold text-[#1A1F2C] mb-4">
-          ONE pay for Developers
+          ONE for Developers 2.0
         </h1>
         <p className="text-xl text-gray-600 mb-8">
           Plataforma de gerenciamento financeiro para construtoras
