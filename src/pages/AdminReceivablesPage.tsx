@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader } from "lucide-react";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -156,14 +155,14 @@ const AdminReceivablesPage = () => {
         <h2 className="text-xl font-semibold">Recebíveis</h2>
         <div className="w-64">
           <Select
-            value={selectedStatus || ""}
-            onValueChange={(value) => setSelectedStatus(value === "" ? null : value)}
+            value={selectedStatus || "all"}
+            onValueChange={(value) => setSelectedStatus(value === "all" ? null : value)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Filtrar por status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos os status</SelectItem>
+              <SelectItem value="all">Todos os status</SelectItem>
               {Object.entries(statusLabels).map(([value, label]) => (
                 <SelectItem key={value} value={value}>{label}</SelectItem>
               ))}
