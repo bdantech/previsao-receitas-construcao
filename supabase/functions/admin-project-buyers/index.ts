@@ -43,31 +43,19 @@ serve(async (req) => {
 
     console.log('Admin project buyers request:', action, companyId, projectId, buyerId)
 
-    const supabaseClient = createClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        global: {
-          headers: {
-            Authorization: authHeader
-          },
-        },
-      }
-    )
-
+    // Initialize the admin client with service role key
     const serviceClient = createClient(
       supabaseUrl,
       supabaseServiceKey
     )
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    // Get user from the token
+    const { data: { user }, error: authError } = await serviceClient.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    )
     
-    if (authError) {
+    if (authError || !user) {
       console.error('Auth error:', authError)
-      throw authError
-    }
-    
-    if (!user) {
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
         { 
@@ -79,7 +67,8 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id)
 
-    const { data: profile, error: profileError } = await supabaseClient
+    // Get user's role from profiles
+    const { data: profile, error: profileError } = await serviceClient
       .from('profiles')
       .select('role')
       .eq('id', user.id)
