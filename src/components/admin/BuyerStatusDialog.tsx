@@ -9,6 +9,10 @@ import { projectBuyersApi } from "@/integrations/supabase/client";
 
 type StatusType = 'contract' | 'credit';
 
+// Define the allowed status values to match the Supabase schema
+type ContractStatus = 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar';
+type CreditStatus = 'aprovado' | 'reprovado' | 'a_analisar';
+
 interface BuyerStatusDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,11 +51,20 @@ export function BuyerStatusDialog({
     try {
       setIsSubmitting(true);
       
-      const updateData = statusType === 'contract' 
-        ? { contract_status: selectedStatus } 
-        : { credit_analysis_status: selectedStatus };
-      
-      await projectBuyersApi.admin.updateBuyer(buyerId, updateData);
+      // Create the properly typed update data object
+      if (statusType === 'contract') {
+        // Ensure the contract status is properly typed
+        const contractStatus = selectedStatus as ContractStatus;
+        await projectBuyersApi.admin.updateBuyer(buyerId, { 
+          contract_status: contractStatus
+        });
+      } else {
+        // Ensure the credit status is properly typed
+        const creditStatus = selectedStatus as CreditStatus;
+        await projectBuyersApi.admin.updateBuyer(buyerId, { 
+          credit_analysis_status: creditStatus 
+        });
+      }
       
       toast({
         title: "Status atualizado",

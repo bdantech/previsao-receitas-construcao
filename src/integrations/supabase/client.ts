@@ -413,7 +413,7 @@ export const projectBuyersApi = {
     cpf?: string,
     contract_file_path?: string,
     contract_file_name?: string,
-    contract_status?: 'aprovado' | 'reprovado' | 'a_enviar',
+    contract_status?: 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar',
     credit_analysis_status?: 'aprovado' | 'reprovado' | 'a_analisar'
   }) => {
     const headers = await getAuthHeaders();
@@ -524,7 +524,7 @@ export const projectBuyersApi = {
       cpf?: string,
       contract_file_path?: string,
       contract_file_name?: string,
-      contract_status?: 'aprovado' | 'reprovado' | 'a_enviar',
+      contract_status?: 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar',
       credit_analysis_status?: 'aprovado' | 'reprovado' | 'a_analisar'
     }) => {
       const headers = await getAuthHeaders();

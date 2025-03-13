@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -245,6 +244,40 @@ serve(async (req) => {
 
     if (action === 'update' && buyerId && buyerData) {
       console.log('Admin updating project buyer with data:', buyerData)
+      
+      // Validate contract_status if it's being updated
+      if (buyerData.contract_status) {
+        const validContractStatuses = ['aprovado', 'reprovado', 'a_enviar', 'a_analisar'];
+        if (!validContractStatuses.includes(buyerData.contract_status)) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Invalid contract_status value',
+              validValues: validContractStatuses
+            }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          );
+        }
+      }
+      
+      // Validate credit_analysis_status if it's being updated
+      if (buyerData.credit_analysis_status) {
+        const validCreditStatuses = ['aprovado', 'reprovado', 'a_analisar'];
+        if (!validCreditStatuses.includes(buyerData.credit_analysis_status)) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Invalid credit_analysis_status value',
+              validValues: validCreditStatuses
+            }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400 
+            }
+          );
+        }
+      }
       
       const { data: buyer, error: buyerError } = await serviceClient
         .from('project_buyers')
