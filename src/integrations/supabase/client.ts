@@ -366,21 +366,50 @@ export const projectBuyersApi = {
   },
   
   getBuyer: async (buyerId: string) => {
-    const headers = await getAuthHeaders();
-    const { data, error } = await supabase.functions.invoke('project-buyers', {
-      headers,
-      body: { 
-        action: 'get',
-        buyerId
+    try {
+      // Get current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Failed to get session');
       }
-    });
+      
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Ensure we have a valid access token
+      if (!session.access_token) {
+        throw new Error('No access token available');
+      }
+
+      console.log('Using session for admin buyer details:', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at,
+        hasAccessToken: !!session.access_token
+      });
     
-    if (error) {
-      console.error('Error fetching project buyer:', error);
+      const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: { 
+          action: 'get',
+          buyerId
+        }
+      });
+    
+      if (error) {
+        console.error('Error fetching project buyer details:', error);
+        throw error;
+      }
+    
+      return data?.buyer;
+    } catch (error) {
+      console.error('Exception in getBuyer:', error);
       throw error;
     }
-    
-    return data?.buyer;
   },
   
   createBuyer: async (projectId: string, buyerData: {
