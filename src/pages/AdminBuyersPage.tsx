@@ -19,7 +19,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+
+// Define allowed status types for better type checking
+type ContractStatus = 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar';
+type CreditStatus = 'aprovado' | 'reprovado' | 'a_analisar';
 
 export default function AdminBuyersPage() {
   const { session, userRole, isLoading: isLoadingAuth } = useAuth();
@@ -28,6 +32,7 @@ export default function AdminBuyersPage() {
   const [statusType, setStatusType] = useState<'contract' | 'credit'>('contract');
   const [selectedBuyerId, setSelectedBuyerId] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Protect the route
   useEffect(() => {
@@ -109,11 +114,56 @@ export default function AdminBuyersPage() {
     if (!selectedBuyerId || !selectedStatus) return;
 
     try {
-      const updateData = statusType === 'contract' 
-        ? { contract_status: selectedStatus as 'aprovado' | 'reprovado' | 'a_enviar' | 'a_analisar' }
-        : { credit_analysis_status: selectedStatus as 'aprovado' | 'reprovado' | 'a_analisar' };
-
-      await projectBuyersApi.admin.updateBuyer(selectedBuyerId, updateData);
+      setIsSubmitting(true);
+      
+      // Create the update data object with proper typing
+      let updateData: { contract_status?: ContractStatus, credit_analysis_status?: CreditStatus };
+      
+      if (statusType === 'contract') {
+        // Validate that selectedStatus is a valid ContractStatus
+        if (!['aprovado', 'reprovado', 'a_enviar', 'a_analisar'].includes(selectedStatus)) {
+          throw new Error(`Invalid contract status: ${selectedStatus}`);
+        }
+        updateData = { contract_status: selectedStatus as ContractStatus };
+      } else {
+        // Validate that selectedStatus is a valid CreditStatus
+        if (!['aprovado', 'reprovado', 'a_analisar'].includes(selectedStatus)) {
+          throw new Error(`Invalid credit analysis status: ${selectedStatus}`);
+        }
+        updateData = { credit_analysis_status: selectedStatus as CreditStatus };
+      }
+      
+      console.log('Updating buyer with data:', { buyerId: selectedBuyerId, ...updateData });
+      
+      // Get a fresh session token
+      const { data: { session: freshSession } } = await supabase.auth.getSession();
+      
+      if (!freshSession?.access_token) {
+        throw new Error('No valid session token');
+      }
+      
+      // Call the edge function directly
+      const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${freshSession.access_token}`
+        },
+        body: {
+          action: 'update',
+          buyerId: selectedBuyerId,
+          buyerData: updateData
+        }
+      });
+      
+      if (error) {
+        console.error("Error updating project buyer:", error);
+        throw error;
+      }
+      
+      if (!data?.buyer) {
+        console.error("Invalid response from update:", data);
+        throw new Error('Invalid response format');
+      }
       
       toast.success("Status atualizado com sucesso");
       setStatusDialogOpen(false);
@@ -121,6 +171,8 @@ export default function AdminBuyersPage() {
     } catch (error) {
       console.error("Error updating status:", error);
       toast.error("Erro ao atualizar status");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -131,11 +183,21 @@ export default function AdminBuyersPage() {
     }
 
     try {
+      console.log('Downloading contract:', buyer.contract_file_path);
+      
+      // Get a fresh session token
+      const { data: { session: freshSession } } = await supabase.auth.getSession();
+      
+      if (!freshSession?.access_token) {
+        throw new Error('No valid session token');
+      }
+
       const { data, error } = await supabase.storage
         .from('documents')
         .download(buyer.contract_file_path);
 
       if (error) {
+        console.error('Error downloading contract:', error);
         throw error;
       }
 
@@ -287,6 +349,9 @@ export default function AdminBuyersPage() {
             <DialogTitle>
               {statusType === 'contract' ? 'Alterar Status do Contrato' : 'Alterar Status da Análise de Crédito'}
             </DialogTitle>
+            <DialogDescription>
+              Selecione o novo status abaixo.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -307,13 +372,15 @@ export default function AdminBuyersPage() {
                       A Analisar
                     </Button>
                     <Button 
-                      variant={selectedStatus === 'aprovado' ? 'success' : 'outline'}
+                      variant={selectedStatus === 'aprovado' ? 'default' : 'outline'}
+                      className={selectedStatus === 'aprovado' ? 'bg-green-600 hover:bg-green-700' : ''}
                       onClick={() => setSelectedStatus('aprovado')}
                     >
                       Aprovar
                     </Button>
                     <Button 
-                      variant={selectedStatus === 'reprovado' ? 'destructive' : 'outline'}
+                      variant={selectedStatus === 'reprovado' ? 'default' : 'outline'}
+                      className={selectedStatus === 'reprovado' ? 'bg-red-600 hover:bg-red-700' : ''}
                       onClick={() => setSelectedStatus('reprovado')}
                     >
                       Reprovar
@@ -328,13 +395,15 @@ export default function AdminBuyersPage() {
                       A Analisar
                     </Button>
                     <Button 
-                      variant={selectedStatus === 'aprovado' ? 'success' : 'outline'}
+                      variant={selectedStatus === 'aprovado' ? 'default' : 'outline'}
+                      className={selectedStatus === 'aprovado' ? 'bg-green-600 hover:bg-green-700' : ''}
                       onClick={() => setSelectedStatus('aprovado')}
                     >
                       Aprovar
                     </Button>
                     <Button 
-                      variant={selectedStatus === 'reprovado' ? 'destructive' : 'outline'}
+                      variant={selectedStatus === 'reprovado' ? 'default' : 'outline'}
+                      className={selectedStatus === 'reprovado' ? 'bg-red-600 hover:bg-red-700' : ''}
                       onClick={() => setSelectedStatus('reprovado')}
                     >
                       Reprovar
@@ -347,8 +416,18 @@ export default function AdminBuyersPage() {
               <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleStatusChange}>
-                Salvar
+              <Button 
+                onClick={handleStatusChange} 
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar'
+                )}
               </Button>
             </div>
           </div>
