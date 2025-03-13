@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -338,6 +339,7 @@ const ProjectDashboardPage = () => {
       
       console.log('File uploaded successfully to:', uploadResponse.data.path);
       
+      // Update the buyer with the contract file information and explicitly set contract_status to "a_analisar"
       const { data, error } = await supabase.functions.invoke('project-buyers', {
         headers: {
           Authorization: `Bearer ${session?.access_token}`
@@ -347,7 +349,8 @@ const ProjectDashboardPage = () => {
           buyerId: selectedBuyer.id,
           buyerData: {
             contract_file_path: uploadResponse.data.path,
-            contract_file_name: file.name
+            contract_file_name: file.name,
+            contract_status: 'a_analisar' // Explicitly set the contract status to "a_analisar"
           }
         }
       });
