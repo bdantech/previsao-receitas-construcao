@@ -49,10 +49,25 @@ serve(async (req) => {
       supabaseServiceKey
     )
 
-    // Get user from the token
-    const { data: { user }, error: authError } = await serviceClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
+    // Create a client with the user's token for authentication
+    const userClient = createClient(
+      supabaseUrl,
+      supabaseKey,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false
+        },
+        global: {
+          headers: {
+            Authorization: authHeader
+          }
+        }
+      }
     )
+
+    // Get user from the token using the user's client
+    const { data: { user }, error: authError } = await userClient.auth.getUser()
     
     if (authError || !user) {
       console.error('Auth error:', authError)
@@ -67,7 +82,7 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id)
 
-    // Get user's role from profiles
+    // Get user's role from profiles using the service client
     const { data: profile, error: profileError } = await serviceClient
       .from('profiles')
       .select('role')

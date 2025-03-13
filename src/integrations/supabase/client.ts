@@ -440,11 +440,11 @@ export const projectBuyersApi = {
         hasAccessToken: !!session.access_token
       });
 
+      // Call the edge function with the session token
       const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${session.access_token}`
         },
         body: { 
           action: 'update',
