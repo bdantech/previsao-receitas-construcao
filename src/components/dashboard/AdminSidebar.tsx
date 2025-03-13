@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Building, Users, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building, Users, FileText, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -75,6 +75,11 @@ export const AdminSidebar = () => {
       icon: Users,
       label: "Compradores",
       href: "/admin/buyers"
+    },
+    {
+      icon: FileText,
+      label: "Recebíveis",
+      href: "/admin/receivables"
     }
   ];
 

@@ -1,3 +1,4 @@
+
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
@@ -10,6 +11,7 @@ import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminCompanyDetail from "./pages/AdminCompanyDetail";
 import AdminBuyersPage from "./pages/AdminBuyersPage";
+import AdminReceivablesPage from "./pages/AdminReceivablesPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
@@ -44,6 +46,7 @@ function App() {
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
             <Route path="/admin/buyers" element={<AdminBuyersPage />} />
+            <Route path="/admin/receivables" element={<AdminReceivablesPage />} />
             
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
