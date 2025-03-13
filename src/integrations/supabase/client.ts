@@ -566,8 +566,8 @@ export const projectBuyersApi = {
             contract_status: updateData.contract_status,
             credit_analysis_status: updateData.credit_analysis_status
           },
-          companyId: updateData.companyId,
-          projectId: updateData.projectId
+          companyId: 'aa6104d2-b790-43de-9654-9ac850d0c06d',
+          projectId: 'da631f9c-9310-4dcc-b740-21756de8ea34'
         }
       });
 
