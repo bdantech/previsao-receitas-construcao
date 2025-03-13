@@ -593,15 +593,17 @@ export const projectBuyersApi = {
         }
         
         if (!session) {
+          console.error('No active session found');
           throw new Error('No active session');
         }
 
         // Ensure we have a valid access token
         if (!session.access_token) {
+          console.error('No access token in session');
           throw new Error('No access token available');
         }
 
-        console.log('Using session for admin buyers:', {
+        console.log('Using session for admin buyer update:', {
           userId: session.user?.id,
           expiresAt: session.expires_at,
           hasAccessToken: !!session.access_token
@@ -610,7 +612,8 @@ export const projectBuyersApi = {
         // Call the edge function with the session token
         const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
           headers: {
-            Authorization: `Bearer ${session.access_token}`
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
           },
           body: {
             action: 'update',

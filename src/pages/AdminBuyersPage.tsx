@@ -127,7 +127,26 @@ export default function AdminBuyersPage() {
             projectId: selectedBuyer.project_id
           };
 
-      await projectBuyersApi.admin.updateBuyer(selectedBuyerId, updateData);
+      // await projectBuyersApi.admin.updateBuyer(selectedBuyerId, updateData);
+      
+      const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: {
+          action: 'update',
+          buyerId:selectedBuyerId,
+          buyerData: {
+            contract_status: updateData.contract_status,
+            credit_analysis_status: updateData.credit_analysis_status
+          },
+          companyId: updateData.companyId,
+          projectId: updateData.projectId
+        }
+      });
+
+      console.log('data', data);
+      console.log('error', error);  
       
       toast.success("Status atualizado com sucesso");
       setStatusDialogOpen(false);
