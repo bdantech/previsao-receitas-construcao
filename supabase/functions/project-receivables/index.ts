@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -256,25 +255,52 @@ serve(async (req) => {
           }
         }
         
-        // Check buyer status to determine initial receivable status
-        const { data: buyerData, error: buyerError } = await adminSupabase
+        // Check if we already have a buyer with this CPF for this project
+        const { data: existingBuyer, error: buyerCheckError } = await adminSupabase
           .from('project_buyers')
-          .select('buyer_status')
+          .select('id, full_name, buyer_status')
           .eq('project_id', projectId)
           .eq('cpf', buyerCpf)
           .maybeSingle()
         
-        if (buyerError) {
-          console.error('Buyer verification error:', buyerError)
-          throw buyerError
+        if (buyerCheckError) {
+          console.error('Buyer check error:', buyerCheckError)
+          throw buyerCheckError
         }
-
-        // Determine initial status based on buyer status
+        
+        // If buyer doesn't exist, create a new one
+        if (!existingBuyer) {
+          console.log('No existing buyer found with CPF', buyerCpf, 'Creating new buyer record')
+          
+          const { data: newBuyer, error: createBuyerError } = await adminSupabase
+            .from('project_buyers')
+            .insert({
+              project_id: projectId,
+              full_name: buyerName,
+              cpf: buyerCpf,
+              contract_status: 'a_enviar',
+              credit_analysis_status: 'a_analisar',
+              buyer_status: 'a_analisar'
+            })
+            .select()
+            .single()
+          
+          if (createBuyerError) {
+            console.error('Error creating buyer:', createBuyerError)
+            throw createBuyerError
+          }
+          
+          console.log('New buyer created:', newBuyer)
+        } else {
+          console.log('Existing buyer found:', existingBuyer)
+        }
+        
+        // Determine initial status based on buyer status (either from existing or just created)
         let initialStatus = 'enviado'
-        if (buyerData) {
-          if (buyerData.buyer_status === 'aprovado') {
+        if (existingBuyer) {
+          if (existingBuyer.buyer_status === 'aprovado') {
             initialStatus = 'elegivel_para_antecipacao'
-          } else if (buyerData.buyer_status === 'reprovado') {
+          } else if (existingBuyer.buyer_status === 'reprovado') {
             initialStatus = 'reprovado'
           }
         }
