@@ -196,7 +196,7 @@ const CreateAnticipationForm = () => {
             interest_rate_long_term,
             fee_per_receivable
           `)
-          .eq('company_id', companyData?.id)
+          .eq('company_credit_analysis.company_id', companyData?.id)
           .eq('status', 'Ativa')
           .single();
 
