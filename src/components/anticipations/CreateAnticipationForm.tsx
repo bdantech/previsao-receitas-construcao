@@ -66,7 +66,7 @@ const CreateAnticipationForm = () => {
       
       setIsLoading(true);
       try {
-        // Get receivables that are eligible for anticipation
+        // Get project data to get company ID
         const { data: projectData, error: projectError } = await supabase.functions.invoke('project-management', {
           headers: {
             Authorization: `Bearer ${session.access_token}`
@@ -81,13 +81,43 @@ const CreateAnticipationForm = () => {
           throw projectError;
         }
         
-        // Store company data
+        // Check if project data exists and has the expected structure
+        if (!projectData || !projectData.project) {
+          throw new Error('Project data not found');
+        }
+        
+        // Store company data - Note that company name might be stored differently
+        // First, try to access it from the expected path
+        let companyName = '';
+        
+        // Check if we have company data in a nested structure
+        if (projectData.project.companies && projectData.project.companies.name) {
+          companyName = projectData.project.companies.name;
+        } else {
+          // Fetch company name separately if needed
+          const { data: companyResult } = await supabase.functions.invoke('company-data', {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`
+            },
+            body: {
+              action: 'getCompany',
+              companyId: projectData.project.company_id
+            }
+          });
+          
+          if (companyResult && companyResult.company) {
+            companyName = companyResult.company.name;
+          } else {
+            companyName = 'Company';  // Fallback name
+          }
+        }
+        
         setCompanyData({
           id: projectData.project.company_id,
-          name: projectData.project.companies.name
+          name: companyName
         });
         
-        // Get receivables
+        // Get receivables eligible for anticipation
         const response = await supabase.functions.invoke('company-anticipations', {
           headers: {
             Authorization: `Bearer ${session.access_token}`
