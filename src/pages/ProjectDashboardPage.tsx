@@ -145,8 +145,6 @@ const ProjectDashboardPage = () => {
       fetchProjectBuyers();
     } else if (activeTab === "recebiveis" && projectId && session?.access_token) {
       fetchProjectReceivables();
-    } else if (activeTab === "antecipacoes" && projectId && session?.access_token) {
-      fetchAnticipations();
     }
   }, [activeTab, projectId, session]);
 
@@ -218,47 +216,6 @@ const ProjectDashboardPage = () => {
       });
     } finally {
       setIsLoadingReceivables(false);
-    }
-  };
-
-  const fetchAnticipations = async () => {
-    if (!projectId || !session?.access_token) return;
-
-    try {
-      setIsLoadingAnticipations(true);
-      
-      const { data, error } = await supabase.functions.invoke('project-anticipations', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: {
-          method: 'GET',
-          endpoint: 'anticipations',
-          projectId: projectId
-        }
-      });
-      
-      if (error) {
-        console.error('Error fetching anticipations:', error);
-        toast({
-          title: "Erro ao carregar antecipações",
-          description: "Não foi possível obter a lista de antecipações deste projeto.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      console.log('Project anticipations:', data);
-      setAnticipations(data?.anticipations || []);
-    } catch (error) {
-      console.error('Error fetching anticipations:', error);
-      toast({
-        title: "Erro ao carregar antecipações",
-        description: "Ocorreu um erro ao buscar as antecipações.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingAnticipations(false);
     }
   };
 

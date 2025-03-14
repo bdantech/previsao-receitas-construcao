@@ -417,6 +417,7 @@ async function handleGetAnticipations(supabaseClient, data, corsHeaders) {
       .from('anticipation_requests')
       .select(`
         id,
+        project_id,
         valor_total,
         valor_liquido,
         status,

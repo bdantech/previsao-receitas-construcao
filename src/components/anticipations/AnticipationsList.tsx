@@ -84,7 +84,7 @@ const AnticipationsList = ({ projectId }: AnticipationsListProps) => {
         
         // Filter anticipations by project ID
         const projectAnticipations = response.data?.anticipations.filter(
-          (ant: Anticipation) => ant.projects?.name === projectData.project.name
+          (ant: Anticipation) => ant.project_id === projectId
         ) || [];
         
         setAnticipations(projectAnticipations);
@@ -92,7 +92,7 @@ const AnticipationsList = ({ projectId }: AnticipationsListProps) => {
         console.error('Error fetching anticipations:', error);
         toast({
           title: "Erro ao carregar antecipações",
-          description: "Não foi possível obter a lista de antecipações.",
+          description: "Não foi possível obter a lista de antecipações deste projeto.",
           variant: "destructive"
         });
       } finally {
