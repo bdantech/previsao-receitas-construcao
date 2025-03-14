@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -84,7 +83,18 @@ serve(async (req) => {
           const { data, error: listError } = await supabase
             .from('company_credit_analysis')
             .select(`
-              *,
+              id,
+              company_credit_analysis.company_id,
+              interest_rate_180,
+              interest_rate_360,
+              interest_rate_720,
+              interest_rate_long_term,
+              fee_per_receivable,
+              credit_limit,
+              consumed_credit,
+              status,
+              created_at,
+              updated_at,
               companies:company_id (name, cnpj)
             `)
             .order('created_at', { ascending: false })
@@ -106,7 +116,18 @@ serve(async (req) => {
         const { data: getResult, error: getError } = await supabase
           .from('company_credit_analysis')
           .select(`
-            *,
+            id,
+            company_credit_analysis.company_id,
+            interest_rate_180,
+            interest_rate_360,
+            interest_rate_720,
+            interest_rate_long_term,
+            fee_per_receivable,
+            credit_limit,
+            consumed_credit,
+            status,
+            created_at,
+            updated_at,
             companies:company_id (name, cnpj)
           `)
           .eq('id', analysisId)
