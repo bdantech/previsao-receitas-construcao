@@ -151,7 +151,7 @@ serve(async (req) => {
           const { data: existingActive } = await supabase
             .from('company_credit_analysis')
             .select('id')
-            .eq('company_id', companyId)
+            .eq('company_credit_analysis.company_id', companyId)
             .eq('status', 'Ativa')
             .limit(1)
 
@@ -217,7 +217,7 @@ serve(async (req) => {
           const { data: existingActive } = await supabase
             .from('company_credit_analysis')
             .select('id')
-            .eq('company_id', currentAnalysis.company_id)
+            .eq('company_credit_analysis.company_id', currentAnalysis.company_id)
             .eq('status', 'Ativa')
             .neq('id', analysisId) // Exclude the current analysis
             .limit(1)
