@@ -1,27 +1,29 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { Pool } from 'https://deno.land/x/postgres@v0.17.0/mod.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
-// Configuração CORS para permitir chamadas do frontend
+// CORS configuration
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
-  // Tratamento para requisições OPTIONS (preflight CORS)
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Verificar se o banco de dados está configurado
-    const databaseUrl = Deno.env.get('SUPABASE_DB_URL')
-    if (!databaseUrl) {
-      throw new Error('Database connection string not found')
+    // Get environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing environment variables')
     }
-    
-    // Get authorization header for user authentication
+
+    // Get authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
@@ -32,41 +34,103 @@ serve(async (req) => {
         }
       )
     }
+
+    // Initialize Supabase client with Service Role Key (bypasses RLS)
+    const supabase = createClient(
+      supabaseUrl,
+      supabaseServiceKey
+    )
+
+    // Authenticate user
+    const reqClient = createClient(
+      supabaseUrl,
+      supabaseServiceKey,
+      {
+        global: {
+          headers: {
+            Authorization: authHeader
+          },
+        },
+      }
+    )
+
+    const { data: { user }, error: authError } = await reqClient.auth.getUser()
     
-    // Criar pool de conexões
-    const pool = new Pool(databaseUrl, 3, true)
-    
-    // Parse request body
-    const { query_text, params } = await req.json()
-    
-    if (!query_text) {
-      throw new Error('Query text is required')
-    }
-    
-    // Conectar ao banco de dados
-    const connection = await pool.connect()
-    
-    try {
-      // Executar a query
-      const result = await connection.queryObject({
-        text: query_text,
-        args: params || []
-      })
-      
-      // Retornar o resultado
+    if (authError || !user) {
       return new Response(
-        JSON.stringify(result.rows),
+        JSON.stringify({ error: 'Authentication required' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
+          status: 401 
         }
       )
-    } finally {
-      // Liberar a conexão de volta para o pool
-      connection.release()
     }
+
+    // Check if user is admin
+    const { data: profile, error: profileError } = await reqClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError) {
+      return new Response(
+        JSON.stringify({ error: 'Error checking user permissions' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      )
+    }
+
+    if (profile.role !== 'admin') {
+      return new Response(
+        JSON.stringify({ error: 'Admin access required' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403 
+        }
+      )
+    }
+
+    // Parse request to get the SQL and params
+    const { query, params } = await req.json()
+
+    if (!query) {
+      return new Response(
+        JSON.stringify({ error: 'SQL query is required' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      )
+    }
+
+    // Execute the SQL
+    const { data, error } = await supabase.rpc('execute_sql', {
+      params: params || {},
+      query_text: query
+    })
+
+    if (error) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        }
+      )
+    }
+
+    return new Response(
+      JSON.stringify({ data }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
+    )
   } catch (error) {
-    console.error('Error executing SQL:', error)
+    console.error('Error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

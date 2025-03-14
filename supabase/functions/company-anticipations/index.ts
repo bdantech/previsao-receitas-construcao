@@ -142,6 +142,7 @@ async function handleCalculateValorLiquido(supabaseClient, serviceClient, data, 
 
   try {
     // Use the SQL function to calculate the valor liquido
+    // Fix: We're now explicitly specifying the parameter names to avoid ambiguity
     const { data: result, error } = await serviceClient.rpc(
       'calculate_anticipation_valor_liquido',
       {
