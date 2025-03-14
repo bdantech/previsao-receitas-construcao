@@ -186,24 +186,23 @@ const CreateAnticipationForm = () => {
       try {
         setIsLoading(true);
         
-        // Get the credit analysis for the company
-        const { data: creditAnalysis, error: creditAnalysisError } = await supabase
-          .from('company_credit_analysis')
-          .select(`
-            interest_rate_180,
-            interest_rate_360,
-            interest_rate_720,
-            interest_rate_long_term,
-            fee_per_receivable
-          `)
-          .eq('company_id', companyData?.id)
-          .eq('status', 'Ativa')
-          .single();
+        // Get the credit analysis for the company using a raw SQL query to avoid ambiguous column references
+        const { data: creditAnalysisResult, error: creditAnalysisError } = await supabase
+          .rpc('get_active_credit_analysis_for_company', {
+            p_company_id: companyData?.id
+          });
 
         if (creditAnalysisError) {
           console.error('Error fetching credit analysis:', creditAnalysisError);
           throw new Error('Não foi possível obter a análise de crédito da empresa');
         }
+
+        // Check if we got a valid result
+        if (!creditAnalysisResult) {
+          throw new Error('Não foi encontrada análise de crédito ativa para esta empresa');
+        }
+
+        const creditAnalysis = creditAnalysisResult;
 
         // Calculate values directly in the frontend
         const valorTotal = selectedReceivables.reduce((total, rec) => total + Number(rec.amount), 0);
