@@ -39,6 +39,62 @@ export type Database = {
         }
         Relationships: []
       }
+      company_credit_analysis: {
+        Row: {
+          available_credit: number | null
+          company_id: string
+          consumed_credit: number
+          created_at: string
+          credit_limit: number
+          fee_per_receivable: number
+          id: string
+          interest_rate_180: number
+          interest_rate_360: number
+          interest_rate_720: number
+          interest_rate_long_term: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          available_credit?: number | null
+          company_id: string
+          consumed_credit?: number
+          created_at?: string
+          credit_limit: number
+          fee_per_receivable: number
+          id?: string
+          interest_rate_180: number
+          interest_rate_360: number
+          interest_rate_720: number
+          interest_rate_long_term: number
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          available_credit?: number | null
+          company_id?: string
+          consumed_credit?: number
+          created_at?: string
+          credit_limit?: number
+          fee_per_receivable?: number
+          id?: string
+          interest_rate_180?: number
+          interest_rate_360?: number
+          interest_rate_720?: number
+          interest_rate_long_term?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_credit_analysis_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_types: {
         Row: {
           created_at: string
@@ -372,6 +428,13 @@ export type Database = {
           query_text: string
         }
         Returns: Json
+      }
+      get_company_interest_rate: {
+        Args: {
+          p_company_id: string
+          p_days: number
+        }
+        Returns: number
       }
       get_initial_receivable_status: {
         Args: {
