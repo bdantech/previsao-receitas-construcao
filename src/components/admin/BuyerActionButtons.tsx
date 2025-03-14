@@ -14,8 +14,8 @@ interface BuyerActionButtonsProps {
     credit_analysis_status: string;
     contract_file_path?: string;
     contract_file_name?: string;
-    company_id?: string;  // Add company_id
-    project_id?: string;  // Add project_id
+    company_id?: string;
+    project_id?: string;
   };
   onStatusUpdated: () => void;
 }
@@ -25,8 +25,11 @@ export function BuyerActionButtons({ buyer, onStatusUpdated }: BuyerActionButton
   const [creditDialogOpen, setCreditDialogOpen] = useState(false);
   const { toast } = useToast();
 
+  // Check if a contract is available to download
+  const hasContract = !!buyer.contract_file_path && buyer.contract_file_path.trim() !== '';
+
   const handleDownload = async () => {
-    if (!buyer.contract_file_path) {
+    if (!hasContract) {
       toast({
         title: "Nenhum contrato disponível",
         description: "Este comprador ainda não possui um contrato para download.",
@@ -96,8 +99,8 @@ export function BuyerActionButtons({ buyer, onStatusUpdated }: BuyerActionButton
         variant="ghost" 
         size="sm"
         onClick={handleDownload}
-        disabled={!buyer.contract_file_path}
-        title={buyer.contract_file_path ? "Baixar contrato" : "Sem contrato disponível"}
+        disabled={!hasContract}
+        title={hasContract ? "Baixar contrato" : "Sem contrato disponível"}
       >
         <DownloadCloud className="h-4 w-4" />
       </Button>
