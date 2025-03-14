@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -68,25 +67,20 @@ const AnticipationsList = ({ projectId }: AnticipationsListProps) => {
         
         const companyId = projectData.project.company_id;
         
-        // Get anticipations
-        const response = await supabase.functions.invoke('company-anticipations', {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          },
-          body: {
-            action: 'getAnticipations',
-            companyId
-          }
-        });
+        // Get anticipations using the SQL function directly
+        const { data: anticipationsData, error: anticipationsError } = await supabase
+          .rpc('get_project_anticipations', {
+            p_company_id: companyId,
+            p_project_id: projectId
+          });
         
-        if (response.error) {
-          throw response.error;
+        if (anticipationsError) {
+          console.error('Error fetching anticipations:', anticipationsError);
+          throw anticipationsError;
         }
         
-        // Filter anticipations by project ID
-        const projectAnticipations = response.data?.anticipations.filter(
-          (ant: Anticipation) => ant.project_id === projectId
-        ) || [];
+        // Parse the result
+        const projectAnticipations = anticipationsData || [];
         
         setAnticipations(projectAnticipations);
       } catch (error) {
