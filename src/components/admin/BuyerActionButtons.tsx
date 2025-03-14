@@ -14,6 +14,8 @@ interface BuyerActionButtonsProps {
     credit_analysis_status: string;
     contract_file_path?: string;
     contract_file_name?: string;
+    company_id?: string;  // Add company_id
+    project_id?: string;  // Add project_id
   };
   onStatusUpdated: () => void;
 }
@@ -108,6 +110,8 @@ export function BuyerActionButtons({ buyer, onStatusUpdated }: BuyerActionButton
         statusType="contract"
         currentStatus={buyer.contract_status}
         onStatusUpdated={onStatusUpdated}
+        companyId={buyer.company_id}
+        projectId={buyer.project_id}
       />
       
       <BuyerStatusDialog
@@ -118,6 +122,8 @@ export function BuyerActionButtons({ buyer, onStatusUpdated }: BuyerActionButton
         statusType="credit"
         currentStatus={buyer.credit_analysis_status}
         onStatusUpdated={onStatusUpdated}
+        companyId={buyer.company_id}
+        projectId={buyer.project_id}
       />
     </div>
   );

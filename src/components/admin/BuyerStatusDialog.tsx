@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { projectBuyersApi } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 
 type StatusType = 'contract' | 'credit';
 
@@ -21,6 +21,8 @@ interface BuyerStatusDialogProps {
   statusType: StatusType;
   currentStatus: string;
   onStatusUpdated: () => void;
+  companyId?: string; // Add companyId (optional to maintain backward compatibility)
+  projectId?: string; // Add projectId (optional to maintain backward compatibility)
 }
 
 export function BuyerStatusDialog({
@@ -30,10 +32,13 @@ export function BuyerStatusDialog({
   buyerName,
   statusType,
   currentStatus,
-  onStatusUpdated
+  onStatusUpdated,
+  companyId,
+  projectId
 }: BuyerStatusDialogProps) {
   const [selectedStatus, setSelectedStatus] = useState(currentStatus);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [buyer, setBuyer] = useState<any>(null);
   const { toast } = useToast();
   
   const statusTitle = statusType === 'contract' ? 'Contrato' : 'Análise de Crédito';
@@ -45,24 +50,95 @@ export function BuyerStatusDialog({
     ...(statusType === 'contract' ? [{ value: 'a_enviar', label: 'A Enviar' }] : [])
   ];
 
+  // Fetch buyer details to get companyId and projectId if not provided
+  useEffect(() => {
+    const fetchBuyerDetails = async () => {
+      if (!open || (companyId && projectId)) return;
+      
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        
+        const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: { 
+            action: 'get',
+            buyerId
+          }
+        });
+        
+        if (error) {
+          console.error('Error fetching buyer details:', error);
+          return;
+        }
+        
+        if (data?.buyer) {
+          setBuyer(data.buyer);
+        }
+      } catch (error) {
+        console.error('Failed to fetch buyer details:', error);
+      }
+    };
+    
+    fetchBuyerDetails();
+  }, [open, buyerId, companyId, projectId]);
+
   const handleSubmit = async () => {
     if (!buyerId || selectedStatus === currentStatus) return;
     
     try {
       setIsSubmitting(true);
       
-      // Create the properly typed update data object
+      // Get companyId and projectId from props or fetched buyer data
+      const effectiveCompanyId = companyId || buyer?.company_id;
+      const effectiveProjectId = projectId || buyer?.project_id;
+      
+      // Check if we have the required IDs
+      if (!effectiveCompanyId || !effectiveProjectId) {
+        toast({
+          title: "Erro ao atualizar status",
+          description: "Não foi possível identificar a empresa ou projeto.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Create the properly typed update data object with required companyId and projectId
       if (statusType === 'contract') {
         // Ensure the contract status is properly typed
         const contractStatus = selectedStatus as ContractStatus;
-        await projectBuyersApi.admin.updateBuyer(buyerId, { 
-          contract_status: contractStatus
+        await supabase.functions.invoke('admin-project-buyers', {
+          headers: {
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          },
+          body: {
+            action: 'update',
+            buyerId,
+            buyerData: { 
+              contract_status: contractStatus
+            },
+            companyId: effectiveCompanyId,
+            projectId: effectiveProjectId
+          }
         });
       } else {
         // Ensure the credit status is properly typed
         const creditStatus = selectedStatus as CreditStatus;
-        await projectBuyersApi.admin.updateBuyer(buyerId, { 
-          credit_analysis_status: creditStatus 
+        await supabase.functions.invoke('admin-project-buyers', {
+          headers: {
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          },
+          body: {
+            action: 'update',
+            buyerId,
+            buyerData: { 
+              credit_analysis_status: creditStatus 
+            },
+            companyId: effectiveCompanyId,
+            projectId: effectiveProjectId
+          }
         });
       }
       
