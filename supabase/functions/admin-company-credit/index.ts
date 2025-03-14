@@ -177,7 +177,20 @@ serve(async (req) => {
             consumed_credit: analysisData.consumed_credit || 0,
             status: analysisData.status
           })
-          .select()
+          .select(`
+            id,
+            company_credit_analysis.company_id,
+            interest_rate_180,
+            interest_rate_360,
+            interest_rate_720,
+            interest_rate_long_term,
+            fee_per_receivable,
+            credit_limit,
+            consumed_credit,
+            status,
+            created_at,
+            updated_at
+          `)
         
         result = createResult
         error = createError
@@ -231,7 +244,20 @@ serve(async (req) => {
             status: analysisData.status
           })
           .eq('id', analysisId)
-          .select()
+          .select(`
+            id,
+            company_credit_analysis.company_id,
+            interest_rate_180,
+            interest_rate_360,
+            interest_rate_720,
+            interest_rate_long_term,
+            fee_per_receivable,
+            credit_limit,
+            consumed_credit,
+            status,
+            created_at,
+            updated_at
+          `)
         
         result = updateResult
         error = updateError
@@ -250,7 +276,20 @@ serve(async (req) => {
           .from('company_credit_analysis')
           .delete()
           .eq('id', analysisId)
-          .select()
+          .select(`
+            id,
+            company_credit_analysis.company_id,
+            interest_rate_180,
+            interest_rate_360,
+            interest_rate_720,
+            interest_rate_long_term,
+            fee_per_receivable,
+            credit_limit,
+            consumed_credit,
+            status,
+            created_at,
+            updated_at
+          `)
         
         result = deleteResult
         error = deleteError
