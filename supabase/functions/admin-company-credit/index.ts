@@ -274,10 +274,17 @@ serve(async (req) => {
             }
           }
 
-          // Update the credit analysis
-          const { data: updateResult, error: updateError } = await supabase
-            .from('company_credit_analysis')
-            .update({
+          // Update the credit analysis using a direct fetch to the REST API
+          const apiUrl = `${supabaseUrl}/rest/v1/company_credit_analysis?id=eq.${analysisId}`;
+          const updateResponse = await fetch(apiUrl, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
               interest_rate_180: analysisData.interest_rate_180,
               interest_rate_360: analysisData.interest_rate_360,
               interest_rate_720: analysisData.interest_rate_720,
@@ -287,16 +294,22 @@ serve(async (req) => {
               consumed_credit: analysisData.consumed_credit,
               status: analysisData.status
             })
-            .eq('id', analysisId)
-            .select('*')
-            .single()
-          
-          if (updateError) {
-            console.error('Error updating credit analysis:', updateError)
-            throw updateError
+          });
+
+          if (!updateResponse.ok) {
+            const errorData = await updateResponse.json();
+            console.error('Error updating credit analysis:', errorData);
+            throw new Error(`Failed to update credit analysis: ${updateResponse.statusText}`);
           }
+
+          const updateResult = await updateResponse.json();
           
-          result = updateResult
+          if (!updateResult || updateResult.length === 0) {
+            console.error('No data returned from update operation');
+            throw new Error('Failed to update credit analysis');
+          }
+
+          result = updateResult[0];
         } catch (err) {
           error = err
         }
@@ -311,27 +324,36 @@ serve(async (req) => {
           })
         }
 
-        const { data: deleteResult, error: deleteError } = await supabase
-          .from('company_credit_analysis')
-          .delete()
-          .eq('id', analysisId)
-          .select(`
-            id,
-            company_id,
-            interest_rate_180,
-            interest_rate_360,
-            interest_rate_720,
-            interest_rate_long_term,
-            fee_per_receivable,
-            credit_limit,
-            consumed_credit,
-            status,
-            created_at,
-            updated_at
-          `)
-        
-        result = deleteResult
-        error = deleteError
+        try {
+          // Delete the credit analysis using a direct fetch to the REST API
+          const apiUrl = `${supabaseUrl}/rest/v1/company_credit_analysis?id=eq.${analysisId}`;
+          const deleteResponse = await fetch(apiUrl, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Prefer': 'return=representation'
+            }
+          });
+
+          if (!deleteResponse.ok) {
+            const errorData = await deleteResponse.json();
+            console.error('Error deleting credit analysis:', errorData);
+            throw new Error(`Failed to delete credit analysis: ${deleteResponse.statusText}`);
+          }
+
+          const deleteResult = await deleteResponse.json();
+          
+          if (!deleteResult || deleteResult.length === 0) {
+            console.error('No data returned from delete operation');
+            throw new Error('Failed to delete credit analysis');
+          }
+
+          result = deleteResult[0];
+        } catch (err) {
+          error = err;
+        }
         break
 
       default:
