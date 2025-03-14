@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { 
@@ -186,28 +185,74 @@ const CreateAnticipationForm = () => {
       // Calculate anticipated value
       try {
         setIsLoading(true);
-        const response = await supabase.functions.invoke('company-anticipations', {
-          headers: {
-            Authorization: `Bearer ${session?.access_token}`
-          },
-          body: {
-            action: 'calculateValorLiquido',
-            receivableIds: selectedReceivables.map(r => r.id),
-            companyId: companyData?.id
-          }
-        });
         
-        if (response.error) {
-          throw response.error;
+        // Get the credit analysis for the company
+        const { data: creditAnalysis, error: creditAnalysisError } = await supabase
+          .from('company_credit_analysis')
+          .select(`
+            interest_rate_180,
+            interest_rate_360,
+            interest_rate_720,
+            interest_rate_long_term,
+            fee_per_receivable
+          `)
+          .eq('company_id', companyData?.id)
+          .eq('status', 'Ativa')
+          .single();
+
+        if (creditAnalysisError) {
+          console.error('Error fetching credit analysis:', creditAnalysisError);
+          throw new Error('Não foi possível obter a análise de crédito da empresa');
+        }
+
+        // Calculate values directly in the frontend
+        const valorTotal = selectedReceivables.reduce((total, rec) => total + Number(rec.amount), 0);
+        const quantidade = selectedReceivables.length;
+        
+        // Calculate fee deduction
+        const feeDeduction = quantidade * creditAnalysis.fee_per_receivable;
+        
+        // Calculate interest deduction for each receivable
+        let interestDeduction = 0;
+        const today = new Date();
+        
+        for (const receivable of selectedReceivables) {
+          const dueDate = new Date(receivable.due_date);
+          const daysTodue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Get appropriate interest rate based on days to due
+          let interestRate;
+          if (daysTodue <= 180) {
+            interestRate = creditAnalysis.interest_rate_180;
+          } else if (daysTodue <= 360) {
+            interestRate = creditAnalysis.interest_rate_360;
+          } else if (daysTodue <= 720) {
+            interestRate = creditAnalysis.interest_rate_720;
+          } else {
+            interestRate = creditAnalysis.interest_rate_long_term;
+          }
+          
+          // Calculate interest deduction for this receivable
+          interestDeduction += (Number(receivable.amount) * interestRate / 100);
         }
         
-        setCalculationResult(response.data);
+        // Calculate final valor liquido
+        const valorLiquido = valorTotal - interestDeduction - feeDeduction;
+        
+        // Set calculation result
+        setCalculationResult({
+          valorTotal,
+          valorLiquido,
+          quantidade,
+          taxas: creditAnalysis
+        });
+        
         setStep(2);
       } catch (error) {
         console.error('Error calculating anticipated value:', error);
         toast({
           title: "Erro ao calcular valor antecipado",
-          description: "Não foi possível calcular o valor antecipado. Tente novamente.",
+          description: error instanceof Error ? error.message : "Não foi possível calcular o valor antecipado. Tente novamente.",
           variant: "destructive"
         });
       } finally {
