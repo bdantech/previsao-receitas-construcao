@@ -1,14 +1,29 @@
-
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { useForm } from "react-hook-form";
+import { useState, useEffect } from "react";
 import { z } from "zod";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+// Define the CreditAnalysis interface
 interface CreditAnalysis {
   id: string;
   company_id: string;
@@ -25,14 +40,6 @@ interface CreditAnalysis {
   updated_at: string;
 }
 
-interface CreditAnalysisDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  companyName: string;
-  onSave: (data: Partial<CreditAnalysis>) => void;
-  initialData: CreditAnalysis | null;
-}
-
 const formSchema = z.object({
   interest_rate_180: z.coerce.number().min(0, "Taxa de juros deve ser positiva"),
   interest_rate_360: z.coerce.number().min(0, "Taxa de juros deve ser positiva"),
@@ -44,12 +51,20 @@ const formSchema = z.object({
   status: z.enum(['Ativa', 'Inativa'])
 });
 
+interface CreditAnalysisDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  companyName: string;
+  onSave: (data: Partial<CreditAnalysis>) => void;
+  initialData: CreditAnalysis | null;
+}
+
 export function CreditAnalysisDialog({
   open,
   onOpenChange,
   companyName,
   onSave,
-  initialData
+  initialData,
 }: CreditAnalysisDialogProps) {
   const [submitting, setSubmitting] = useState(false);
   
@@ -67,16 +82,54 @@ export function CreditAnalysisDialog({
     }
   });
 
+  // Reset form when initialData changes
+  useEffect(() => {
+    if (open) {
+      console.log('Dialog opened with initialData:', initialData);
+      form.reset({
+        interest_rate_180: initialData?.interest_rate_180 || 0,
+        interest_rate_360: initialData?.interest_rate_360 || 0,
+        interest_rate_720: initialData?.interest_rate_720 || 0,
+        interest_rate_long_term: initialData?.interest_rate_long_term || 0,
+        fee_per_receivable: initialData?.fee_per_receivable || 0,
+        credit_limit: initialData?.credit_limit || 0,
+        consumed_credit: initialData?.consumed_credit || 0,
+        status: initialData?.status || 'Ativa'
+      });
+    }
+  }, [initialData, open, form]);
+
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setSubmitting(true);
       await onSave(values);
-      form.reset();
+      // Don't reset the form here, as it will be closed by the parent component
     } catch (error) {
       console.error("Error submitting form:", error);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Format currency input
+  const formatCurrency = (value: string) => {
+    if (!value) return "";
+    // Remove non-numeric characters
+    const numericValue = value.replace(/[^0-9]/g, "");
+    // Convert to number and format
+    const number = parseInt(numericValue, 10) / 100;
+    return number.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  };
+
+  // Format percentage input
+  const formatPercentage = (value: string) => {
+    if (!value) return "";
+    // Remove non-numeric characters
+    const numericValue = value.replace(/[^0-9.]/g, "");
+    return `${numericValue}%`;
   };
 
   return (
@@ -86,9 +139,9 @@ export function CreditAnalysisDialog({
           <DialogTitle>
             {initialData ? "Editar Análise de Crédito" : "Nova Análise de Crédito"}
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <DialogDescription>
             {companyName}
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -99,9 +152,17 @@ export function CreditAnalysisDialog({
                 name="credit_limit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Limite de Crédito (R$)</FormLabel>
+                    <FormLabel>Limite de Crédito</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input 
+                        {...field} 
+                        placeholder="R$ 0,00"
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, "");
+                          field.onChange(parseFloat(value) / 100 || 0);
+                        }}
+                        value={formatCurrency(field.value.toString())}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -113,9 +174,17 @@ export function CreditAnalysisDialog({
                 name="consumed_credit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Crédito Consumido (R$)</FormLabel>
+                    <FormLabel>Crédito Consumido</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input 
+                        {...field} 
+                        placeholder="R$ 0,00"
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, "");
+                          field.onChange(parseFloat(value) / 100 || 0);
+                        }}
+                        value={formatCurrency(field.value.toString())}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -127,9 +196,17 @@ export function CreditAnalysisDialog({
                 name="interest_rate_180"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Taxa de Juros até 180 dias (%)</FormLabel>
+                    <FormLabel>Taxa de Juros até 180 dias</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input 
+                        {...field} 
+                        placeholder="0%"
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, "");
+                          field.onChange(parseFloat(value) || 0);
+                        }}
+                        value={`${field.value}%`}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -141,9 +218,17 @@ export function CreditAnalysisDialog({
                 name="interest_rate_360"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Taxa de Juros até 360 dias (%)</FormLabel>
+                    <FormLabel>Taxa de Juros até 360 dias</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input 
+                        {...field} 
+                        placeholder="0%"
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, "");
+                          field.onChange(parseFloat(value) || 0);
+                        }}
+                        value={`${field.value}%`}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -155,9 +240,17 @@ export function CreditAnalysisDialog({
                 name="interest_rate_720"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Taxa de Juros até 720 dias (%)</FormLabel>
+                    <FormLabel>Taxa de Juros até 720 dias</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input 
+                        {...field} 
+                        placeholder="0%"
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, "");
+                          field.onChange(parseFloat(value) || 0);
+                        }}
+                        value={`${field.value}%`}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -169,9 +262,17 @@ export function CreditAnalysisDialog({
                 name="interest_rate_long_term"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Taxa de Juros Longo Prazo (%)</FormLabel>
+                    <FormLabel>Taxa de Juros Longo Prazo</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input 
+                        {...field} 
+                        placeholder="0%"
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, "");
+                          field.onChange(parseFloat(value) || 0);
+                        }}
+                        value={`${field.value}%`}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -183,9 +284,17 @@ export function CreditAnalysisDialog({
                 name="fee_per_receivable"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tarifa por Recebível (R$)</FormLabel>
+                    <FormLabel>Tarifa por Recebível</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input 
+                        {...field} 
+                        placeholder="R$ 0,00"
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, "");
+                          field.onChange(parseFloat(value) / 100 || 0);
+                        }}
+                        value={formatCurrency(field.value.toString())}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -200,7 +309,7 @@ export function CreditAnalysisDialog({
                     <FormLabel>Status</FormLabel>
                     <Select 
                       onValueChange={field.onChange} 
-                      defaultValue={field.value}
+                      value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
