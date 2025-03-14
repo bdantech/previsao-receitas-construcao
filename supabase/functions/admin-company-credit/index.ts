@@ -176,10 +176,17 @@ serve(async (req) => {
             }
           }
 
-          // Insert the new credit analysis
-          const { data: insertResult, error: insertError } = await supabase
-            .from('company_credit_analysis')
-            .insert({
+          // Insert the new credit analysis using a direct fetch to the REST API
+          const apiUrl = `${supabaseUrl}/rest/v1/company_credit_analysis`;
+          const insertResponse = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`,
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
               company_id: companyId,
               interest_rate_180: analysisData.interest_rate_180,
               interest_rate_360: analysisData.interest_rate_360,
@@ -190,27 +197,22 @@ serve(async (req) => {
               consumed_credit: analysisData.consumed_credit || 0,
               status: analysisData.status
             })
-            .select('id')
-            .single()
-          
-          if (insertError) {
-            console.error('Error inserting new credit analysis:', insertError)
-            throw insertError
+          });
+
+          if (!insertResponse.ok) {
+            const errorData = await insertResponse.json();
+            console.error('Error inserting new credit analysis:', errorData);
+            throw new Error(`Failed to create credit analysis: ${insertResponse.statusText}`);
           }
 
-          // Fetch the complete inserted record
-          const { data: createResult, error: fetchError } = await supabase
-            .from('company_credit_analysis')
-            .select('*')
-            .eq('id', insertResult.id)
-            .single()
+          const insertResult = await insertResponse.json();
           
-          if (fetchError) {
-            console.error('Error fetching inserted credit analysis:', fetchError)
-            throw fetchError
+          if (!insertResult || insertResult.length === 0) {
+            console.error('No data returned from insert operation');
+            throw new Error('Failed to create credit analysis');
           }
-          
-          result = createResult
+
+          result = insertResult[0];
         } catch (err) {
           error = err
         }
