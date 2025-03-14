@@ -23,6 +23,8 @@ const AdminCompanyDetail = () => {
 
   useEffect(() => {
     const fetchCompanyDetails = async () => {
+      if (!companyId) return;
+      
       try {
         setLoading(true);
         
@@ -88,7 +90,7 @@ const AdminCompanyDetail = () => {
   return (
     <AdminDashboardLayout>
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">{company.name}</h1>
+        <h1 className="text-2xl font-bold">{company?.name}</h1>
         
         <Card>
           <CardHeader>
@@ -98,36 +100,38 @@ const AdminCompanyDetail = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium">CNPJ</p>
-                <p>{formatCNPJ(company.cnpj)}</p>
+                <p>{formatCNPJ(company?.cnpj)}</p>
               </div>
               <div>
                 <p className="text-sm font-medium">Website</p>
-                <p>{company.website || "N/A"}</p>
+                <p>{company?.website || "N/A"}</p>
               </div>
               <div>
                 <p className="text-sm font-medium">Status dos Documentos</p>
-                <CompanyStatusBadge status={company.documents_status} />
+                <CompanyStatusBadge status={company?.documents_status} />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="documents">
-          <TabsList>
-            <TabsTrigger value="documents">Documentos</TabsTrigger>
-            <TabsTrigger value="projects">Projetos</TabsTrigger>
-            <TabsTrigger value="credit">Análise de Crédito</TabsTrigger>
-          </TabsList>
-          <TabsContent value="documents">
-            <CompanyDocuments companyId={companyId!} />
-          </TabsContent>
-          <TabsContent value="projects">
-            <AdminCompanyProjects companyId={companyId!} companyName={company.name} />
-          </TabsContent>
-          <TabsContent value="credit">
-            <AdminCompanyCredit companyId={companyId!} companyName={company.name} />
-          </TabsContent>
-        </Tabs>
+        {company && (
+          <Tabs defaultValue="documents">
+            <TabsList>
+              <TabsTrigger value="documents">Documentos</TabsTrigger>
+              <TabsTrigger value="projects">Projetos</TabsTrigger>
+              <TabsTrigger value="credit">Análise de Crédito</TabsTrigger>
+            </TabsList>
+            <TabsContent value="documents">
+              <CompanyDocuments companyId={companyId!} />
+            </TabsContent>
+            <TabsContent value="projects">
+              <AdminCompanyProjects companyId={companyId!} companyName={company.name} />
+            </TabsContent>
+            <TabsContent value="credit">
+              <AdminCompanyCredit companyId={companyId!} companyName={company.name} />
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </AdminDashboardLayout>
   );

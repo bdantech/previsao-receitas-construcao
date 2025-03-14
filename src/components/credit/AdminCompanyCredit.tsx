@@ -55,8 +55,9 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
       });
 
       if (error) throw error;
-
-      setCreditAnalyses(data || []);
+      
+      // Ensure data is always an array, even if empty
+      setCreditAnalyses(Array.isArray(data) ? data : []);
     } catch (error: any) {
       console.error("Error fetching credit analyses:", error);
       toast({
@@ -64,6 +65,8 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
         description: "Failed to load credit analyses: " + error.message,
         variant: "destructive",
       });
+      // Set to empty array on error to prevent map issues
+      setCreditAnalyses([]);
     } finally {
       setLoading(false);
     }
