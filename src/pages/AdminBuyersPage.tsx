@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { projectBuyersApi } from "@/integrations/supabase/client";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
@@ -160,7 +159,7 @@ export default function AdminBuyersPage() {
   };
 
   const downloadContract = async (buyer: any) => {
-    if (!buyer.contract_file_path) {
+    if (!buyer.contract_file_path || buyer.contract_file_path.trim() === '') {
       toast.error("Este comprador não possui contrato para download");
       return;
     }
@@ -300,8 +299,8 @@ export default function AdminBuyersPage() {
                               size="sm" 
                               variant="outline"
                               onClick={() => downloadContract(buyer)}
-                              disabled={!buyer.contract_file_path}
-                              title={buyer.contract_file_path ? "Baixar contrato" : "Sem contrato disponível"}
+                              disabled={!buyer.contract_file_path || buyer.contract_file_path.trim() === ''}
+                              title={buyer.contract_file_path && buyer.contract_file_path.trim() !== '' ? "Baixar contrato" : "Sem contrato disponível"}
                             >
                               <FileText className="h-4 w-4 mr-1" />
                               Contrato
