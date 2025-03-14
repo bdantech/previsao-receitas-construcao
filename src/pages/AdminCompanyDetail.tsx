@@ -12,6 +12,7 @@ import { AdminCompanyProjects } from "@/components/dashboard/AdminCompanyProject
 import { useAuth } from "@/hooks/useAuth";
 import { CompanyStatusBadge } from "@/components/company/CompanyStatusBadge";
 import { formatCNPJ } from "@/lib/formatters";
+import { AdminCompanyCredit } from "@/components/credit/AdminCompanyCredit";
 
 const AdminCompanyDetail = () => {
   const { companyId } = useParams();
@@ -115,12 +116,16 @@ const AdminCompanyDetail = () => {
           <TabsList>
             <TabsTrigger value="documents">Documentos</TabsTrigger>
             <TabsTrigger value="projects">Projetos</TabsTrigger>
+            <TabsTrigger value="credit">Análise de Crédito</TabsTrigger>
           </TabsList>
           <TabsContent value="documents">
             <CompanyDocuments companyId={companyId!} />
           </TabsContent>
           <TabsContent value="projects">
             <AdminCompanyProjects companyId={companyId!} companyName={company.name} />
+          </TabsContent>
+          <TabsContent value="credit">
+            <AdminCompanyCredit companyId={companyId!} companyName={company.name} />
           </TabsContent>
         </Tabs>
       </div>
