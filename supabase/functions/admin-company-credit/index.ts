@@ -300,48 +300,76 @@ serve(async (req) => {
         }
 
         try {
-          // Get the company_id for the analysis we're updating
-          const { data: currentAnalysis, error: getError } = await supabase
-            .from('company_credit_analysis')
-            .select('company_id, status')
-            .eq('id', analysisId)
-            .single()
-          
-          if (getError) {
-            console.error('Error getting current analysis:', getError)
-            throw getError
+          // Get the company_id for the analysis we're updating using direct REST API
+          const getApiUrl = `${supabaseUrl}/rest/v1/company_credit_analysis?id=eq.${analysisId}&select=company_id,status`;
+          const getResponse = await fetch(getApiUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          });
+
+          if (!getResponse.ok) {
+            const errorData = await getResponse.json();
+            console.error('Error getting current analysis:', errorData);
+            throw new Error(`Failed to get current analysis: ${getResponse.statusText}`);
           }
 
-          if (!currentAnalysis) {
-            throw new Error('Analysis not found')
+          const currentAnalyses = await getResponse.json();
+          
+          if (!currentAnalyses || currentAnalyses.length === 0) {
+            throw new Error('Analysis not found');
           }
+          
+          const currentAnalysis = currentAnalyses[0];
+          console.log('Current analysis:', currentAnalysis);
 
           // If changing to Ativa, check if there's already another active analysis
           if (analysisData.status === 'Ativa') {
-            // Find existing active analyses using a direct query without joins
-            const { data: existingActive, error: findError } = await supabase
-              .from('company_credit_analysis')
-              .select('id')
-              .filter('company_id', 'eq', currentAnalysis.company_id)
-              .filter('status', 'eq', 'Ativa')
-              .neq('id', analysisId) // Exclude the current analysis
-              .limit(1)
-            
-            if (findError) {
-              console.error('Error finding existing active analyses:', findError)
-              throw findError
+            // Find existing active analyses using direct REST API
+            const activeApiUrl = `${supabaseUrl}/rest/v1/company_credit_analysis?company_id=eq.${currentAnalysis.company_id}&status=eq.Ativa&id=neq.${analysisId}&select=id`;
+            const activeResponse = await fetch(activeApiUrl, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`
+              }
+            });
+
+            if (!activeResponse.ok) {
+              const errorData = await activeResponse.json();
+              console.error('Error finding existing active analyses:', errorData);
+              throw new Error(`Failed to find existing active analyses: ${activeResponse.statusText}`);
             }
 
+            const existingActive = await activeResponse.json();
+            console.log('Existing active analyses:', existingActive);
+            
             // Update existing active analyses to inactive
             if (existingActive && existingActive.length > 0) {
-              const { error: updateError } = await supabase
-                .from('company_credit_analysis')
-                .update({ status: 'Inativa' })
-                .eq('id', existingActive[0].id)
-              
-              if (updateError) {
-                console.error('Error updating existing active analysis:', updateError)
-                throw updateError
+              for (const active of existingActive) {
+                const inactiveApiUrl = `${supabaseUrl}/rest/v1/company_credit_analysis?id=eq.${active.id}`;
+                const inactiveResponse = await fetch(inactiveApiUrl, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Prefer': 'return=minimal'
+                  },
+                  body: JSON.stringify({
+                    status: 'Inativa'
+                  })
+                });
+                
+                if (!inactiveResponse.ok) {
+                  const errorData = await inactiveResponse.json();
+                  console.error('Error updating existing active analysis:', errorData);
+                  throw new Error(`Failed to update existing active analysis: ${inactiveResponse.statusText}`);
+                }
               }
             }
           }
