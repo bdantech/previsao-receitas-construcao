@@ -69,38 +69,79 @@ serve(async (req) => {
     switch (action) {
       case 'list':
         // List all credit analyses or for a specific company
-        if (companyId) {
-          const { data, error: listError } = await supabase
-            .from('company_credit_analysis')
-            .select('*')
-            .eq('company_id', companyId)
-            .order('created_at', { ascending: false })
-          
-          result = data
-          error = listError
-        } else {
-          // Join with companies to get company names for easier administration
-          const { data, error: listError } = await supabase
-            .from('company_credit_analysis')
-            .select(`
-              id,
-              company_id,
-              interest_rate_180,
-              interest_rate_360,
-              interest_rate_720,
-              interest_rate_long_term,
-              fee_per_receivable,
-              credit_limit,
-              consumed_credit,
-              status,
-              created_at,
-              updated_at,
-              companies:company_id (name, cnpj)
-            `)
-            .order('created_at', { ascending: false })
-          
-          result = data
-          error = listError
+        try {
+          if (companyId) {
+            // List analyses for a specific company using direct REST API
+            const apiUrl = `${supabaseUrl}/rest/v1/company_credit_analysis?company_id=eq.${companyId}&order=created_at.desc`;
+            const listResponse = await fetch(apiUrl, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`
+              }
+            });
+
+            if (!listResponse.ok) {
+              const errorData = await listResponse.json();
+              console.error('Error listing credit analyses for company:', errorData);
+              throw new Error(`Failed to list credit analyses: ${listResponse.statusText}`);
+            }
+
+            const listResult = await listResponse.json();
+            result = listResult;
+          } else {
+            // List all analyses with company information using direct REST API
+            // First get all credit analyses
+            const apiUrl = `${supabaseUrl}/rest/v1/company_credit_analysis?order=created_at.desc`;
+            const listResponse = await fetch(apiUrl, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`
+              }
+            });
+
+            if (!listResponse.ok) {
+              const errorData = await listResponse.json();
+              console.error('Error listing all credit analyses:', errorData);
+              throw new Error(`Failed to list credit analyses: ${listResponse.statusText}`);
+            }
+
+            const analyses = await listResponse.json();
+            
+            // Then get company information for each analysis
+            const analysesWithCompanies = await Promise.all(
+              analyses.map(async (analysis) => {
+                const companyUrl = `${supabaseUrl}/rest/v1/companies?id=eq.${analysis.company_id}&select=name,cnpj`;
+                const companyResponse = await fetch(companyUrl, {
+                  method: 'GET',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`
+                  }
+                });
+                
+                if (companyResponse.ok) {
+                  const companies = await companyResponse.json();
+                  if (companies && companies.length > 0) {
+                    return {
+                      ...analysis,
+                      companies: companies[0]
+                    };
+                  }
+                }
+                
+                return analysis;
+              })
+            );
+            
+            result = analysesWithCompanies;
+          }
+        } catch (err) {
+          error = err;
         }
         break
 
@@ -113,28 +154,59 @@ serve(async (req) => {
           })
         }
 
-        const { data: getResult, error: getError } = await supabase
-          .from('company_credit_analysis')
-          .select(`
-            id,
-            company_id,
-            interest_rate_180,
-            interest_rate_360,
-            interest_rate_720,
-            interest_rate_long_term,
-            fee_per_receivable,
-            credit_limit,
-            consumed_credit,
-            status,
-            created_at,
-            updated_at,
-            companies:company_id (name, cnpj)
-          `)
-          .eq('id', analysisId)
-          .single()
-        
-        result = getResult
-        error = getError
+        try {
+          // Get the credit analysis using direct REST API
+          const apiUrl = `${supabaseUrl}/rest/v1/company_credit_analysis?id=eq.${analysisId}`;
+          const getResponse = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          });
+
+          if (!getResponse.ok) {
+            const errorData = await getResponse.json();
+            console.error('Error getting credit analysis:', errorData);
+            throw new Error(`Failed to get credit analysis: ${getResponse.statusText}`);
+          }
+
+          const analyses = await getResponse.json();
+          
+          if (!analyses || analyses.length === 0) {
+            throw new Error('Credit analysis not found');
+          }
+          
+          const analysis = analyses[0];
+          
+          // Get company information
+          const companyUrl = `${supabaseUrl}/rest/v1/companies?id=eq.${analysis.company_id}&select=name,cnpj`;
+          const companyResponse = await fetch(companyUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          });
+          
+          if (companyResponse.ok) {
+            const companies = await companyResponse.json();
+            if (companies && companies.length > 0) {
+              result = {
+                ...analysis,
+                companies: companies[0]
+              };
+            } else {
+              result = analysis;
+            }
+          } else {
+            result = analysis;
+          }
+        } catch (err) {
+          error = err;
+        }
         break
 
       case 'create':
