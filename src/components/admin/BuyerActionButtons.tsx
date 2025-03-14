@@ -43,14 +43,18 @@ export function BuyerActionButtons({ buyer, onStatusUpdated }: BuyerActionButton
         throw error;
       }
       
-      const url = URL.createObjectURL(data);
+      // Create a download link
+      const blob = new Blob([data], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = buyer.contract_file_name || 'contrato.pdf';
       document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
       
       toast({
         title: "Download iniciado",
@@ -91,7 +95,7 @@ export function BuyerActionButtons({ buyer, onStatusUpdated }: BuyerActionButton
         size="sm"
         onClick={handleDownload}
         disabled={!buyer.contract_file_path}
-        title="Baixar contrato"
+        title={buyer.contract_file_path ? "Baixar contrato" : "Sem contrato disponível"}
       >
         <DownloadCloud className="h-4 w-4" />
       </Button>

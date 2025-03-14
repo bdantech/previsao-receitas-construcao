@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { projectBuyersApi } from "@/integrations/supabase/client";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
@@ -19,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AdminBuyersTable } from "@/components/admin/AdminBuyersTable";
 
 export default function AdminBuyersPage() {
   const { session, userRole, isLoading: isLoadingAuth } = useAuth();
@@ -169,6 +171,7 @@ export default function AdminBuyersPage() {
         .download(buyer.contract_file_path);
 
       if (error) {
+        console.error('Error downloading contract:', error);
         throw error;
       }
 
@@ -180,8 +183,10 @@ export default function AdminBuyersPage() {
       a.download = buyer.contract_file_name || 'contrato.pdf';
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
       
       toast.success("Download do contrato iniciado");
     } catch (error) {
