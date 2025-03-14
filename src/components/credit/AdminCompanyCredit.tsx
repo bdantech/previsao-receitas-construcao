@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -45,7 +44,7 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
   const fetchCreditAnalyses = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('admin-company-credit', {
+      const response = await supabase.functions.invoke('admin-company-credit', {
         method: 'POST',
         headers: await getAuthHeader(),
         body: {
@@ -54,10 +53,21 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
         }
       });
 
-      if (error) throw error;
+      if (response.error) throw response.error;
       
-      // Ensure data is always an array, even if empty
-      setCreditAnalyses(Array.isArray(data) ? data : []);
+      // Extract the data from the response
+      const responseData = response.data;
+      
+      console.log('Credit analyses response:', responseData);
+      
+      // Check if the data is in the expected format
+      if (responseData && responseData.success && responseData.data) {
+        // Ensure data is always an array, even if empty
+        setCreditAnalyses(Array.isArray(responseData.data) ? responseData.data : []);
+      } else {
+        // Handle legacy format or unexpected format
+        setCreditAnalyses(Array.isArray(responseData) ? responseData : []);
+      }
     } catch (error: any) {
       console.error("Error fetching credit analyses:", error);
       toast({
@@ -88,7 +98,7 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
       
       if (selectedAnalysis) {
         // Update existing analysis
-        const { data, error } = await supabase.functions.invoke('admin-company-credit', {
+        const response = await supabase.functions.invoke('admin-company-credit', {
           method: 'POST',
           headers: await getAuthHeader(),
           body: {
@@ -98,8 +108,13 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
           }
         });
         
-        if (error) throw error;
-        result = data;
+        if (response.error) throw response.error;
+        
+        // Extract the data from the response
+        result = response.data && response.data.success && response.data.data 
+          ? response.data.data 
+          : response.data;
+          
         toast({
           title: "Success",
           description: "Credit analysis updated successfully",
@@ -107,7 +122,7 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
         });
       } else {
         // Create new analysis
-        const { data, error } = await supabase.functions.invoke('admin-company-credit', {
+        const response = await supabase.functions.invoke('admin-company-credit', {
           method: 'POST',
           headers: await getAuthHeader(),
           body: {
@@ -120,8 +135,13 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
           }
         });
         
-        if (error) throw error;
-        result = data;
+        if (response.error) throw response.error;
+        
+        // Extract the data from the response
+        result = response.data && response.data.success && response.data.data 
+          ? response.data.data 
+          : response.data;
+          
         toast({
           title: "Success",
           description: "Credit analysis created successfully",
@@ -129,6 +149,7 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
         });
       }
       
+      console.log('Save result:', result);
       setDialogOpen(false);
       fetchCreditAnalyses();
     } catch (error: any) {
