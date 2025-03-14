@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { 
@@ -72,22 +71,23 @@ const AnticipationDetails = () => {
       try {
         setIsLoading(true);
         
-        const response = await supabase.functions.invoke('company-anticipations', {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          },
-          body: {
-            action: 'getAnticipationDetails',
-            anticipationId
-          }
-        });
+        // Get anticipation details using the SQL function directly
+        const { data: detailsData, error: detailsError } = await supabase
+          .rpc('get_anticipation_details', {
+            p_anticipation_id: anticipationId
+          });
         
-        if (response.error) {
-          throw response.error;
+        if (detailsError) {
+          console.error('Error fetching anticipation details:', detailsError);
+          throw detailsError;
         }
         
-        setAnticipation(response.data?.anticipation || null);
-        setReceivables(response.data?.receivables || []);
+        if (!detailsData || !detailsData.anticipation) {
+          throw new Error('Antecipação não encontrada');
+        }
+        
+        setAnticipation(detailsData.anticipation);
+        setReceivables(detailsData.receivables || []);
       } catch (error) {
         console.error('Error fetching anticipation details:', error);
         toast({
