@@ -84,7 +84,7 @@ serve(async (req) => {
             .from('company_credit_analysis')
             .select(`
               id,
-              company_credit_analysis.company_id,
+              company_id,
               interest_rate_180,
               interest_rate_360,
               interest_rate_720,
@@ -117,7 +117,7 @@ serve(async (req) => {
           .from('company_credit_analysis')
           .select(`
             id,
-            company_credit_analysis.company_id,
+            company_id,
             interest_rate_180,
             interest_rate_360,
             interest_rate_720,
@@ -179,7 +179,7 @@ serve(async (req) => {
           })
           .select(`
             id,
-            company_credit_analysis.company_id,
+            company_id,
             interest_rate_180,
             interest_rate_360,
             interest_rate_720,
@@ -246,7 +246,7 @@ serve(async (req) => {
           .eq('id', analysisId)
           .select(`
             id,
-            company_credit_analysis.company_id,
+            company_id,
             interest_rate_180,
             interest_rate_360,
             interest_rate_720,
@@ -278,7 +278,7 @@ serve(async (req) => {
           .eq('id', analysisId)
           .select(`
             id,
-            company_credit_analysis.company_id,
+            company_id,
             interest_rate_180,
             interest_rate_360,
             interest_rate_720,
