@@ -143,6 +143,9 @@ serve(async (req) => {
           }
         }
 
+        // Calculate available_credit
+        const available_credit = analysisData.credit_limit - (analysisData.consumed_credit || 0);
+
         const { data: createResult, error: createError } = await supabase
           .from('company_credit_analysis')
           .insert({
@@ -154,6 +157,7 @@ serve(async (req) => {
             fee_per_receivable: analysisData.fee_per_receivable,
             credit_limit: analysisData.credit_limit,
             consumed_credit: analysisData.consumed_credit || 0,
+            available_credit: available_credit,
             status: analysisData.status
           })
           .select()
@@ -197,6 +201,9 @@ serve(async (req) => {
           }
         }
 
+        // Calculate available_credit
+        const updatedAvailableCredit = analysisData.credit_limit - analysisData.consumed_credit;
+
         const { data: updateResult, error: updateError } = await supabase
           .from('company_credit_analysis')
           .update({
@@ -207,6 +214,7 @@ serve(async (req) => {
             fee_per_receivable: analysisData.fee_per_receivable,
             credit_limit: analysisData.credit_limit,
             consumed_credit: analysisData.consumed_credit,
+            available_credit: updatedAvailableCredit,
             status: analysisData.status
           })
           .eq('id', analysisId)
