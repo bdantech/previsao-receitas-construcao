@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -19,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { ReceivableDialog } from "@/components/receivables/ReceivableDialog";
 import { ReceivableBulkImportDialog } from "@/components/receivables/ReceivableBulkImportDialog";
+import AnticipationsList from "@/components/anticipations/AnticipationsList";
 
 interface Project {
   id: string;
@@ -61,6 +61,19 @@ interface Receivable {
   };
 }
 
+interface Anticipation {
+  id: string;
+  project_id: string;
+  buyer_name: string;
+  buyer_cpf: string;
+  amount: number;
+  due_date: string;
+  description?: string;
+  status: 'enviado' | 'elegivel_para_antecipacao' | 'reprovado' | 'antecipado';
+  created_at: string;
+  updated_at: string;
+}
+
 const ProjectDashboardPage = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
@@ -72,6 +85,8 @@ const ProjectDashboardPage = () => {
   const [isLoadingReceivables, setIsLoadingReceivables] = useState(false);
   const [receivableDialogOpen, setReceivableDialogOpen] = useState(false);
   const [bulkImportDialogOpen, setBulkImportDialogOpen] = useState(false);
+  const [anticipations, setAnticipations] = useState<Anticipation[]>([]);
+  const [isLoadingAnticipations, setIsLoadingAnticipations] = useState(false);
   const { session } = useAuth();
   const { toast } = useToast();
   
@@ -130,6 +145,8 @@ const ProjectDashboardPage = () => {
       fetchProjectBuyers();
     } else if (activeTab === "recebiveis" && projectId && session?.access_token) {
       fetchProjectReceivables();
+    } else if (activeTab === "antecipacoes" && projectId && session?.access_token) {
+      fetchAnticipations();
     }
   }, [activeTab, projectId, session]);
 
@@ -201,6 +218,47 @@ const ProjectDashboardPage = () => {
       });
     } finally {
       setIsLoadingReceivables(false);
+    }
+  };
+
+  const fetchAnticipations = async () => {
+    if (!projectId || !session?.access_token) return;
+
+    try {
+      setIsLoadingAnticipations(true);
+      
+      const { data, error } = await supabase.functions.invoke('project-anticipations', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          method: 'GET',
+          endpoint: 'anticipations',
+          projectId: projectId
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching anticipations:', error);
+        toast({
+          title: "Erro ao carregar antecipações",
+          description: "Não foi possível obter a lista de antecipações deste projeto.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      console.log('Project anticipations:', data);
+      setAnticipations(data?.anticipations || []);
+    } catch (error) {
+      console.error('Error fetching anticipations:', error);
+      toast({
+        title: "Erro ao carregar antecipações",
+        description: "Ocorreu um erro ao buscar as antecipações.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingAnticipations(false);
     }
   };
 
@@ -339,7 +397,6 @@ const ProjectDashboardPage = () => {
       
       console.log('File uploaded successfully to:', uploadResponse.data.path);
       
-      // Update the buyer with the contract file information and explicitly set contract_status to "a_analisar"
       const { data, error } = await supabase.functions.invoke('project-buyers', {
         headers: {
           Authorization: `Bearer ${session?.access_token}`
@@ -350,7 +407,7 @@ const ProjectDashboardPage = () => {
           buyerData: {
             contract_file_path: uploadResponse.data.path,
             contract_file_name: file.name,
-            contract_status: 'a_analisar' // Explicitly set the contract status to "a_analisar"
+            contract_status: 'a_analisar'
           }
         }
       });
@@ -694,16 +751,7 @@ const ProjectDashboardPage = () => {
           </TabsContent>
           
           <TabsContent value="antecipacoes" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Antecipações</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center text-gray-500 py-8">
-                  Nenhuma antecipação cadastrada para este projeto ainda.
-                </p>
-              </CardContent>
-            </Card>
+            <AnticipationsList projectId={projectId || ""} />
           </TabsContent>
           
           <TabsContent value="boletos" className="mt-6">

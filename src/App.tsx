@@ -15,6 +15,8 @@ import AdminReceivablesPage from "./pages/AdminReceivablesPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
+import CreateAnticipationForm from "./components/anticipations/CreateAnticipationForm";
+import AnticipationDetails from "./components/anticipations/AnticipationDetails";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Create a client
@@ -42,6 +44,8 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/project-dashboard/:projectId" element={<ProjectDashboardPage />} />
+            <Route path="/project-dashboard/:projectId/create-anticipation" element={<CreateAnticipationForm />} />
+            <Route path="/project-dashboard/:projectId/anticipation/:anticipationId" element={<AnticipationDetails />} />
             <Route path="/company" element={<CompanyPage />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />

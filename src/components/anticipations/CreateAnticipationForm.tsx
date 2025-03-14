@@ -1,0 +1,536 @@
+
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { Loader, ChevronRight, ChevronLeft, CheckCircle, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Checkbox } from "@/components/ui/checkbox";
+import { formatCPF, formatCurrency } from "@/lib/formatters";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+interface Receivable {
+  id: string;
+  buyer_name?: string;
+  buyer_cpf: string;
+  amount: number;
+  due_date: string;
+  description?: string;
+  status: string;
+  projects?: {
+    name: string;
+  };
+}
+
+interface CalculationResult {
+  valorTotal: number;
+  valorLiquido: number;
+  quantidade: number;
+  taxas: {
+    interest_rate_180: number;
+    interest_rate_360: number;
+    interest_rate_720: number;
+    interest_rate_long_term: number;
+    fee_per_receivable: number;
+  }
+}
+
+const CreateAnticipationForm = () => {
+  const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { session } = useAuth();
+  
+  const [step, setStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [receivables, setReceivables] = useState<Receivable[]>([]);
+  const [selectedReceivables, setSelectedReceivables] = useState<Receivable[]>([]);
+  const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [companyData, setCompanyData] = useState<{ id: string; name: string } | null>(null);
+  
+  // Fetch receivables and company data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!session?.access_token || !projectId) return;
+      
+      setIsLoading(true);
+      try {
+        // Get receivables that are eligible for anticipation
+        const { data: projectData, error: projectError } = await supabase.functions.invoke('project-management', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: {
+            method: 'GET',
+            endpoint: `projects/${projectId}`
+          }
+        });
+        
+        if (projectError) {
+          throw projectError;
+        }
+        
+        // Store company data
+        setCompanyData({
+          id: projectData.project.company_id,
+          name: projectData.project.companies.name
+        });
+        
+        // Get receivables
+        const response = await supabase.functions.invoke('company-anticipations', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: {
+            action: 'getReceivablesForAnticipation',
+            projectId,
+            companyId: projectData.project.company_id
+          }
+        });
+        
+        if (response.error) {
+          throw response.error;
+        }
+        
+        setReceivables(response.data?.receivables || []);
+      } catch (error) {
+        console.error('Error fetching receivables:', error);
+        toast({
+          title: "Erro ao carregar recebíveis",
+          description: "Não foi possível obter a lista de recebíveis elegíveis para antecipação.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [session, projectId, toast]);
+  
+  // Calculate total amount of selected receivables
+  const totalSelectedAmount = selectedReceivables.reduce((sum, receivable) => sum + Number(receivable.amount), 0);
+  
+  // Toggle receivable selection
+  const toggleReceivable = (receivable: Receivable) => {
+    if (selectedReceivables.some(r => r.id === receivable.id)) {
+      setSelectedReceivables(selectedReceivables.filter(r => r.id !== receivable.id));
+    } else {
+      setSelectedReceivables([...selectedReceivables, receivable]);
+    }
+  };
+  
+  // Select all receivables
+  const selectAllReceivables = () => {
+    setSelectedReceivables([...receivables]);
+  };
+  
+  // Deselect all receivables
+  const deselectAllReceivables = () => {
+    setSelectedReceivables([]);
+  };
+  
+  // Handle continue to next step
+  const handleContinue = async () => {
+    if (step === 1) {
+      if (selectedReceivables.length === 0) {
+        toast({
+          title: "Selecione pelo menos um recebível",
+          description: "Você precisa selecionar pelo menos um recebível para continuar.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Calculate anticipated value
+      try {
+        setIsLoading(true);
+        const response = await supabase.functions.invoke('company-anticipations', {
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`
+          },
+          body: {
+            action: 'calculateValorLiquido',
+            receivableIds: selectedReceivables.map(r => r.id),
+            companyId: companyData?.id
+          }
+        });
+        
+        if (response.error) {
+          throw response.error;
+        }
+        
+        setCalculationResult(response.data);
+        setStep(2);
+      } catch (error) {
+        console.error('Error calculating anticipated value:', error);
+        toast({
+          title: "Erro ao calcular valor antecipado",
+          description: "Não foi possível calcular o valor antecipado. Tente novamente.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    } else if (step === 2) {
+      setStep(3);
+    }
+  };
+  
+  // Handle back button
+  const handleBack = () => {
+    if (step > 1) {
+      setStep(step - 1);
+    }
+  };
+  
+  // Handle form submission
+  const handleSubmit = async () => {
+    if (!companyData?.id || !projectId || !calculationResult) return;
+    
+    try {
+      setIsSubmitting(true);
+      
+      const response = await supabase.functions.invoke('company-anticipations', {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: {
+          action: 'createAnticipation',
+          companyId: companyData.id,
+          projectId,
+          receivableIds: selectedReceivables.map(r => r.id),
+          valorTotal: calculationResult.valorTotal,
+          valorLiquido: calculationResult.valorLiquido,
+          taxaJuros180: calculationResult.taxas.interest_rate_180,
+          taxaJuros360: calculationResult.taxas.interest_rate_360,
+          taxaJuros720: calculationResult.taxas.interest_rate_720,
+          taxaJurosLongoPrazo: calculationResult.taxas.interest_rate_long_term,
+          tarifaPorRecebivel: calculationResult.taxas.fee_per_receivable
+        }
+      });
+      
+      if (response.error) {
+        throw response.error;
+      }
+      
+      toast({
+        title: "Antecipação solicitada com sucesso",
+        description: "Sua solicitação de antecipação foi enviada e está em análise.",
+      });
+      
+      // Redirect back to Project Dashboard, Antecipações tab
+      navigate(`/project-dashboard/${projectId}?tab=antecipacoes`);
+    } catch (error) {
+      console.error('Error creating anticipation:', error);
+      toast({
+        title: "Erro ao criar antecipação",
+        description: "Não foi possível criar a solicitação de antecipação. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  // Render loading state
+  if (isLoading && step === 1 && receivables.length === 0) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="mx-auto h-8 w-8 animate-spin text-gray-500" />
+          <p className="mt-2 text-gray-500">Carregando recebíveis...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="container max-w-4xl mx-auto py-8">
+      {/* Step indicator */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex-1">
+            <div className={`h-2 rounded-l-full ${step >= 1 ? 'bg-primary' : 'bg-gray-200'}`}></div>
+          </div>
+          <div className="flex-1">
+            <div className={`h-2 ${step >= 2 ? 'bg-primary' : 'bg-gray-200'}`}></div>
+          </div>
+          <div className="flex-1">
+            <div className={`h-2 rounded-r-full ${step === 3 ? 'bg-primary' : 'bg-gray-200'}`}></div>
+          </div>
+        </div>
+        <div className="flex justify-between text-sm">
+          <div className={step >= 1 ? 'text-primary font-medium' : 'text-gray-500'}>
+            Selecionar Recebíveis
+          </div>
+          <div className={step >= 2 ? 'text-primary font-medium' : 'text-gray-500'}>
+            Revisar Valores
+          </div>
+          <div className={step === 3 ? 'text-primary font-medium' : 'text-gray-500'}>
+            Confirmar
+          </div>
+        </div>
+      </div>
+      
+      <Card className="w-full">
+        {step === 1 && (
+          <>
+            <CardHeader>
+              <CardTitle>Selecione os recebíveis para antecipação</CardTitle>
+              <CardDescription>
+                Escolha um ou mais recebíveis elegíveis para antecipar
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 flex justify-between items-center">
+                <div>
+                  <span className="font-semibold">Valor total selecionado:</span> {formatCurrency(totalSelectedAmount)}
+                </div>
+                <div className="space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={selectAllReceivables}
+                    disabled={receivables.length === 0 || receivables.length === selectedReceivables.length}
+                  >
+                    Selecionar Todos
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={deselectAllReceivables}
+                    disabled={selectedReceivables.length === 0}
+                  >
+                    Limpar Seleção
+                  </Button>
+                </div>
+              </div>
+              
+              {receivables.length === 0 ? (
+                <div className="text-center py-8">
+                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium">Nenhum recebível disponível</h3>
+                  <p className="text-gray-500 mt-2">
+                    Não há recebíveis elegíveis para antecipação neste projeto.
+                  </p>
+                </div>
+              ) : (
+                <div className="border rounded-md overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="py-2 px-4 text-left w-12"></th>
+                        <th className="py-2 px-4 text-left">Comprador</th>
+                        <th className="py-2 px-4 text-left">CPF</th>
+                        <th className="py-2 px-4 text-left">Vencimento</th>
+                        <th className="py-2 px-4 text-right">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {receivables.map((receivable) => (
+                        <tr 
+                          key={receivable.id} 
+                          className={`border-b hover:bg-gray-50 cursor-pointer ${
+                            selectedReceivables.some(r => r.id === receivable.id) ? 'bg-primary/5' : ''
+                          }`}
+                          onClick={() => toggleReceivable(receivable)}
+                        >
+                          <td className="py-3 px-4">
+                            <Checkbox 
+                              checked={selectedReceivables.some(r => r.id === receivable.id)}
+                              onCheckedChange={() => toggleReceivable(receivable)}
+                              className="ml-1"
+                            />
+                          </td>
+                          <td className="py-3 px-4 font-medium">{receivable.buyer_name || "—"}</td>
+                          <td className="py-3 px-4">{formatCPF(receivable.buyer_cpf)}</td>
+                          <td className="py-3 px-4">
+                            {format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                          </td>
+                          <td className="py-3 px-4 text-right">{formatCurrency(receivable.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </>
+        )}
+        
+        {step === 2 && calculationResult && (
+          <>
+            <CardHeader>
+              <CardTitle>Revisão dos valores</CardTitle>
+              <CardDescription>
+                Confirme os valores da sua solicitação de antecipação
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="p-4 border rounded-lg">
+                    <div className="text-sm text-gray-500 mb-1">Quantidade de Recebíveis</div>
+                    <div className="text-2xl font-semibold">{calculationResult.quantidade}</div>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <div className="text-sm text-gray-500 mb-1">Valor Total dos Recebíveis</div>
+                    <div className="text-2xl font-semibold">{formatCurrency(calculationResult.valorTotal)}</div>
+                  </div>
+                </div>
+                
+                <div className="bg-primary/5 p-6 rounded-lg border">
+                  <div className="text-sm text-gray-500 mb-2">Valor Líquido (a receber)</div>
+                  <div className="text-3xl font-bold text-primary">
+                    {formatCurrency(calculationResult.valorLiquido)}
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-medium mb-3">Detalhamento das taxas aplicadas</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Taxa de juros até 180 dias:</span>
+                      <span className="font-medium">{calculationResult.taxas.interest_rate_180}% a.m.</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Taxa de juros até 360 dias:</span>
+                      <span className="font-medium">{calculationResult.taxas.interest_rate_360}% a.m.</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Taxa de juros até 720 dias:</span>
+                      <span className="font-medium">{calculationResult.taxas.interest_rate_720}% a.m.</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Taxa de juros longo prazo:</span>
+                      <span className="font-medium">{calculationResult.taxas.interest_rate_long_term}% a.m.</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Tarifa por recebível:</span>
+                      <span className="font-medium">{formatCurrency(calculationResult.taxas.fee_per_receivable)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </>
+        )}
+        
+        {step === 3 && calculationResult && (
+          <>
+            <CardHeader>
+              <CardTitle>Confirmar Antecipação</CardTitle>
+              <CardDescription>
+                Revise e confirme a solicitação de antecipação
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="bg-gray-50 p-6 rounded-lg border">
+                  <h3 className="font-medium text-lg mb-4">Resumo da Antecipação</h3>
+                  
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Empresa:</span>
+                      <span className="font-medium">{companyData?.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Quantidade de recebíveis:</span>
+                      <span className="font-medium">{calculationResult.quantidade}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Valor total dos recebíveis:</span>
+                      <span className="font-medium">{formatCurrency(calculationResult.valorTotal)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Valor líquido a receber:</span>
+                      <span className="font-medium">{formatCurrency(calculationResult.valorLiquido)}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-primary/5 p-6 rounded-lg border">
+                  <h3 className="font-medium text-lg mb-4">Termos e Condições</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Ao clicar em "Confirmar Antecipação", você concorda com os seguintes termos:
+                  </p>
+                  <ul className="text-sm text-gray-600 space-y-2 list-disc pl-5">
+                    <li>Esta é uma solicitação formal de antecipação de recebíveis que está sujeita à aprovação.</li>
+                    <li>Os recebíveis selecionados ficarão bloqueados para outras operações enquanto esta solicitação estiver em análise.</li>
+                    <li>O valor líquido a receber pode sofrer alterações caso a análise identifique alguma inconsistência nos recebíveis.</li>
+                    <li>Após a aprovação, o valor líquido será creditado na conta bancária registrada em sua empresa.</li>
+                  </ul>
+                </div>
+                
+                <div className="flex items-center justify-center mt-4">
+                  <CheckCircle className="text-primary h-6 w-6 mr-2" />
+                  <span className="text-center">
+                    Ao continuar, confirmo que li e concordo com os termos acima.
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </>
+        )}
+        
+        <CardFooter className="flex justify-between">
+          <Button
+            variant="outline"
+            onClick={step === 1 ? () => navigate(`/project-dashboard/${projectId}`) : handleBack}
+          >
+            {step === 1 ? 'Cancelar' : (
+              <>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Voltar
+              </>
+            )}
+          </Button>
+          
+          {step < 3 ? (
+            <Button onClick={handleContinue} disabled={isLoading || selectedReceivables.length === 0}>
+              {isLoading ? (
+                <>
+                  <Loader className="h-4 w-4 mr-2 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  Continuar
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </>
+              )}
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleSubmit} 
+              disabled={isSubmitting}
+              className="bg-primary"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader className="h-4 w-4 mr-2 animate-spin" />
+                  Processando...
+                </>
+              ) : 'Confirmar Antecipação'}
+            </Button>
+          )}
+        </CardFooter>
+      </Card>
+    </div>
+  );
+};
+
+export default CreateAnticipationForm;
