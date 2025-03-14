@@ -21,10 +21,18 @@ serve(async (req) => {
       throw new Error('Database connection string not found')
     }
     
-    // Verificar administrador (using auth service role)
-    // For security, this function should only be called from other edge functions
-    // using the service role client, not directly from the frontend
-
+    // Get authorization header for user authentication
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401 
+        }
+      )
+    }
+    
     // Criar pool de conexões
     const pool = new Pool(databaseUrl, 3, true)
     

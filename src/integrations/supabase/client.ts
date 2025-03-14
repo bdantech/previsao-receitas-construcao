@@ -813,3 +813,287 @@ export const receivablesApi = {
     }
   }
 };
+
+// Anticipations API utilities
+export const anticipationsApi = {
+  // Company user methods
+  calculateAnticipationValue: async (receivableIds: string[], companyId: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('company-anticipations', {
+        headers,
+        body: { 
+          action: 'calculateValorLiquido',
+          receivableIds,
+          companyId
+        }
+      });
+      
+      if (error) {
+        console.error('Error calculating anticipation value:', error);
+        throw error;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Exception in calculateAnticipationValue:', error);
+      throw error;
+    }
+  },
+  
+  getEligibleReceivables: async (companyId: string, projectId?: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('company-anticipations', {
+        headers,
+        body: { 
+          action: 'getReceivablesForAnticipation',
+          companyId,
+          projectId,
+          status: 'elegivel_para_antecipacao'
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching eligible receivables:', error);
+        throw error;
+      }
+      
+      return data?.receivables || [];
+    } catch (error) {
+      console.error('Exception in getEligibleReceivables:', error);
+      throw error;
+    }
+  },
+  
+  createAnticipation: async (anticipationData: {
+    companyId: string,
+    projectId: string,
+    receivableIds: string[],
+    valorTotal: number,
+    valorLiquido: number,
+    taxaJuros180: number,
+    taxaJuros360: number,
+    taxaJuros720: number,
+    taxaJurosLongoPrazo: number,
+    tarifaPorRecebivel: number
+  }) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('company-anticipations', {
+        headers,
+        body: { 
+          action: 'createAnticipation',
+          ...anticipationData
+        }
+      });
+      
+      if (error) {
+        console.error('Error creating anticipation:', error);
+        throw error;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Exception in createAnticipation:', error);
+      throw error;
+    }
+  },
+  
+  getCompanyAnticipations: async (companyId: string, status?: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('company-anticipations', {
+        headers,
+        body: { 
+          action: 'getAnticipations',
+          companyId,
+          status
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching company anticipations:', error);
+        throw error;
+      }
+      
+      return data?.anticipations || [];
+    } catch (error) {
+      console.error('Exception in getCompanyAnticipations:', error);
+      throw error;
+    }
+  },
+  
+  getAnticipationDetails: async (anticipationId: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('company-anticipations', {
+        headers,
+        body: { 
+          action: 'getAnticipationDetails',
+          anticipationId
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching anticipation details:', error);
+        throw error;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Exception in getAnticipationDetails:', error);
+      throw error;
+    }
+  },
+  
+  getAnticipationReceivables: async (anticipationId: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('company-anticipations', {
+        headers,
+        body: { 
+          action: 'getAnticipationReceivables',
+          anticipationId
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching anticipation receivables:', error);
+        throw error;
+      }
+      
+      return data?.receivables || [];
+    } catch (error) {
+      console.error('Exception in getAnticipationReceivables:', error);
+      throw error;
+    }
+  },
+  
+  // Admin methods
+  admin: {
+    getAllAnticipations: async (filters?: {
+      companyId?: string,
+      projectId?: string,
+      status?: string,
+      fromDate?: string,
+      toDate?: string,
+      minValorTotal?: number,
+      maxValorTotal?: number,
+      page?: number,
+      pageSize?: number
+    }) => {
+      try {
+        const headers = await getAuthHeaders();
+        const { data, error } = await supabase.functions.invoke('admin-anticipations', {
+          headers,
+          body: { 
+            action: 'getAllAnticipations',
+            ...filters
+          }
+        });
+        
+        if (error) {
+          console.error('Error fetching all anticipations:', error);
+          throw error;
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('Exception in getAllAnticipations:', error);
+        throw error;
+      }
+    },
+    
+    getAnticipationDetails: async (anticipationId: string) => {
+      try {
+        const headers = await getAuthHeaders();
+        const { data, error } = await supabase.functions.invoke('admin-anticipations', {
+          headers,
+          body: { 
+            action: 'getAnticipationDetails',
+            anticipationId
+          }
+        });
+        
+        if (error) {
+          console.error('Error fetching anticipation details:', error);
+          throw error;
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('Exception in getAnticipationDetails:', error);
+        throw error;
+      }
+    },
+    
+    updateAnticipationStatus: async (anticipationId: string, newStatus: string, notes?: string) => {
+      try {
+        const headers = await getAuthHeaders();
+        const { data, error } = await supabase.functions.invoke('admin-anticipations', {
+          headers,
+          body: { 
+            action: 'updateAnticipationStatus',
+            anticipationId,
+            newStatus,
+            notes
+          }
+        });
+        
+        if (error) {
+          console.error('Error updating anticipation status:', error);
+          throw error;
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('Exception in updateAnticipationStatus:', error);
+        throw error;
+      }
+    },
+    
+    getCompanyAnticipations: async (companyId: string, status?: string) => {
+      try {
+        const headers = await getAuthHeaders();
+        const { data, error } = await supabase.functions.invoke('admin-anticipations', {
+          headers,
+          body: { 
+            action: 'getCompanyAnticipations',
+            companyId,
+            status
+          }
+        });
+        
+        if (error) {
+          console.error('Error fetching company anticipations:', error);
+          throw error;
+        }
+        
+        return data?.anticipations || [];
+      } catch (error) {
+        console.error('Exception in getCompanyAnticipations:', error);
+        throw error;
+      }
+    }
+  }
+};
+
+// Execute SQL utility function
+export const executeSql = async (query_text: string, params?: any) => {
+  const headers = await getAuthHeaders();
+  const { data, error } = await supabase.functions.invoke('execute-sql', {
+    headers,
+    body: { 
+      query_text,
+      params
+    }
+  });
+  
+  if (error) {
+    console.error('Error executing SQL:', error);
+    throw error;
+  }
+  
+  return data;
+};

@@ -9,6 +9,108 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      anticipation_receivables: {
+        Row: {
+          anticipation_id: string
+          created_at: string
+          id: string
+          receivable_id: string
+        }
+        Insert: {
+          anticipation_id: string
+          created_at?: string
+          id?: string
+          receivable_id: string
+        }
+        Update: {
+          anticipation_id?: string
+          created_at?: string
+          id?: string
+          receivable_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anticipation_receivables_anticipation_id_fkey"
+            columns: ["anticipation_id"]
+            isOneToOne: false
+            referencedRelation: "anticipation_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anticipation_receivables_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anticipation_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          project_id: string
+          quantidade_recebiveis: number
+          status: Database["public"]["Enums"]["anticipation_status"]
+          tarifa_por_recebivel: number
+          taxa_juros_180: number
+          taxa_juros_360: number
+          taxa_juros_720: number
+          taxa_juros_longo_prazo: number
+          updated_at: string
+          valor_liquido: number
+          valor_total: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          project_id: string
+          quantidade_recebiveis: number
+          status?: Database["public"]["Enums"]["anticipation_status"]
+          tarifa_por_recebivel: number
+          taxa_juros_180: number
+          taxa_juros_360: number
+          taxa_juros_720: number
+          taxa_juros_longo_prazo: number
+          updated_at?: string
+          valor_liquido: number
+          valor_total: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          quantidade_recebiveis?: number
+          status?: Database["public"]["Enums"]["anticipation_status"]
+          tarifa_por_recebivel?: number
+          taxa_juros_180?: number
+          taxa_juros_360?: number
+          taxa_juros_720?: number
+          taxa_juros_longo_prazo?: number
+          updated_at?: string
+          valor_liquido?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anticipation_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anticipation_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           cnpj: string
@@ -422,6 +524,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      calculate_anticipation_valor_liquido: {
+        Args: {
+          p_receivable_ids: string[]
+          p_company_id: string
+        }
+        Returns: number
+      }
       execute_sql: {
         Args: {
           params: Json
@@ -449,6 +558,7 @@ export type Database = {
       }
     }
     Enums: {
+      anticipation_status: "Solicitada" | "Aprovada" | "Reprovada" | "Concluída"
       buyer_status: "aprovado" | "reprovado" | "a_analisar"
       contract_status: "aprovado" | "reprovado" | "a_enviar" | "a_analisar"
       credit_analysis_status: "aprovado" | "reprovado" | "a_analisar"
