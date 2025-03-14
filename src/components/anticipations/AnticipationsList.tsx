@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface Anticipation {
   id: string;
+  project_id: string; // Added this property to match the backend data structure
   valor_total: number;
   valor_liquido: number;
   status: string;
