@@ -146,54 +146,74 @@ serve(async (req) => {
           })
         }
 
-        // If status is Ativa, check if there's already an active analysis
-        if (analysisData.status === 'Ativa') {
-          const { data: existingActive } = await supabase
-            .from('company_credit_analysis')
-            .select('id')
-            .eq('company_credit_analysis.company_id', companyId)
-            .eq('status', 'Ativa')
-            .limit(1)
-
-          if (existingActive && existingActive.length > 0) {
-            // Update the existing active analysis to inactive
-            await supabase
+        try {
+          // If status is Ativa, check if there's already an active analysis and update it
+          if (analysisData.status === 'Ativa') {
+            // Find existing active analyses using a direct query without joins
+            const { data: existingActive, error: findError } = await supabase
               .from('company_credit_analysis')
-              .update({ status: 'Inativa' })
-              .eq('id', existingActive[0].id)
-          }
-        }
+              .select('id')
+              .filter('company_id', 'eq', companyId)
+              .filter('status', 'eq', 'Ativa')
+              .limit(1)
+            
+            if (findError) {
+              console.error('Error finding existing active analyses:', findError)
+              throw findError
+            }
 
-        const { data: createResult, error: createError } = await supabase
-          .from('company_credit_analysis')
-          .insert({
-            company_id: companyId,
-            interest_rate_180: analysisData.interest_rate_180,
-            interest_rate_360: analysisData.interest_rate_360,
-            interest_rate_720: analysisData.interest_rate_720,
-            interest_rate_long_term: analysisData.interest_rate_long_term,
-            fee_per_receivable: analysisData.fee_per_receivable,
-            credit_limit: analysisData.credit_limit,
-            consumed_credit: analysisData.consumed_credit || 0,
-            status: analysisData.status
-          })
-          .select(`
-            id,
-            company_id,
-            interest_rate_180,
-            interest_rate_360,
-            interest_rate_720,
-            interest_rate_long_term,
-            fee_per_receivable,
-            credit_limit,
-            consumed_credit,
-            status,
-            created_at,
-            updated_at
-          `)
-        
-        result = createResult
-        error = createError
+            // Update existing active analyses to inactive
+            if (existingActive && existingActive.length > 0) {
+              const { error: updateError } = await supabase
+                .from('company_credit_analysis')
+                .update({ status: 'Inativa' })
+                .eq('id', existingActive[0].id)
+              
+              if (updateError) {
+                console.error('Error updating existing active analysis:', updateError)
+                throw updateError
+              }
+            }
+          }
+
+          // Insert the new credit analysis
+          const { data: insertResult, error: insertError } = await supabase
+            .from('company_credit_analysis')
+            .insert({
+              company_id: companyId,
+              interest_rate_180: analysisData.interest_rate_180,
+              interest_rate_360: analysisData.interest_rate_360,
+              interest_rate_720: analysisData.interest_rate_720,
+              interest_rate_long_term: analysisData.interest_rate_long_term,
+              fee_per_receivable: analysisData.fee_per_receivable,
+              credit_limit: analysisData.credit_limit,
+              consumed_credit: analysisData.consumed_credit || 0,
+              status: analysisData.status
+            })
+            .select('id')
+            .single()
+          
+          if (insertError) {
+            console.error('Error inserting new credit analysis:', insertError)
+            throw insertError
+          }
+
+          // Fetch the complete inserted record
+          const { data: createResult, error: fetchError } = await supabase
+            .from('company_credit_analysis')
+            .select('*')
+            .eq('id', insertResult.id)
+            .single()
+          
+          if (fetchError) {
+            console.error('Error fetching inserted credit analysis:', fetchError)
+            throw fetchError
+          }
+          
+          result = createResult
+        } catch (err) {
+          error = err
+        }
         break
 
       case 'update':
@@ -205,62 +225,79 @@ serve(async (req) => {
           })
         }
 
-        // Get the company_id for the analysis we're updating
-        const { data: currentAnalysis } = await supabase
-          .from('company_credit_analysis')
-          .select('company_id, status')
-          .eq('id', analysisId)
-          .single()
-
-        // If changing to Ativa, check if there's already another active analysis
-        if (analysisData.status === 'Ativa' && currentAnalysis) {
-          const { data: existingActive } = await supabase
+        try {
+          // Get the company_id for the analysis we're updating
+          const { data: currentAnalysis, error: getError } = await supabase
             .from('company_credit_analysis')
-            .select('id')
-            .eq('company_credit_analysis.company_id', currentAnalysis.company_id)
-            .eq('status', 'Ativa')
-            .neq('id', analysisId) // Exclude the current analysis
-            .limit(1)
-
-          if (existingActive && existingActive.length > 0) {
-            // Update the existing active analysis to inactive
-            await supabase
-              .from('company_credit_analysis')
-              .update({ status: 'Inativa' })
-              .eq('id', existingActive[0].id)
+            .select('company_id, status')
+            .eq('id', analysisId)
+            .single()
+          
+          if (getError) {
+            console.error('Error getting current analysis:', getError)
+            throw getError
           }
-        }
 
-        const { data: updateResult, error: updateError } = await supabase
-          .from('company_credit_analysis')
-          .update({
-            interest_rate_180: analysisData.interest_rate_180,
-            interest_rate_360: analysisData.interest_rate_360,
-            interest_rate_720: analysisData.interest_rate_720,
-            interest_rate_long_term: analysisData.interest_rate_long_term,
-            fee_per_receivable: analysisData.fee_per_receivable,
-            credit_limit: analysisData.credit_limit,
-            consumed_credit: analysisData.consumed_credit,
-            status: analysisData.status
-          })
-          .eq('id', analysisId)
-          .select(`
-            id,
-            company_id,
-            interest_rate_180,
-            interest_rate_360,
-            interest_rate_720,
-            interest_rate_long_term,
-            fee_per_receivable,
-            credit_limit,
-            consumed_credit,
-            status,
-            created_at,
-            updated_at
-          `)
-        
-        result = updateResult
-        error = updateError
+          if (!currentAnalysis) {
+            throw new Error('Analysis not found')
+          }
+
+          // If changing to Ativa, check if there's already another active analysis
+          if (analysisData.status === 'Ativa') {
+            // Find existing active analyses using a direct query without joins
+            const { data: existingActive, error: findError } = await supabase
+              .from('company_credit_analysis')
+              .select('id')
+              .filter('company_id', 'eq', currentAnalysis.company_id)
+              .filter('status', 'eq', 'Ativa')
+              .neq('id', analysisId) // Exclude the current analysis
+              .limit(1)
+            
+            if (findError) {
+              console.error('Error finding existing active analyses:', findError)
+              throw findError
+            }
+
+            // Update existing active analyses to inactive
+            if (existingActive && existingActive.length > 0) {
+              const { error: updateError } = await supabase
+                .from('company_credit_analysis')
+                .update({ status: 'Inativa' })
+                .eq('id', existingActive[0].id)
+              
+              if (updateError) {
+                console.error('Error updating existing active analysis:', updateError)
+                throw updateError
+              }
+            }
+          }
+
+          // Update the credit analysis
+          const { data: updateResult, error: updateError } = await supabase
+            .from('company_credit_analysis')
+            .update({
+              interest_rate_180: analysisData.interest_rate_180,
+              interest_rate_360: analysisData.interest_rate_360,
+              interest_rate_720: analysisData.interest_rate_720,
+              interest_rate_long_term: analysisData.interest_rate_long_term,
+              fee_per_receivable: analysisData.fee_per_receivable,
+              credit_limit: analysisData.credit_limit,
+              consumed_credit: analysisData.consumed_credit,
+              status: analysisData.status
+            })
+            .eq('id', analysisId)
+            .select('*')
+            .single()
+          
+          if (updateError) {
+            console.error('Error updating credit analysis:', updateError)
+            throw updateError
+          }
+          
+          result = updateResult
+        } catch (err) {
+          error = err
+        }
         break
 
       case 'delete':
