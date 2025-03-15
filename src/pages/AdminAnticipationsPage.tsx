@@ -80,9 +80,11 @@ const AdminAnticipationsPage = () => {
       };
       
       if (status) filters.status = status;
-      if (companySearch) filters.companyId = companySearch;
+      if (companySearch) filters.companySearch = companySearch;
       if (dateFrom) filters.fromDate = dateFrom;
       if (dateTo) filters.toDate = dateTo;
+      
+      console.log('Sending filters to edge function:', filters);
       
       const { data, error } = await supabase.functions.invoke('admin-anticipations', {
         headers: {

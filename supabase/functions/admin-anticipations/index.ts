@@ -138,6 +138,7 @@ serve(async (req) => {
 async function handleGetAllAnticipations(serviceClient, data, corsHeaders) {
   const { 
     companyId, 
+    companySearch,
     projectId, 
     status, 
     fromDate, 
@@ -149,6 +150,61 @@ async function handleGetAllAnticipations(serviceClient, data, corsHeaders) {
   } = data
 
   try {
+    console.log('Handling get all anticipations with filters:', { 
+      companyId, 
+      companySearch,
+      projectId, 
+      status, 
+      fromDate, 
+      toDate, 
+      minValorTotal, 
+      maxValorTotal,
+      page,
+      pageSize
+    })
+
+    // Check if we need to look up company ID by name first
+    let actualCompanyId = companyId
+    
+    if (companySearch && !companyId) {
+      console.log('Searching for company with name:', companySearch)
+      
+      // Look up company by name
+      const { data: companies, error: companyError } = await serviceClient
+        .from('companies')
+        .select('id')
+        .ilike('name', `%${companySearch}%`)
+        .limit(1)
+      
+      if (companyError) {
+        console.error('Error searching for company:', companyError)
+        throw companyError
+      }
+      
+      if (companies && companies.length > 0) {
+        actualCompanyId = companies[0].id
+        console.log('Found company ID:', actualCompanyId)
+      } else {
+        console.log('No company found with search term:', companySearch)
+        // Return empty results if no company found with that name
+        return new Response(
+          JSON.stringify({ 
+            anticipations: [],
+            pagination: {
+              total: 0,
+              page,
+              pageSize,
+              totalPages: 0
+            }
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        )
+      }
+    }
+
     // Build the query with all optional filters
     let query = serviceClient
       .from('anticipation_requests')
@@ -167,8 +223,9 @@ async function handleGetAllAnticipations(serviceClient, data, corsHeaders) {
       `)
 
     // Apply filters if provided
-    if (companyId) {
-      query = query.eq('company_id', companyId)
+    if (actualCompanyId) {
+      query = query.eq('company_id', actualCompanyId)
+      console.log('Filtering by company ID:', actualCompanyId)
     }
 
     if (projectId) {
@@ -205,8 +262,8 @@ async function handleGetAllAnticipations(serviceClient, data, corsHeaders) {
       .select('id', { count: 'exact', head: true })
     
     // Apply the same filters to the count query
-    if (companyId) {
-      countQuery.eq('company_id', companyId)
+    if (actualCompanyId) {
+      countQuery.eq('company_id', actualCompanyId)
     }
     if (projectId) {
       countQuery.eq('project_id', projectId)
@@ -234,6 +291,8 @@ async function handleGetAllAnticipations(serviceClient, data, corsHeaders) {
       throw countError
     }
 
+    console.log('Total count:', count)
+
     // Get paginated results
     const { data: anticipations, error } = await query
       .order('created_at', { ascending: false })
@@ -243,6 +302,8 @@ async function handleGetAllAnticipations(serviceClient, data, corsHeaders) {
       console.error('Error fetching anticipations:', error)
       throw error
     }
+
+    console.log(`Found ${anticipations.length} anticipations`)
 
     return new Response(
       JSON.stringify({ 
