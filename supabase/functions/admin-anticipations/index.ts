@@ -199,8 +199,35 @@ async function handleGetAllAnticipations(serviceClient, data, corsHeaders) {
     const offset = (page - 1) * pageSize
     
     // Get total count of results (without pagination)
-    const countQuery = structuredClone(query)
-    const { count, error: countError } = await countQuery.count()
+    // Create a new query for counting instead of using structuredClone
+    const countQuery = serviceClient
+      .from('anticipation_requests')
+      .select('id', { count: 'exact', head: true })
+    
+    // Apply the same filters to the count query
+    if (companyId) {
+      countQuery.eq('company_id', companyId)
+    }
+    if (projectId) {
+      countQuery.eq('project_id', projectId)
+    }
+    if (status && status !== 'all') {
+      countQuery.eq('status', status)
+    }
+    if (fromDate) {
+      countQuery.gte('created_at', fromDate)
+    }
+    if (toDate) {
+      countQuery.lte('created_at', toDate)
+    }
+    if (minValorTotal) {
+      countQuery.gte('valor_total', minValorTotal)
+    }
+    if (maxValorTotal) {
+      countQuery.lte('valor_total', maxValorTotal)
+    }
+    
+    const { count, error: countError } = await countQuery
     
     if (countError) {
       console.error('Error getting count:', countError)
