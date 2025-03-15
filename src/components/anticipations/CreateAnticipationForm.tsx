@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { 
@@ -31,17 +32,19 @@ interface Receivable {
   };
 }
 
+interface CreditAnalysis {
+  interest_rate_180: number;
+  interest_rate_360: number;
+  interest_rate_720: number;
+  interest_rate_long_term: number;
+  fee_per_receivable: number;
+}
+
 interface CalculationResult {
   valorTotal: number;
   valorLiquido: number;
   quantidade: number;
-  taxas: {
-    interest_rate_180: number;
-    interest_rate_360: number;
-    interest_rate_720: number;
-    interest_rate_long_term: number;
-    fee_per_receivable: number;
-  }
+  taxas: CreditAnalysis;
 }
 
 const CreateAnticipationForm = () => {
@@ -187,7 +190,7 @@ const CreateAnticipationForm = () => {
         setIsLoading(true);
         
         // Get the credit analysis for the company using a raw SQL query to avoid ambiguous column references
-        const { data: creditAnalysisResult, error: creditAnalysisError } = await supabase
+        const { data: creditAnalysisData, error: creditAnalysisError } = await supabase
           .rpc('get_active_credit_analysis_for_company', {
             p_company_id: companyData?.id
           });
@@ -198,11 +201,12 @@ const CreateAnticipationForm = () => {
         }
 
         // Check if we got a valid result
-        if (!creditAnalysisResult) {
+        if (!creditAnalysisData) {
           throw new Error('Não foi encontrada análise de crédito ativa para esta empresa');
         }
 
-        const creditAnalysis = creditAnalysisResult;
+        // Cast the credit analysis to the proper type
+        const creditAnalysis = creditAnalysisData as unknown as CreditAnalysis;
 
         // Calculate values directly in the frontend
         const valorTotal = selectedReceivables.reduce((total, rec) => total + Number(rec.amount), 0);

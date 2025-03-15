@@ -570,7 +570,7 @@ async function handleGetAnticipationDetails(supabaseClient, data, corsHeaders) {
     }
 
     // Get associated receivables
-    const { data: receivables, error: receivablesError } = await handleGetAnticipationReceivables(
+    const { data: receivablesResponse, error: receivablesError } = await handleGetAnticipationReceivables(
       supabaseClient, 
       { anticipationId }, 
       {}
@@ -584,7 +584,7 @@ async function handleGetAnticipationDetails(supabaseClient, data, corsHeaders) {
     return new Response(
       JSON.stringify({ 
         anticipation, 
-        receivables: receivables.receivables 
+        receivables: receivablesResponse.receivables 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -18,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface Anticipation {
   id: string;
-  project_id: string; // Added this property to match the backend data structure
+  project_id: string;
   valor_total: number;
   valor_liquido: number;
   status: string;
@@ -79,10 +80,12 @@ const AnticipationsList = ({ projectId }: AnticipationsListProps) => {
           throw anticipationsError;
         }
         
-        // Parse the result
-        const projectAnticipations = anticipationsData || [];
-        
-        setAnticipations(projectAnticipations);
+        // Parse the result and ensure proper typing
+        if (Array.isArray(anticipationsData)) {
+          setAnticipations(anticipationsData as unknown as Anticipation[]);
+        } else {
+          setAnticipations([]);
+        }
       } catch (error) {
         console.error('Error fetching anticipations:', error);
         toast({

@@ -53,6 +53,11 @@ interface Receivable {
   status: string;
 }
 
+interface AnticipationDetailsResponse {
+  anticipation: Anticipation;
+  receivables: Receivable[];
+}
+
 const AnticipationDetails = () => {
   const { projectId, anticipationId } = useParams<{ projectId: string; anticipationId: string }>();
   const navigate = useNavigate();
@@ -72,7 +77,7 @@ const AnticipationDetails = () => {
         setIsLoading(true);
         
         // Get anticipation details using the SQL function directly
-        const { data: detailsData, error: detailsError } = await supabase
+        const { data, error: detailsError } = await supabase
           .rpc('get_anticipation_details', {
             p_anticipation_id: anticipationId
           });
@@ -82,12 +87,19 @@ const AnticipationDetails = () => {
           throw detailsError;
         }
         
-        if (!detailsData || !detailsData.anticipation) {
+        if (!data) {
           throw new Error('Antecipação não encontrada');
         }
         
-        setAnticipation(detailsData.anticipation);
-        setReceivables(detailsData.receivables || []);
+        // Properly cast the response data
+        const typedData = data as unknown as AnticipationDetailsResponse;
+        
+        if (!typedData.anticipation) {
+          throw new Error('Antecipação não encontrada');
+        }
+        
+        setAnticipation(typedData.anticipation);
+        setReceivables(typedData.receivables || []);
       } catch (error) {
         console.error('Error fetching anticipation details:', error);
         toast({
