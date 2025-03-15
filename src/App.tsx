@@ -12,6 +12,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminCompanyDetail from "./pages/AdminCompanyDetail";
 import AdminBuyersPage from "./pages/AdminBuyersPage";
 import AdminReceivablesPage from "./pages/AdminReceivablesPage";
+import AdminAnticipationsPage from "./pages/AdminAnticipationsPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
@@ -51,6 +52,7 @@ function App() {
             <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
             <Route path="/admin/buyers" element={<AdminBuyersPage />} />
             <Route path="/admin/receivables" element={<AdminReceivablesPage />} />
+            <Route path="/admin/anticipations" element={<AdminAnticipationsPage />} />
             
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
