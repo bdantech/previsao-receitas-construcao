@@ -538,6 +538,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_active_credit_analysis_for_company: {
+        Args: {
+          p_company_id: string
+        }
+        Returns: Json
+      }
+      get_anticipation_details: {
+        Args: {
+          p_anticipation_id: string
+        }
+        Returns: Json
+      }
       get_company_interest_rate: {
         Args: {
           p_company_id: string
@@ -551,6 +563,13 @@ export type Database = {
           buyer_cpf: string
         }
         Returns: Database["public"]["Enums"]["receivable_status"]
+      }
+      get_project_anticipations: {
+        Args: {
+          p_company_id: string
+          p_project_id?: string
+        }
+        Returns: Json
       }
       is_admin: {
         Args: Record<PropertyKey, never>

@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -374,6 +375,17 @@ async function handleCreateAnticipation(supabaseClient, serviceClient, data, cor
     if (receivablesLinkError) {
       console.error('Error linking receivables to anticipation:', receivablesLinkError)
       throw receivablesLinkError
+    }
+
+    // Update the status of the receivables to 'antecipado'
+    const { error: updateReceivablesError } = await serviceClient
+      .from('receivables')
+      .update({ status: 'antecipado' })
+      .in('id', receivableIds)
+
+    if (updateReceivablesError) {
+      console.error('Error updating receivables status:', updateReceivablesError)
+      throw updateReceivablesError
     }
 
     return new Response(
