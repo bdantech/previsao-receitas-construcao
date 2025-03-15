@@ -175,7 +175,7 @@ async function handleGetAllAnticipations(serviceClient, data, corsHeaders) {
       query = query.eq('project_id', projectId)
     }
 
-    if (status) {
+    if (status && status !== 'all') {
       query = query.eq('status', status)
     }
 

@@ -187,7 +187,7 @@ const AdminAnticipationsPage = () => {
                     <SelectValue placeholder="Todos os status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="Solicitada">Solicitada</SelectItem>
                     <SelectItem value="Aprovada">Aprovada</SelectItem>
                     <SelectItem value="Reprovada">Reprovada</SelectItem>
