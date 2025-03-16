@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { formatCNPJ } from "@/lib/formatters";
 
 interface Company {
   id: string;
@@ -168,7 +168,7 @@ const CompanyPage = () => {
               <h1 className="text-2xl font-bold text-gray-800 mb-1">
                 {company.name}
               </h1>
-              <p className="text-gray-500">CNPJ: {company.cnpj}</p>
+              <p className="text-gray-500">CNPJ: {formatCNPJ(company.cnpj)}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
