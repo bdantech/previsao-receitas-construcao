@@ -8,6 +8,7 @@ import { Loader } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { formatCNPJ } from "@/lib/formatters";
 
 interface ProjectDialogProps {
   open: boolean;
@@ -75,6 +76,16 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
       fetchUserCompany();
     }
   }, [open, session, toast]);
+  
+  const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Remove any non-digit characters
+    const onlyDigits = e.target.value.replace(/\D/g, '');
+    
+    // Limit to 14 digits (CNPJ length)
+    if (onlyDigits.length <= 14) {
+      setCnpj(onlyDigits);
+    }
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,8 +203,8 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
               <Label htmlFor="cnpj">CNPJ *</Label>
               <Input 
                 id="cnpj" 
-                value={cnpj} 
-                onChange={(e) => setCnpj(e.target.value)} 
+                value={formatCNPJ(cnpj)}
+                onChange={handleCnpjChange}
                 placeholder="Digite o CNPJ do projeto"
                 required
               />
