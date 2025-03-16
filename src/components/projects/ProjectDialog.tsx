@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -78,10 +77,7 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
   }, [open, session, toast]);
   
   const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Remove any non-digit characters
     const onlyDigits = e.target.value.replace(/\D/g, '');
-    
-    // Limit to 14 digits (CNPJ length)
     if (onlyDigits.length <= 14) {
       setCnpj(onlyDigits);
     }
@@ -143,11 +139,20 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
       
       if (response.error) {
         console.error("Project creation error:", response.error);
-        toast({
-          title: "Erro ao criar projeto",
-          description: response.error.message || "Ocorreu um erro ao criar o projeto.",
-          variant: "destructive"
-        });
+        
+        if (response.error.message && response.error.message.includes("duplicate key") && response.error.message.includes("cnpj")) {
+          toast({
+            title: "CNPJ duplicado",
+            description: "Um Projeto com este CNPJ já existe. Por favor, altere o CNPJ para criar um novo Projeto.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Erro ao criar projeto",
+            description: response.error.message || "Ocorreu um erro ao criar o projeto.",
+            variant: "destructive"
+          });
+        }
         return;
       }
       
