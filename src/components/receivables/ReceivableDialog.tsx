@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { maskCPF } from "@/lib/formatters";
+import { maskCPF, isValidCPF } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
 
 interface ReceivableDialogProps {
@@ -25,6 +25,7 @@ export function ReceivableDialog({
 }: ReceivableDialogProps) {
   const [buyerName, setBuyerName] = useState("");
   const [buyerCpf, setBuyerCpf] = useState("");
+  const [cpfError, setCpfError] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [description, setDescription] = useState("");
@@ -36,6 +37,7 @@ export function ReceivableDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setCpfError(null);
 
     // Check authentication
     if (!session) {
@@ -61,6 +63,17 @@ export function ReceivableDialog({
 
     // Format CPF to numbers only
     const cleanCpf = buyerCpf.replace(/\D/g, "");
+    
+    // Validate CPF
+    if (!isValidCPF(cleanCpf)) {
+      setCpfError("CPF inválido. Verifique se o número está correto.");
+      toast({
+        title: "CPF inválido",
+        description: "O CPF informado não é válido. Verifique se o número está correto.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Parse amount to number
     const amountValue = parseFloat(amount.replace(/\./g, "").replace(",", "."));
@@ -106,6 +119,7 @@ export function ReceivableDialog({
       setDueDate("");
       setDescription("");
       setErrorMessage(null);
+      setCpfError(null);
 
       // Close dialog and refresh data
       onOpenChange(false);
@@ -143,6 +157,8 @@ export function ReceivableDialog({
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setBuyerCpf(maskCPF(value));
+    // Clear CPF error when user starts typing again
+    if (cpfError) setCpfError(null);
   };
 
   // Handle amount input with formatting (Brazilian currency)
@@ -191,7 +207,11 @@ export function ReceivableDialog({
               placeholder="000.000.000-00"
               maxLength={14}
               required
+              className={cpfError ? "border-red-300" : ""}
             />
+            {cpfError && (
+              <div className="text-sm text-red-500 mt-1">{cpfError}</div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="amount">Valor (R$) *</Label>
