@@ -19,6 +19,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { ReceivableDialog } from "@/components/receivables/ReceivableDialog";
 import { ReceivableBulkImportDialog } from "@/components/receivables/ReceivableBulkImportDialog";
 import AnticipationsList from "@/components/anticipations/AnticipationsList";
+import { Switch } from "@/components/ui/switch";
 
 interface Project {
   id: string;
@@ -94,6 +95,7 @@ const ProjectDashboardPage = () => {
   const [editedName, setEditedName] = useState("");
   const [editedInitialDate, setEditedInitialDate] = useState("");
   const [editedEndDate, setEditedEndDate] = useState("");
+  const [editedStatus, setEditedStatus] = useState<'active' | 'inactive'>('active');
   const [isSaving, setIsSaving] = useState(false);
   
   const [contractDialogOpen, setContractDialogOpen] = useState(false);
@@ -129,6 +131,7 @@ const ProjectDashboardPage = () => {
           setEditedName(data.project.name);
           setEditedInitialDate(data.project.initial_date);
           setEditedEndDate(data.project.end_date || "");
+          setEditedStatus(data.project.status);
         }
       } catch (error) {
         console.error('Error fetching project details:', error);
@@ -238,7 +241,8 @@ const ProjectDashboardPage = () => {
           endpoint: `${projectId}`,
           name: editedName,
           initial_date: editedInitialDate,
-          end_date: editedEndDate || null
+          end_date: editedEndDate || null,
+          status: editedStatus
         }
       });
       
@@ -514,6 +518,19 @@ const ProjectDashboardPage = () => {
                   value={editedEndDate}
                   onChange={(e) => setEditedEndDate(e.target.value)}
                 />
+              </div>
+              <div className="flex items-center justify-between space-y-0 pt-2">
+                <Label htmlFor="status">Status do Projeto</Label>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="status"
+                    checked={editedStatus === 'active'}
+                    onCheckedChange={(checked) => setEditedStatus(checked ? 'active' : 'inactive')}
+                  />
+                  <span className="text-sm text-gray-500">
+                    {editedStatus === 'active' ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
               </div>
             </div>
             <DialogFooter>
