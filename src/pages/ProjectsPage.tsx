@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { ProjectsList } from "@/components/projects/ProjectsList";
 import { ProjectDialog } from "@/components/projects/ProjectDialog";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const ProjectsPage = () => {
   const { session, userRole, isLoading } = useAuth();
   const [isLoading2, setIsLoading2] = useState(true);
   const [projects, setProjects] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("active");
   
   useEffect(() => {
     const fetchProjects = async () => {
@@ -27,7 +29,8 @@ const ProjectsPage = () => {
             },
             body: {
               method: 'GET',
-              endpoint: 'projects'
+              endpoint: 'projects',
+              status: statusFilter
             }
           });
           
@@ -49,11 +52,13 @@ const ProjectsPage = () => {
     if (session) {
       fetchProjects();
     }
-  }, [session]);
+  }, [session, statusFilter]);
   
   const handleProjectCreated = (newProject) => {
     console.log('New project created:', newProject);
-    setProjects((prevProjects) => [...prevProjects, newProject]);
+    if (newProject.status === statusFilter || statusFilter === "all") {
+      setProjects((prevProjects) => [...prevProjects, newProject]);
+    }
     setIsDialogOpen(false);
   };
   
@@ -76,14 +81,33 @@ const ProjectsPage = () => {
   return (
     <DashboardLayout>
       <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold">Projetos</h1>
-          <Button 
-            onClick={() => setIsDialogOpen(true)}
-            className="bg-green-500 hover:bg-green-600"
-          >
-            <Plus className="mr-2 h-4 w-4" /> Criar Projeto
-          </Button>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
+            <ToggleGroup 
+              type="single" 
+              value={statusFilter}
+              onValueChange={(value) => value && setStatusFilter(value)}
+              className="border rounded-md bg-white"
+            >
+              <ToggleGroupItem value="active" className="text-sm">
+                Ativos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="inactive" className="text-sm">
+                Inativos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="all" className="text-sm">
+                Todos
+              </ToggleGroupItem>
+            </ToggleGroup>
+            
+            <Button 
+              onClick={() => setIsDialogOpen(true)}
+              className="bg-green-500 hover:bg-green-600 ml-auto"
+            >
+              <Plus className="mr-2 h-4 w-4" /> Criar Projeto
+            </Button>
+          </div>
         </div>
         
         {isLoading2 ? (

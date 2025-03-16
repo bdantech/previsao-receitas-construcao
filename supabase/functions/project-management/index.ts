@@ -80,40 +80,6 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id)
 
-    // Get user company endpoint
-    if (endpoint === 'user-company') {
-      console.log('Fetching user company')
-      const { data: userCompany, error: userCompanyError } = await supabaseClient
-        .from('user_companies')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single()
-
-      if (userCompanyError) {
-        if (userCompanyError.code === 'PGRST116') {
-          // No company found, not an error for this endpoint
-          return new Response(
-            JSON.stringify({ companyId: null }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200 
-            }
-          )
-        }
-        console.error('User company error:', userCompanyError)
-        throw userCompanyError
-      }
-
-      console.log('User company found:', userCompany)
-      return new Response(
-        JSON.stringify({ companyId: userCompany.company_id }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      )
-    }
-
     // Get user profile to determine role
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
@@ -146,7 +112,8 @@ serve(async (req) => {
         query = query.ilike('name', `%${params.name}%`)
       }
       
-      if (params.status) {
+      // Handle status filter
+      if (params.status && params.status !== 'all') {
         query = query.eq('status', params.status)
       }
       
