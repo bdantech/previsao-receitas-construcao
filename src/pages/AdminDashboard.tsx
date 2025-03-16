@@ -7,6 +7,7 @@ import { Loader, ArrowRight } from "lucide-react";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { formatCNPJ } from "@/lib/formatters";
 
 const AdminDashboard = () => {
   const { session, userRole, isLoading } = useAuth();
@@ -132,7 +133,7 @@ const AdminDashboard = () => {
                         {company.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {company.cnpj}
+                        {formatCNPJ(company.cnpj)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {company.website ? (
