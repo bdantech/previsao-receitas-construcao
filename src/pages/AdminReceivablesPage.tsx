@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader } from "lucide-react";
+import { Loader, Search, RefreshCw } from "lucide-react";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import {
   Select,
@@ -23,6 +23,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/lib/formatters";
 
 interface Receivable {
   id: string;
@@ -33,6 +36,11 @@ interface Receivable {
   status: string;
   project_name: string;
   company_name: string;
+}
+
+interface Summary {
+  totalAmount: number;
+  count: number;
 }
 
 const statusLabels = {
@@ -56,68 +64,86 @@ const AdminReceivablesPage = () => {
   const [receivables, setReceivables] = useState<Receivable[]>([]);
   const [loadingReceivables, setLoadingReceivables] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [companySearch, setCompanySearch] = useState<string>("");
+  const [summary, setSummary] = useState<Summary>({ totalAmount: 0, count: 0 });
 
-  useEffect(() => {
-    const fetchReceivables = async () => {
-      if (session && userRole === 'admin') {
-        try {
-          setLoadingReceivables(true);
-          
-          // Prepare filters
-          const filters: Record<string, any> = {};
-          if (selectedStatus) {
-            filters.status = selectedStatus;
-          }
-          
-          const { data, error } = await supabase.functions.invoke('admin-receivables', {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`
-            },
-            body: {
-              method: 'GET',
-              filters
-            }
-          });
-          
-          if (error) {
-            console.error("Function invocation error:", error);
-            toast({
-              title: "Erro",
-              description: "Falha ao carregar recebíveis. Tente novamente.",
-              variant: "destructive"
-            });
-            throw error;
-          }
-          
-          console.log("Receivables data received:", data);
-          if (data && data.receivables) {
-            setReceivables(data.receivables);
-          } else {
-            console.error("Unexpected response format:", data);
-            toast({
-              title: "Erro",
-              description: "Formato de dados inválido recebido do servidor.",
-              variant: "destructive"
-            });
-          }
-        } catch (error) {
-          console.error("Error fetching receivables:", error);
-        } finally {
-          setLoadingReceivables(false);
+  const fetchReceivables = async () => {
+    if (session && userRole === 'admin') {
+      try {
+        setLoadingReceivables(true);
+        
+        // Prepare filters
+        const filters: Record<string, any> = {};
+        if (selectedStatus) {
+          filters.status = selectedStatus;
         }
-      } else if (!isLoading) {
+        if (companySearch.trim()) {
+          filters.companyName = companySearch.trim();
+        }
+        
+        const { data, error } = await supabase.functions.invoke('admin-receivables', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: {
+            method: 'GET',
+            filters
+          }
+        });
+        
+        if (error) {
+          console.error("Function invocation error:", error);
+          toast({
+            title: "Erro",
+            description: "Falha ao carregar recebíveis. Tente novamente.",
+            variant: "destructive"
+          });
+          throw error;
+        }
+        
+        console.log("Receivables data received:", data);
+        if (data && data.receivables) {
+          setReceivables(data.receivables);
+          
+          // Set summary data
+          if (data.summary) {
+            setSummary(data.summary);
+          } else {
+            setSummary({ 
+              totalAmount: data.receivables.reduce((sum: number, item: Receivable) => sum + Number(item.amount), 0),
+              count: data.receivables.length
+            });
+          }
+        } else {
+          console.error("Unexpected response format:", data);
+          toast({
+            title: "Erro",
+            description: "Formato de dados inválido recebido do servidor.",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching receivables:", error);
+      } finally {
         setLoadingReceivables(false);
       }
-    };
+    } else if (!isLoading) {
+      setLoadingReceivables(false);
+    }
+  };
 
+  useEffect(() => {
     fetchReceivables();
-  }, [session, userRole, isLoading, selectedStatus]);
+  }, [session, userRole, isLoading]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
+  const handleSearch = () => {
+    fetchReceivables();
+  };
+
+  const handleClearFilters = () => {
+    setSelectedStatus(null);
+    setCompanySearch("");
+    fetchReceivables();
   };
 
   const formatCpf = (cpf: string) => {
@@ -153,24 +179,86 @@ const AdminReceivablesPage = () => {
     <AdminDashboardLayout>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Recebíveis</h2>
-        <div className="w-64">
-          <Select
-            value={selectedStatus || "all"}
-            onValueChange={(value) => setSelectedStatus(value === "all" ? null : value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Filtrar por status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os status</SelectItem>
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="flex items-center gap-2"
+          onClick={fetchReceivables}
+        >
+          <RefreshCw className="h-4 w-4" />
+          Atualizar
+        </Button>
       </div>
+      
+      {/* Filters */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Filtros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Status</label>
+              <Select
+                value={selectedStatus || "all"}
+                onValueChange={(value) => setSelectedStatus(value === "all" ? null : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  {Object.entries(statusLabels).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Empresa</label>
+              <div className="flex gap-2">
+                <Input 
+                  placeholder="Buscar por empresa" 
+                  value={companySearch}
+                  onChange={(e) => setCompanySearch(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={handleClearFilters}>
+              Limpar Filtros
+            </Button>
+            <Button onClick={handleSearch} className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Buscar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Summary Card */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Resumo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-500 mb-1">Total de Recebíveis</div>
+              <div className="text-2xl font-bold">{summary.count}</div>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-500 mb-1">Valor Total</div>
+              <div className="text-2xl font-bold">{formatCurrency(summary.totalAmount)}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
+      {/* Receivables List */}
       <Card>
         <CardContent className="p-0">
           {loadingReceivables ? (

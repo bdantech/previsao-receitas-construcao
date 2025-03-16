@@ -166,6 +166,72 @@ serve(async (req) => {
       if (filters.toDate) {
         query = query.lte('due_date', filters.toDate)
       }
+      
+      // Handle company name filter
+      if (filters.companyName) {
+        // First find companies matching the name
+        const { data: companies, error: companiesError } = await serviceClient
+          .from('companies')
+          .select('id')
+          .ilike('name', `%${filters.companyName}%`)
+        
+        if (companiesError) {
+          console.error('Companies lookup error:', companiesError)
+          throw companiesError
+        }
+        
+        if (companies && companies.length > 0) {
+          const companyIds = companies.map(c => c.id)
+          
+          // Then find projects for these companies
+          const { data: projects, error: projectsError } = await serviceClient
+            .from('projects')
+            .select('id')
+            .in('company_id', companyIds)
+          
+          if (projectsError) {
+            console.error('Projects lookup error:', projectsError)
+            throw projectsError
+          }
+          
+          if (projects && projects.length > 0) {
+            const projectIds = projects.map(p => p.id)
+            query = query.in('project_id', projectIds)
+          } else {
+            // No matching projects, return empty result
+            return new Response(
+              JSON.stringify({ 
+                receivables: [],
+                count: 0,
+                summary: {
+                  totalAmount: 0,
+                  count: 0
+                }
+              }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200 
+              }
+            )
+          }
+        } else {
+          // No matching companies, return empty result
+          return new Response(
+            JSON.stringify({ 
+              receivables: [],
+              count: 0,
+              summary: {
+                totalAmount: 0,
+                count: 0
+              }
+            }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200 
+            }
+          )
+        }
+      }
     }
     
     // Execute query and handle result
@@ -184,10 +250,18 @@ serve(async (req) => {
       project_name: item.projects?.name || 'Unknown Project'
     }))
 
+    // Calculate summary data
+    const totalAmount = processedReceivables.reduce((sum, item) => sum + Number(item.amount), 0)
+    const count = processedReceivables.length
+
     return new Response(
       JSON.stringify({ 
         receivables: processedReceivables,
-        count: processedReceivables.length
+        count: processedReceivables.length,
+        summary: {
+          totalAmount,
+          count
+        }
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
