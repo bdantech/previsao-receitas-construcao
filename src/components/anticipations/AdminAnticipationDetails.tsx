@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatCurrency, formatCNPJ, formatCpf } from "@/lib/formatters";
+import { formatCurrency, formatCNPJ, formatCPF } from "@/lib/formatters";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 
 interface Company {
@@ -77,7 +76,6 @@ export const AdminAnticipationDetails = ({
   const [notes, setNotes] = useState<string>("");
   const [isReceivablesOpen, setIsReceivablesOpen] = useState(false);
   
-  // Fetch anticipation details
   useEffect(() => {
     const fetchDetails = async () => {
       if (!session?.access_token || !anticipationId) return;
@@ -172,7 +170,6 @@ export const AdminAnticipationDetails = ({
     }
   };
   
-  // Determine available status transitions
   const getAvailableStatusOptions = (currentStatus: string) => {
     switch (currentStatus) {
       case 'Solicitada':
@@ -206,7 +203,6 @@ export const AdminAnticipationDetails = ({
           </div>
         ) : anticipation ? (
           <div className="space-y-6">
-            {/* Basic Info with improved layout */}
             <div className="grid grid-cols-2 gap-6">
               <div className="col-span-1 space-y-4">
                 <div className="space-y-1">
@@ -254,7 +250,6 @@ export const AdminAnticipationDetails = ({
             
             <Separator />
             
-            {/* Taxas e Tarifas */}
             <div>
               <h3 className="text-base font-medium mb-3">Taxas e Tarifas</h3>
               
@@ -288,7 +283,6 @@ export const AdminAnticipationDetails = ({
             
             <Separator />
             
-            {/* Collapsible Recebíveis */}
             <Collapsible
               open={isReceivablesOpen}
               onOpenChange={setIsReceivablesOpen}
@@ -330,7 +324,7 @@ export const AdminAnticipationDetails = ({
                         receivables.map((receivable) => (
                           <tr key={receivable.id} className="border-b hover:bg-gray-50">
                             <td className="py-2 px-3">{receivable.buyer_name}</td>
-                            <td className="py-2 px-3">{formatCpf(receivable.buyer_cpf)}</td>
+                            <td className="py-2 px-3">{formatCPF(receivable.buyer_cpf)}</td>
                             <td className="py-2 px-3 text-right">{formatCurrency(receivable.amount)}</td>
                             <td className="py-2 px-3">
                               {format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })}
@@ -353,7 +347,6 @@ export const AdminAnticipationDetails = ({
             
             <Separator />
             
-            {/* Status Update Form */}
             <div>
               <h3 className="text-base font-medium mb-3">Atualizar Status</h3>
               
