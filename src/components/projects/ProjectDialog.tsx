@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -124,7 +125,8 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
           cnpj,
           company_id: companyId,
           initial_date: initialDate,
-          end_date: endDate || null
+          end_date: endDate || null,
+          status: 'active' // Always set status to active when creating a new project
         }
       });
       

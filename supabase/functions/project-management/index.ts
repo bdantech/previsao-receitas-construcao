@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -153,7 +154,7 @@ serve(async (req) => {
     if (endpoint === 'projects' && method === 'POST') {
       console.log('Creating project with data:', params)
       
-      const { name, cnpj, company_id, initial_date, end_date } = params
+      const { name, cnpj, company_id, initial_date, end_date, status } = params
       
       if (!name || !cnpj || !company_id || !initial_date) {
         return new Response(
@@ -186,6 +187,9 @@ serve(async (req) => {
         }
       }
       
+      // Set default status to active if not provided
+      const projectStatus = status || 'active'
+      
       const { data: project, error: projectError } = await supabaseClient
         .from('projects')
         .insert({
@@ -193,7 +197,8 @@ serve(async (req) => {
           cnpj,
           company_id,
           initial_date,
-          end_date: end_date || null
+          end_date: end_date || null,
+          status: projectStatus
         })
         .select()
         .single()
@@ -324,6 +329,39 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ project }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      )
+    }
+    
+    // Get user's company endpoint
+    if (endpoint === 'user-company' && method === 'GET') {
+      console.log('Getting user company for user ID:', user.id)
+      
+      const { data: userCompany, error: userCompanyError } = await supabaseClient
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single()
+
+      if (userCompanyError) {
+        console.error('User company error:', userCompanyError)
+        if (userCompanyError.code === 'PGRST116') {
+          return new Response(
+            JSON.stringify({ error: 'User not associated with any company' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 404 
+            }
+          )
+        }
+        throw userCompanyError
+      }
+
+      return new Response(
+        JSON.stringify({ companyId: userCompany.company_id }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
