@@ -16,6 +16,12 @@ import { formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Anticipation {
   id: string;
@@ -42,6 +48,56 @@ const AnticipationsList = ({ projectId }: AnticipationsListProps) => {
   
   const [isLoading, setIsLoading] = useState(true);
   const [anticipations, setAnticipations] = useState<Anticipation[]>([]);
+  const [hasCreditAnalysis, setHasCreditAnalysis] = useState(false);
+  const [isCheckingCredit, setIsCheckingCredit] = useState(true);
+  
+  // Check if company has active credit analysis
+  useEffect(() => {
+    const checkCreditAnalysis = async () => {
+      if (!session?.access_token || !projectId) return;
+      
+      try {
+        setIsCheckingCredit(true);
+        
+        // Get project to get company ID
+        const { data: projectData } = await supabase.functions.invoke('project-management', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: {
+            method: 'GET',
+            endpoint: `projects/${projectId}`
+          }
+        });
+        
+        if (!projectData || !projectData.project) {
+          throw new Error('Project not found');
+        }
+        
+        const companyId = projectData.project.company_id;
+        
+        // Check for active credit analysis
+        const { data: creditData, error: creditError } = await supabase.rpc('get_active_credit_analysis_for_company', {
+          p_company_id: companyId
+        });
+        
+        if (creditError) {
+          console.error('Error checking credit analysis:', creditError);
+          throw creditError;
+        }
+        
+        // If credit data exists, company has active credit analysis
+        setHasCreditAnalysis(creditData !== null && Object.keys(creditData).length > 0);
+      } catch (error) {
+        console.error('Error checking credit analysis:', error);
+        setHasCreditAnalysis(false);
+      } finally {
+        setIsCheckingCredit(false);
+      }
+    };
+    
+    checkCreditAnalysis();
+  }, [session, projectId]);
   
   // Fetch anticipations
   useEffect(() => {
@@ -127,6 +183,50 @@ const AnticipationsList = ({ projectId }: AnticipationsListProps) => {
     }
   };
   
+  const renderCreateAnticipationButton = () => {
+    if (isCheckingCredit) {
+      return (
+        <Button disabled className="flex items-center gap-2">
+          <Loader className="h-4 w-4 animate-spin" />
+          Verificando análise de crédito...
+        </Button>
+      );
+    }
+    
+    if (!hasCreditAnalysis) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button 
+                  disabled
+                  className="flex items-center gap-2 opacity-70 cursor-not-allowed"
+                >
+                  <Plus className="h-4 w-4" />
+                  Solicitar Antecipação
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p>Sua empresa não possui uma análise de crédito ativa no momento.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+    
+    return (
+      <Button 
+        onClick={handleCreateAnticipation}
+        className="flex items-center gap-2"
+      >
+        <Plus className="h-4 w-4" />
+        Solicitar Antecipação
+      </Button>
+    );
+  };
+  
   if (isLoading) {
     return (
       <div className="flex justify-center py-10">
@@ -139,10 +239,7 @@ const AnticipationsList = ({ projectId }: AnticipationsListProps) => {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Antecipações</CardTitle>
-        <Button onClick={handleCreateAnticipation} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Solicitar Antecipação
-        </Button>
+        {renderCreateAnticipationButton()}
       </CardHeader>
       <CardContent>
         {anticipations.length === 0 ? (
@@ -152,14 +249,36 @@ const AnticipationsList = ({ projectId }: AnticipationsListProps) => {
             <p className="text-gray-500 mb-6">
               Você ainda não solicitou nenhuma antecipação para este projeto.
             </p>
-            <Button 
-              variant="outline" 
-              onClick={handleCreateAnticipation}
-              className="flex items-center gap-2 mx-auto"
-            >
-              <Plus className="h-4 w-4" />
-              Solicitar Primeira Antecipação
-            </Button>
+            {hasCreditAnalysis ? (
+              <Button 
+                variant="outline" 
+                onClick={handleCreateAnticipation}
+                className="flex items-center gap-2 mx-auto"
+              >
+                <Plus className="h-4 w-4" />
+                Solicitar Primeira Antecipação
+              </Button>
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button 
+                        variant="outline" 
+                        disabled
+                        className="flex items-center gap-2 mx-auto opacity-70 cursor-not-allowed"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Solicitar Primeira Antecipação
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Sua empresa não possui uma análise de crédito ativa no momento.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
