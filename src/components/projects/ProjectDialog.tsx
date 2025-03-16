@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,6 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
   const [endDate, setEndDate] = useState("");
   const [fetchingCompany, setFetchingCompany] = useState(false);
   
-  // Fetch the user's company ID when the dialog opens
   useEffect(() => {
     const fetchUserCompany = async () => {
       if (!session?.access_token) return;
@@ -34,7 +32,6 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
       try {
         setFetchingCompany(true);
         
-        // Use the functions API with authentication token
         const { data, error } = await supabase.functions.invoke('project-management', {
           headers: {
             Authorization: `Bearer ${session.access_token}`
@@ -81,7 +78,6 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Debug output to check the form values
     console.log("Form values:", {
       name,
       cnpj,
@@ -90,7 +86,6 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
     });
     
     if (!name || !cnpj || !initialDate || !companyId) {
-      // Log which fields are missing
       console.log("Missing fields:", {
         name: !name,
         cnpj: !cnpj,
@@ -148,13 +143,11 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
         description: "Projeto criado com sucesso!",
       });
       
-      // Reset form
       setName("");
       setCnpj("");
       setInitialDate("");
       setEndDate("");
       
-      // Pass the new project to the parent component
       if (response.data && response.data.project) {
         onProjectCreated(response.data.project);
       }
@@ -236,7 +229,10 @@ export const ProjectDialog = ({ open, onOpenChange, onProjectCreated }: ProjectD
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading || fetchingCompany || !companyId}>
+            <Button 
+              type="submit" 
+              disabled={isLoading || fetchingCompany}
+            >
               {isLoading ? (
                 <>
                   <Loader className="mr-2 h-4 w-4 animate-spin" />
