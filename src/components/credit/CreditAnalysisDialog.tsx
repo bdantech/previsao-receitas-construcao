@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -112,24 +113,38 @@ export function CreditAnalysisDialog({
   };
 
   // Format currency input
-  const formatCurrency = (value: string) => {
-    if (!value) return "";
-    // Remove non-numeric characters
-    const numericValue = value.replace(/[^0-9]/g, "");
-    // Convert to number and format
-    const number = parseInt(numericValue, 10) / 100;
-    return number.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
+  const formatCurrency = (value: number | string) => {
+    if (value === undefined || value === null || value === "") return "R$ 0,00";
+    
+    // Convert to number
+    const numericValue = typeof value === 'string' 
+      ? parseFloat(value.replace(/[^\d.,]/g, '').replace(',', '.')) 
+      : value;
+    
+    // Format as currency
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(numericValue);
+  };
+
+  // Parse currency input
+  const parseCurrency = (value: string) => {
+    // Remove all non-numeric characters except for the last dot or comma
+    return value.replace(/[^\d]/g, '');
   };
 
   // Format percentage input
-  const formatPercentage = (value: string) => {
-    if (!value) return "";
-    // Remove non-numeric characters
-    const numericValue = value.replace(/[^0-9.]/g, "");
-    return `${numericValue}%`;
+  const formatPercentage = (value: number | string) => {
+    if (value === undefined || value === null || value === "") return "0%";
+    
+    return `${value}%`;
+  };
+
+  // Parse percentage input
+  const parsePercentage = (value: string) => {
+    // Remove all non-numeric characters except dots
+    return value.replace(/[^\d.]/g, '');
   };
 
   return (
@@ -158,10 +173,10 @@ export function CreditAnalysisDialog({
                         {...field} 
                         placeholder="R$ 0,00"
                         onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9]/g, "");
-                          field.onChange(parseFloat(value) / 100 || 0);
+                          const rawValue = parseCurrency(e.target.value);
+                          field.onChange(rawValue ? parseInt(rawValue, 10) / 100 : 0);
                         }}
-                        value={formatCurrency(field.value.toString())}
+                        value={formatCurrency(field.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -180,10 +195,10 @@ export function CreditAnalysisDialog({
                         {...field} 
                         placeholder="R$ 0,00"
                         onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9]/g, "");
-                          field.onChange(parseFloat(value) / 100 || 0);
+                          const rawValue = parseCurrency(e.target.value);
+                          field.onChange(rawValue ? parseInt(rawValue, 10) / 100 : 0);
                         }}
-                        value={formatCurrency(field.value.toString())}
+                        value={formatCurrency(field.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -202,10 +217,10 @@ export function CreditAnalysisDialog({
                         {...field} 
                         placeholder="0%"
                         onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9.]/g, "");
-                          field.onChange(parseFloat(value) || 0);
+                          const rawValue = parsePercentage(e.target.value);
+                          field.onChange(rawValue ? parseFloat(rawValue) : 0);
                         }}
-                        value={`${field.value}%`}
+                        value={formatPercentage(field.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -224,10 +239,10 @@ export function CreditAnalysisDialog({
                         {...field} 
                         placeholder="0%"
                         onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9.]/g, "");
-                          field.onChange(parseFloat(value) || 0);
+                          const rawValue = parsePercentage(e.target.value);
+                          field.onChange(rawValue ? parseFloat(rawValue) : 0);
                         }}
-                        value={`${field.value}%`}
+                        value={formatPercentage(field.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -246,10 +261,10 @@ export function CreditAnalysisDialog({
                         {...field} 
                         placeholder="0%"
                         onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9.]/g, "");
-                          field.onChange(parseFloat(value) || 0);
+                          const rawValue = parsePercentage(e.target.value);
+                          field.onChange(rawValue ? parseFloat(rawValue) : 0);
                         }}
-                        value={`${field.value}%`}
+                        value={formatPercentage(field.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -268,10 +283,10 @@ export function CreditAnalysisDialog({
                         {...field} 
                         placeholder="0%"
                         onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9.]/g, "");
-                          field.onChange(parseFloat(value) || 0);
+                          const rawValue = parsePercentage(e.target.value);
+                          field.onChange(rawValue ? parseFloat(rawValue) : 0);
                         }}
-                        value={`${field.value}%`}
+                        value={formatPercentage(field.value)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -290,10 +305,10 @@ export function CreditAnalysisDialog({
                         {...field} 
                         placeholder="R$ 0,00"
                         onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9]/g, "");
-                          field.onChange(parseFloat(value) / 100 || 0);
+                          const rawValue = parseCurrency(e.target.value);
+                          field.onChange(rawValue ? parseInt(rawValue, 10) / 100 : 0);
                         }}
-                        value={formatCurrency(field.value.toString())}
+                        value={formatCurrency(field.value)}
                       />
                     </FormControl>
                     <FormMessage />
