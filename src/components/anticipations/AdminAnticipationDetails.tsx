@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader, CheckCircle, XCircle } from "lucide-react";
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { formatCurrency } from "@/lib/formatters";
+import { formatCNPJ, formatCurrency } from "@/lib/formatters";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 interface Company {
@@ -53,6 +53,11 @@ interface Anticipation {
   updated_at: string;
   companies: Company;
   projects: Project;
+  taxa_juros_180?: number;
+  taxa_juros_360?: number;
+  taxa_juros_720?: number;
+  taxa_juros_longo_prazo?: number;
+  tarifa_por_recebivel?: number;
 }
 
 interface AdminAnticipationDetailsProps {
@@ -242,6 +247,7 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
           </Button>
         </div>
         
+        {/* Error message section */}
         {errorMessage && (
           <Alert variant="destructive" className="mb-4">
             <AlertTitle>Erro ao aprovar antecipação</AlertTitle>
@@ -263,7 +269,9 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
             <p className="text-gray-500">
               Data de Criação: {format(new Date(anticipation.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })} ({formatDistanceToNow(new Date(anticipation.created_at), { locale: ptBR, addSuffix: true })})
             </p>
-            <p className="text-gray-500">Empresa: {anticipation.companies?.name} ({anticipation.companies?.cnpj})</p>
+            <p className="text-gray-500">
+              Empresa: {anticipation.companies?.name} ({anticipation.companies?.cnpj ? formatCNPJ(anticipation.companies.cnpj) : ''})
+            </p>
             <p className="text-gray-500">Projeto: {anticipation.projects?.name}</p>
             <p className="text-gray-500">Status: {getStatusBadge(anticipation.status)}</p>
           </div>
@@ -272,6 +280,33 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
             <p className="text-right text-lg font-semibold">Valor Total: {formatCurrency(anticipation.valor_total)}</p>
             <p className="text-right text-lg font-semibold">Valor Líquido: {formatCurrency(anticipation.valor_liquido)}</p>
             <p className="text-right text-gray-500">Quantidade de Recebíveis: {anticipation.quantidade_recebiveis}</p>
+          </div>
+        </div>
+        
+        {/* New section for interest rates and fees */}
+        <div className="mt-4 bg-gray-50 p-4 rounded-md">
+          <h3 className="text-md font-semibold mb-2">Taxas e Tarifas</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div>
+              <p className="text-sm text-gray-500">Taxa até 180 dias:</p>
+              <p className="font-medium">{anticipation.taxa_juros_180 !== undefined ? `${anticipation.taxa_juros_180}% a.m.` : 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Taxa até 360 dias:</p>
+              <p className="font-medium">{anticipation.taxa_juros_360 !== undefined ? `${anticipation.taxa_juros_360}% a.m.` : 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Taxa até 720 dias:</p>
+              <p className="font-medium">{anticipation.taxa_juros_720 !== undefined ? `${anticipation.taxa_juros_720}% a.m.` : 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Taxa longo prazo:</p>
+              <p className="font-medium">{anticipation.taxa_juros_longo_prazo !== undefined ? `${anticipation.taxa_juros_longo_prazo}% a.m.` : 'N/A'}</p>
+            </div>
+          </div>
+          <div className="mt-2">
+            <p className="text-sm text-gray-500">Tarifa por recebível:</p>
+            <p className="font-medium">{anticipation.tarifa_por_recebivel !== undefined ? formatCurrency(anticipation.tarifa_por_recebivel) : 'N/A'}</p>
           </div>
         </div>
         
