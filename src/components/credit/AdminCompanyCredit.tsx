@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle, Edit, AlertCircle } from "lucide-react";
 import { CreditAnalysisDialog } from "./CreditAnalysisDialog";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CreditAnalysis {
   id: string;
@@ -36,6 +38,9 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
   const [selectedAnalysis, setSelectedAnalysis] = useState<CreditAnalysis | null>(null);
   const { getAuthHeader } = useAuth();
   const { toast } = useToast();
+  
+  // Check if there's an active credit analysis
+  const hasActiveAnalysis = creditAnalyses.some(analysis => analysis.status === 'Ativa');
 
   useEffect(() => {
     fetchCreditAnalyses();
@@ -177,10 +182,26 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Análise de Crédito</h2>
-        <Button onClick={handleCreateAnalysis}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Nova Análise de Crédito
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Button 
+                  onClick={handleCreateAnalysis} 
+                  disabled={hasActiveAnalysis}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Nova Análise de Crédito
+                </Button>
+              </div>
+            </TooltipTrigger>
+            {hasActiveAnalysis && (
+              <TooltipContent>
+                <p>Para criar uma nova Análise de Crédito, por favor, Inative a Análise de Crédito ativa</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {loading ? (
