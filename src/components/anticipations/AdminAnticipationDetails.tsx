@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Loader, X, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { formatCurrency, formatCNPJ, formatCPF } from "@/lib/formatters";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Loader, CheckCircle, XCircle } from "lucide-react";
+import { format, formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { formatCurrency } from "@/lib/formatters";
 
 interface Company {
   name: string;
@@ -21,26 +27,6 @@ interface Company {
 
 interface Project {
   name: string;
-  cnpj: string;
-}
-
-interface Anticipation {
-  id: string;
-  company_id: string;
-  project_id: string;
-  valor_total: number;
-  valor_liquido: number;
-  status: string;
-  quantidade_recebiveis: number;
-  created_at: string;
-  updated_at: string;
-  taxa_juros_180: number;
-  taxa_juros_360: number;
-  taxa_juros_720: number;
-  taxa_juros_longo_prazo: number;
-  tarifa_por_recebivel: number;
-  companies: Company;
-  projects: Project;
 }
 
 interface Receivable {
@@ -53,105 +39,125 @@ interface Receivable {
   status: string;
 }
 
+interface Anticipation {
+  id: string;
+  company_id: string;
+  project_id: string;
+  valor_total: number;
+  valor_liquido: number;
+  status: string;
+  quantidade_recebiveis: number;
+  created_at: string;
+  updated_at: string;
+  companies: Company;
+  projects: Project;
+}
+
 interface AdminAnticipationDetailsProps {
   anticipationId: string;
   onClose: () => void;
-  onStatusUpdate: () => void;
+  onStatusUpdate?: () => void;
 }
 
-export const AdminAnticipationDetails = ({ 
-  anticipationId, 
-  onClose, 
-  onStatusUpdate 
-}: AdminAnticipationDetailsProps) => {
+export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> = ({ anticipationId, onClose, onStatusUpdate }) => {
   const { session } = useAuth();
   const { toast } = useToast();
   
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [anticipation, setAnticipation] = useState<Anticipation | null>(null);
   const [receivables, setReceivables] = useState<Receivable[]>([]);
+  const [open, setOpen] = useState(false);
   
-  const [newStatus, setNewStatus] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
-  const [isReceivablesOpen, setIsReceivablesOpen] = useState(false);
-  
-  useEffect(() => {
-    const fetchDetails = async () => {
-      if (!session?.access_token || !anticipationId) return;
-      
-      try {
-        setIsLoading(true);
-        
-        const { data, error } = await supabase.functions.invoke('admin-anticipations', {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          },
-          body: {
-            action: 'getAnticipationDetails',
-            anticipationId
-          }
-        });
-        
-        if (error) throw error;
-        
-        if (data) {
-          setAnticipation(data.anticipation);
-          setReceivables(data.receivables || []);
-          setNewStatus(data.anticipation.status);
-        }
-      } catch (error) {
-        console.error('Error fetching anticipation details:', error);
-        toast({
-          title: "Erro ao carregar detalhes",
-          description: "Não foi possível obter os detalhes da antecipação.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchDetails();
-  }, [session, anticipationId, toast]);
-  
-  const handleUpdateStatus = async () => {
-    if (!session?.access_token || !anticipation || newStatus === anticipation.status) return;
+  const fetchAnticipationDetails = async () => {
+    if (!session?.access_token) return;
     
     try {
-      setIsSaving(true);
+      setIsLoading(true);
       
       const { data, error } = await supabase.functions.invoke('admin-anticipations', {
         headers: {
           Authorization: `Bearer ${session.access_token}`
         },
         body: {
-          action: 'updateAnticipationStatus',
-          anticipationId,
-          newStatus,
-          notes
+          action: 'getAnticipationDetails',
+          anticipationId: anticipationId
         }
       });
       
       if (error) throw error;
       
-      toast({
-        title: "Status atualizado",
-        description: `A antecipação foi ${newStatus.toLowerCase()} com sucesso.`,
-        variant: "default"
-      });
-      
-      onStatusUpdate();
-      onClose();
+      setAnticipation(data.anticipation);
+      setReceivables(data.receivables);
     } catch (error) {
-      console.error('Error updating anticipation status:', error);
+      console.error('Error fetching anticipation details:', error);
       toast({
-        title: "Erro ao atualizar status",
-        description: "Não foi possível atualizar o status da antecipação.",
+        title: "Erro ao carregar detalhes",
+        description: "Não foi possível obter os detalhes da antecipação.",
         variant: "destructive"
       });
     } finally {
-      setIsSaving(false);
+      setIsLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    fetchAnticipationDetails();
+  }, [session, anticipationId]);
+  
+  const handleStatusChange = async (newStatus: string) => {
+    setIsUpdating(true);
+    
+    try {
+      if (!session?.access_token) {
+        throw new Error("No authentication token available");
+      }
+      
+      const { data, error } = await supabase.functions.invoke("admin-anticipations", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          action: "updateAnticipationStatus",
+          anticipationId: anticipationId,
+          newStatus: newStatus
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data.error) {
+        // Handle credit limit or other errors returned from the function
+        toast({
+          title: "Erro ao atualizar status",
+          description: data.error,
+          variant: "destructive"
+        });
+        setIsUpdating(false);
+        return;
+      }
+      
+      toast({
+        title: "Status atualizado",
+        description: `Antecipação agora está ${newStatus}`,
+        variant: "default"
+      });
+      
+      // Reload anticipation details
+      fetchAnticipationDetails();
+      
+      if (onStatusUpdate) {
+        onStatusUpdate();
+      }
+    } catch (error) {
+      console.error("Error updating anticipation status:", error);
+      toast({
+        title: "Erro ao atualizar status",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpdating(false);
     }
   };
   
@@ -170,240 +176,137 @@ export const AdminAnticipationDetails = ({
     }
   };
   
-  const getAvailableStatusOptions = (currentStatus: string) => {
-    switch (currentStatus) {
-      case 'Solicitada':
-        return ['Solicitada', 'Aprovada', 'Reprovada'];
-      case 'Aprovada':
-        return ['Aprovada', 'Concluída', 'Reprovada'];
-      case 'Reprovada':
-        return ['Reprovada'];
-      case 'Concluída':
-        return ['Concluída'];
-      default:
-        return [currentStatus];
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-gray-500 bg-opacity-50 z-50 flex items-center justify-center">
+        <Loader className="h-8 w-8 animate-spin text-gray-500" />
+      </div>
+    );
+  }
+  
+  if (!anticipation) {
+    return (
+      <div className="fixed inset-0 bg-gray-500 bg-opacity-50 z-50 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-md">
+          <p className="text-lg font-semibold">Antecipação não encontrada.</p>
+          <Button variant="outline" className="mt-4" onClick={onClose}>
+            Fechar
+          </Button>
+        </div>
+      </div>
+    );
+  }
   
   return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Detalhes da Antecipação</span>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogTitle>
-        </DialogHeader>
+    <div className="fixed inset-0 bg-gray-500 bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white p-6 rounded-md max-w-3xl w-full overflow-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold">Detalhes da Antecipação</h2>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Fechar
+          </Button>
+        </div>
         
-        {isLoading ? (
-          <div className="flex justify-center py-10">
-            <Loader className="h-8 w-8 animate-spin text-gray-500" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="text-gray-500">
+              Data de Criação: {format(new Date(anticipation.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })} ({formatDistanceToNow(new Date(anticipation.created_at), { locale: ptBR, addSuffix: true })})
+            </p>
+            <p className="text-gray-500">Empresa: {anticipation.companies?.name} ({anticipation.companies?.cnpj})</p>
+            <p className="text-gray-500">Projeto: {anticipation.projects?.name}</p>
+            <p className="text-gray-500">Status: {getStatusBadge(anticipation.status)}</p>
           </div>
-        ) : anticipation ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
-              <div className="col-span-1 space-y-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-gray-500">Empresa</h3>
-                  <p className="font-medium">{anticipation.companies.name}</p>
-                  <p className="text-sm text-gray-500">CNPJ: {formatCNPJ(anticipation.companies.cnpj)}</p>
-                </div>
-                
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-gray-500">Data de Solicitação</h3>
-                  <p className="font-medium">{format(new Date(anticipation.created_at), 'dd/MM/yyyy', { locale: ptBR })}</p>
-                </div>
-                
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-gray-500">Valor Total</h3>
-                  <p className="text-lg font-semibold">{formatCurrency(anticipation.valor_total)}</p>
-                </div>
-              </div>
-              
-              <div className="col-span-1 space-y-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-gray-500">Projeto</h3>
-                  <p className="font-medium">{anticipation.projects.name}</p>
-                  <p className="text-sm text-gray-500">CNPJ: {formatCNPJ(anticipation.projects.cnpj)}</p>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-medium text-gray-500">Status</h3>
-                    <div>{getStatusBadge(anticipation.status)}</div>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-medium text-gray-500">Recebíveis</h3>
-                    <p className="font-medium">{anticipation.quantidade_recebiveis}</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-gray-500">Valor Líquido</h3>
-                  <p className="text-lg font-semibold">{formatCurrency(anticipation.valor_liquido)}</p>
-                </div>
-              </div>
+          
+          <div>
+            <p className="text-right text-lg font-semibold">Valor Total: {formatCurrency(anticipation.valor_total)}</p>
+            <p className="text-right text-lg font-semibold">Valor Líquido: {formatCurrency(anticipation.valor_liquido)}</p>
+            <p className="text-right text-gray-500">Quantidade de Recebíveis: {anticipation.quantidade_recebiveis}</p>
+          </div>
+        </div>
+        
+        <div className="mt-6">
+          <h3 className="text-xl font-semibold mb-2">Recebíveis Associados</h3>
+          {receivables.length === 0 ? (
+            <p className="text-gray-500">Nenhum recebível associado a esta antecipação.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-3 font-medium">Data de Vencimento</th>
+                    <th className="text-left py-2 px-3 font-medium">Comprador</th>
+                    <th className="text-right py-2 px-3 font-medium">Valor</th>
+                    <th className="text-left py-2 px-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receivables.map((receivable) => (
+                    <tr key={receivable.id} className="border-b hover:bg-gray-50">
+                      <td className="py-2 px-3">
+                        {format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                      </td>
+                      <td className="py-2 px-3">{receivable.buyer_name}</td>
+                      <td className="py-2 px-3 text-right">{formatCurrency(receivable.amount)}</td>
+                      <td className="py-2 px-3">{receivable.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            
-            <Separator />
-            
-            <div>
-              <h3 className="text-base font-medium mb-3">Taxas e Tarifas</h3>
-              
-              <div className="grid grid-cols-5 gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Taxa até 180 dias</h4>
-                  <p className="mt-1">{anticipation.taxa_juros_180}%</p>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Taxa até 360 dias</h4>
-                  <p className="mt-1">{anticipation.taxa_juros_360}%</p>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Taxa até 720 dias</h4>
-                  <p className="mt-1">{anticipation.taxa_juros_720}%</p>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Taxa longo prazo</h4>
-                  <p className="mt-1">{anticipation.taxa_juros_longo_prazo}%</p>
-                </div>
-                
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Tarifa por recebível</h4>
-                  <p className="mt-1">{formatCurrency(anticipation.tarifa_por_recebivel)}</p>
-                </div>
-              </div>
-            </div>
-            
-            <Separator />
-            
-            <Collapsible
-              open={isReceivablesOpen}
-              onOpenChange={setIsReceivablesOpen}
-              className="w-full"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-medium">Recebíveis Antecipados</h3>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center gap-1 p-0 h-8">
-                    {isReceivablesOpen ? (
-                      <>
-                        <ChevronUp className="h-4 w-4" />
-                        <span>Recolher</span>
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="h-4 w-4" />
-                        <span>Expandir</span>
-                      </>
-                    )}
+          )}
+        </div>
+        
+        {/* Status Update Actions */}
+        <div className="mt-8 flex justify-end gap-4">
+          {anticipation.status === 'Solicitada' && (
+            <>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={isUpdating}>
+                    Reprovar
+                    {isUpdating && <Loader className="ml-2 h-4 w-4 animate-spin" />}
                   </Button>
-                </CollapsibleTrigger>
-              </div>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Essa ação irá reprovar a antecipação. Tem certeza que deseja continuar?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleStatusChange('Reprovada')} disabled={isUpdating}>
+                      Confirmar
+                      {isUpdating && <Loader className="ml-2 h-4 w-4 animate-spin" />}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               
-              <CollapsibleContent className="mt-3">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 px-3 font-medium text-sm">Comprador</th>
-                        <th className="text-left py-2 px-3 font-medium text-sm">CPF</th>
-                        <th className="text-right py-2 px-3 font-medium text-sm">Valor</th>
-                        <th className="text-left py-2 px-3 font-medium text-sm">Vencimento</th>
-                        <th className="text-left py-2 px-3 font-medium text-sm">Descrição</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {receivables.length > 0 ? (
-                        receivables.map((receivable) => (
-                          <tr key={receivable.id} className="border-b hover:bg-gray-50">
-                            <td className="py-2 px-3">{receivable.buyer_name}</td>
-                            <td className="py-2 px-3">{formatCPF(receivable.buyer_cpf)}</td>
-                            <td className="py-2 px-3 text-right">{formatCurrency(receivable.amount)}</td>
-                            <td className="py-2 px-3">
-                              {format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })}
-                            </td>
-                            <td className="py-2 px-3">{receivable.description}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="py-4 text-center text-gray-500">
-                            Nenhum recebível encontrado.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-            
-            <Separator />
-            
-            <div>
-              <h3 className="text-base font-medium mb-3">Atualizar Status</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Novo Status</label>
-                  <Select value={newStatus} onValueChange={setNewStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableStatusOptions(anticipation.status).map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium">Observações</label>
-                  <Textarea 
-                    placeholder="Adicione observações sobre esta mudança de status"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="py-4 text-center text-gray-500">
-            Não foi possível carregar os detalhes da antecipação.
-          </div>
-        )}
-        
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button 
-            disabled={isSaving || !anticipation || newStatus === anticipation?.status}
-            onClick={handleUpdateStatus}
-          >
-            {isSaving ? (
-              <>
-                <Loader className="mr-2 h-4 w-4 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              'Atualizar Status'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              <Button 
+                variant="success" 
+                onClick={() => handleStatusChange('Aprovada')} 
+                disabled={isUpdating}
+              >
+                Aprovar
+                {isUpdating && <Loader className="ml-2 h-4 w-4 animate-spin" />}
+              </Button>
+            </>
+          )}
+          
+          {anticipation.status === 'Aprovada' && (
+            <Button 
+              className="bg-blue-500 text-white hover:bg-blue-600"
+              onClick={() => handleStatusChange('Concluída')}
+              disabled={isUpdating}
+            >
+              Concluir
+              {isUpdating && <Loader className="ml-2 h-4 w-4 animate-spin" />}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };

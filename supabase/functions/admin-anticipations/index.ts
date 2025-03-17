@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -433,7 +432,7 @@ async function handleUpdateAnticipationStatus(serviceClient, data, corsHeaders, 
   }
 
   try {
-    // First get the current status
+    // First get the current status and associated data
     const { data: currentAnticipation, error: fetchError } = await serviceClient
       .from('anticipation_requests')
       .select('status, company_id, valor_total')
@@ -460,6 +459,61 @@ async function handleUpdateAnticipationStatus(serviceClient, data, corsHeaders, 
       )
     }
 
+    // If trying to approve, check credit availability
+    if (newStatus === 'Aprovada' && currentStatus !== 'Aprovada') {
+      console.log('Checking credit availability before approval...')
+      
+      // Get the company's credit analysis record
+      const { data: creditAnalysis, error: creditAnalysisError } = await serviceClient
+        .from('company_credit_analysis')
+        .select('id, credit_limit, consumed_credit')
+        .eq('company_id', currentAnticipation.company_id)
+        .eq('status', 'Ativa')
+        .single()
+
+      if (creditAnalysisError) {
+        console.error('Error fetching company credit analysis:', creditAnalysisError)
+        throw creditAnalysisError
+      }
+
+      if (!creditAnalysis) {
+        console.error('No active credit analysis found for company')
+        return new Response(
+          JSON.stringify({ 
+            error: 'Não foi possível aprovar a antecipação: nenhuma análise de crédito ativa encontrada para a empresa.' 
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        )
+      }
+      
+      // Calculate available credit
+      const availableCredit = Number(creditAnalysis.credit_limit) - Number(creditAnalysis.consumed_credit)
+      const anticipationAmount = Number(currentAnticipation.valor_total)
+      
+      console.log(`Credit check: Available: ${availableCredit}, Requested: ${anticipationAmount}`)
+      
+      // Check if there's enough available credit
+      if (anticipationAmount > availableCredit) {
+        console.log('Insufficient credit limit')
+        return new Response(
+          JSON.stringify({ 
+            error: 'Não foi possível aprovar a antecipação: limite de crédito disponível insuficiente.',
+            availableCredit: availableCredit,
+            requestedAmount: anticipationAmount
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        )
+      }
+      
+      console.log('Credit check passed, proceeding with approval')
+    }
+
     // Update the anticipation status
     const { data: updatedAnticipation, error: updateError } = await serviceClient
       .from('anticipation_requests')
@@ -480,7 +534,7 @@ async function handleUpdateAnticipationStatus(serviceClient, data, corsHeaders, 
     if (newStatus === 'Aprovada' && currentStatus !== 'Aprovada') {
       console.log('Updating company credit consumption...')
       
-      // Get the company's credit analysis record
+      // Get the company's credit analysis record again to ensure we have the latest data
       const { data: creditAnalysis, error: creditAnalysisError } = await serviceClient
         .from('company_credit_analysis')
         .select('id, consumed_credit')
@@ -491,11 +545,6 @@ async function handleUpdateAnticipationStatus(serviceClient, data, corsHeaders, 
       if (creditAnalysisError) {
         console.error('Error fetching company credit analysis:', creditAnalysisError)
         throw creditAnalysisError
-      }
-
-      if (!creditAnalysis) {
-        console.error('No active credit analysis found for company')
-        throw new Error('No active credit analysis found for company')
       }
 
       // Calculate new consumed_credit value
