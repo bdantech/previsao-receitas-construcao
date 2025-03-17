@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   AlertDialog,
@@ -19,6 +20,7 @@ import { Loader, CheckCircle, XCircle } from "lucide-react";
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatCurrency } from "@/lib/formatters";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 interface Company {
   name: string;
@@ -68,12 +70,15 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
   const [anticipation, setAnticipation] = useState<Anticipation | null>(null);
   const [receivables, setReceivables] = useState<Receivable[]>([]);
   const [open, setOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [creditInfo, setCreditInfo] = useState<{ available: number, requested: number } | null>(null);
   
   const fetchAnticipationDetails = async () => {
     if (!session?.access_token) return;
     
     try {
       setIsLoading(true);
+      setErrorMessage(null);
       
       const { data, error } = await supabase.functions.invoke('admin-anticipations', {
         headers: {
@@ -107,6 +112,8 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
   
   const handleStatusChange = async (newStatus: string) => {
     setIsUpdating(true);
+    setErrorMessage(null);
+    setCreditInfo(null);
     
     try {
       if (!session?.access_token) {
@@ -124,17 +131,45 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
         }
       });
       
-      if (error) throw error;
-      
-      if (data.error) {
-        // Handle credit limit or other errors returned from the function
+      if (error) {
+        console.error("Error updating anticipation status:", error);
         toast({
           title: "Erro ao atualizar status",
-          description: data.error,
+          description: "Ocorreu um erro ao tentar atualizar o status.",
           variant: "destructive"
         });
         setIsUpdating(false);
         return;
+      }
+      
+      if (data.error) {
+        console.error("Server reported an error:", data.error);
+        
+        // Handle credit limit error specifically
+        if (data.details && data.error === "Limite de crédito insuficiente") {
+          setErrorMessage(data.details.message);
+          setCreditInfo({
+            available: data.details.availableCredit,
+            requested: data.details.requestedAmount
+          });
+          toast({
+            title: "Limite de crédito insuficiente",
+            description: "Não há limite de crédito disponível para esta antecipação.",
+            variant: "destructive"
+          });
+          setIsUpdating(false);
+          return;
+        } else {
+          // Handle other errors
+          setErrorMessage(data.error);
+          toast({
+            title: "Erro ao atualizar status",
+            description: data.error,
+            variant: "destructive"
+          });
+          setIsUpdating(false);
+          return;
+        }
       }
       
       toast({
@@ -199,13 +234,29 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
   
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white p-6 rounded-md max-w-3xl w-full overflow-auto">
+      <div className="bg-white p-6 rounded-md max-w-3xl w-full overflow-auto max-h-[90vh]">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold">Detalhes da Antecipação</h2>
           <Button variant="outline" size="sm" onClick={onClose}>
             Fechar
           </Button>
         </div>
+        
+        {errorMessage && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTitle>Erro ao aprovar antecipação</AlertTitle>
+            <AlertDescription>
+              {errorMessage}
+              {creditInfo && (
+                <div className="mt-2">
+                  <p>Limite disponível: {formatCurrency(creditInfo.available)}</p>
+                  <p>Valor solicitado: {formatCurrency(creditInfo.requested)}</p>
+                  <p>Diferença: {formatCurrency(creditInfo.requested - creditInfo.available)}</p>
+                </div>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

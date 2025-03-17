@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -484,7 +485,7 @@ async function handleUpdateAnticipationStatus(serviceClient, data, corsHeaders, 
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
+            status: 200  // Changed from 400 to 200 to ensure client gets the error message
           }
         )
       }
@@ -500,13 +501,16 @@ async function handleUpdateAnticipationStatus(serviceClient, data, corsHeaders, 
         console.log('Insufficient credit limit')
         return new Response(
           JSON.stringify({ 
-            error: 'Não foi possível aprovar a antecipação: limite de crédito disponível insuficiente.',
-            availableCredit: availableCredit,
-            requestedAmount: anticipationAmount
+            error: 'Limite de crédito insuficiente',
+            details: {
+              message: 'Não foi possível aprovar a antecipação: limite de crédito disponível insuficiente.',
+              availableCredit: availableCredit,
+              requestedAmount: anticipationAmount
+            }
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
+            status: 200  // Changed from 400 to 200 to ensure client gets the error message
           }
         )
       }
