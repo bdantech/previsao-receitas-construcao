@@ -436,7 +436,7 @@ async function handleUpdateAnticipationStatus(serviceClient, data, corsHeaders, 
     // First get the current status
     const { data: currentAnticipation, error: fetchError } = await serviceClient
       .from('anticipation_requests')
-      .select('status')
+      .select('status, company_id, valor_total')
       .eq('id', anticipationId)
       .single()
 
@@ -474,6 +474,48 @@ async function handleUpdateAnticipationStatus(serviceClient, data, corsHeaders, 
     if (updateError) {
       console.error('Error updating anticipation status:', updateError)
       throw updateError
+    }
+
+    // If status is changed to "Aprovada", update the company's consumed_credit
+    if (newStatus === 'Aprovada' && currentStatus !== 'Aprovada') {
+      console.log('Updating company credit consumption...')
+      
+      // Get the company's credit analysis record
+      const { data: creditAnalysis, error: creditAnalysisError } = await serviceClient
+        .from('company_credit_analysis')
+        .select('id, consumed_credit')
+        .eq('company_id', currentAnticipation.company_id)
+        .eq('status', 'Ativa')
+        .single()
+
+      if (creditAnalysisError) {
+        console.error('Error fetching company credit analysis:', creditAnalysisError)
+        throw creditAnalysisError
+      }
+
+      if (!creditAnalysis) {
+        console.error('No active credit analysis found for company')
+        throw new Error('No active credit analysis found for company')
+      }
+
+      // Calculate new consumed_credit value
+      const newConsumedCredit = Number(creditAnalysis.consumed_credit) + Number(currentAnticipation.valor_total)
+      console.log(`Updating consumed credit from ${creditAnalysis.consumed_credit} to ${newConsumedCredit}`)
+
+      // Update the consumed_credit value
+      const { error: updateCreditError } = await serviceClient
+        .from('company_credit_analysis')
+        .update({ 
+          consumed_credit: newConsumedCredit,
+        })
+        .eq('id', creditAnalysis.id)
+
+      if (updateCreditError) {
+        console.error('Error updating company consumed credit:', updateCreditError)
+        throw updateCreditError
+      }
+      
+      console.log('Company credit consumption updated successfully')
     }
 
     return new Response(
