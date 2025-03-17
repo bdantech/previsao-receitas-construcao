@@ -134,17 +134,48 @@ export function CreditAnalysisDialog({
     return value.replace(/[^\d]/g, '');
   };
 
-  // Format percentage input
+  // Format percentage input with decimal support
   const formatPercentage = (value: number | string) => {
     if (value === undefined || value === null || value === "") return "0%";
     
-    return `${value}%`;
+    // Handle value as string or number
+    const numericValue = typeof value === 'string' 
+      ? parseFloat(value.replace(/[^\d.]/g, '')) 
+      : value;
+    
+    // Format with fixed decimal places
+    return `${numericValue.toString()}%`;
   };
 
-  // Parse percentage input
+  // Parse percentage input with decimal support
   const parsePercentage = (value: string) => {
-    // Remove all non-numeric characters except dots
-    return value.replace(/[^\d.]/g, '');
+    // Extract the numeric part (including decimal point)
+    const numericPart = value.replace(/[^0-9.]/g, '');
+    
+    // Ensure we only have one decimal point
+    const parts = numericPart.split('.');
+    if (parts.length > 2) {
+      return parts[0] + '.' + parts.slice(1).join('');
+    }
+    
+    return numericPart;
+  };
+
+  // Handle backspace in percentage fields
+  const handlePercentageKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: any) => {
+    // Handle backspace when cursor is after the % symbol
+    if (e.key === 'Backspace' && e.currentTarget.selectionStart === e.currentTarget.value.length) {
+      e.preventDefault();
+      
+      // Get current value without the % symbol
+      const currentValue = field.value.toString();
+      
+      // Remove the last character
+      const newValue = currentValue.slice(0, -1);
+      
+      // Update the field value
+      field.onChange(newValue === '' ? 0 : parseFloat(newValue));
+    }
   };
 
   return (
@@ -220,6 +251,7 @@ export function CreditAnalysisDialog({
                           const rawValue = parsePercentage(e.target.value);
                           field.onChange(rawValue ? parseFloat(rawValue) : 0);
                         }}
+                        onKeyDown={(e) => handlePercentageKeyDown(e, field)}
                         value={formatPercentage(field.value)}
                       />
                     </FormControl>
@@ -242,6 +274,7 @@ export function CreditAnalysisDialog({
                           const rawValue = parsePercentage(e.target.value);
                           field.onChange(rawValue ? parseFloat(rawValue) : 0);
                         }}
+                        onKeyDown={(e) => handlePercentageKeyDown(e, field)}
                         value={formatPercentage(field.value)}
                       />
                     </FormControl>
@@ -264,6 +297,7 @@ export function CreditAnalysisDialog({
                           const rawValue = parsePercentage(e.target.value);
                           field.onChange(rawValue ? parseFloat(rawValue) : 0);
                         }}
+                        onKeyDown={(e) => handlePercentageKeyDown(e, field)}
                         value={formatPercentage(field.value)}
                       />
                     </FormControl>
@@ -286,6 +320,7 @@ export function CreditAnalysisDialog({
                           const rawValue = parsePercentage(e.target.value);
                           field.onChange(rawValue ? parseFloat(rawValue) : 0);
                         }}
+                        onKeyDown={(e) => handlePercentageKeyDown(e, field)}
                         value={formatPercentage(field.value)}
                       />
                     </FormControl>
