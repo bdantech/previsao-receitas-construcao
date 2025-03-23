@@ -123,3 +123,22 @@ export function formatCurrency(value: number): string {
     currency: 'BRL',
   }).format(value);
 }
+
+/**
+ * Formats large currency values with abbreviations to prevent overflow
+ * e.g., 1,000,000 -> R$ 1M
+ */
+export function formatCompactCurrency(value: number): string {
+  // For small numbers, just use regular formatting
+  if (value < 1000) {
+    return formatCurrency(value);
+  }
+  
+  // For large numbers, use compact notation
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    notation: 'compact',
+    maximumFractionDigits: 1
+  }).format(value);
+}

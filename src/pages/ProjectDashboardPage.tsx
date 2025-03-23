@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -8,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatCNPJ, formatCPF, formatCurrency } from "@/lib/formatters";
+import { formatCNPJ, formatCPF, formatCurrency, formatCompactCurrency } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -65,14 +66,22 @@ interface Receivable {
 interface Anticipation {
   id: string;
   project_id: string;
-  buyer_name: string;
-  buyer_cpf: string;
-  amount: number;
-  due_date: string;
-  description?: string;
-  status: 'enviado' | 'elegivel_para_antecipacao' | 'reprovado' | 'antecipado';
+  valor_total: number;
+  valor_liquido: number;
+  status: string;
+  quantidade_recebiveis: number;
   created_at: string;
   updated_at: string;
+  projects?: {
+    name: string;
+  };
+}
+
+interface DashboardSummary {
+  totalBuyers: number;
+  totalReceivablesAmount: number;
+  totalAnticipationsAmount: number;
+  totalInvoices: number;
 }
 
 const ProjectDashboardPage = () => {
@@ -101,6 +110,14 @@ const ProjectDashboardPage = () => {
   const [contractDialogOpen, setContractDialogOpen] = useState(false);
   const [selectedBuyer, setSelectedBuyer] = useState<ProjectBuyer | null>(null);
   const [isUploadingContract, setIsUploadingContract] = useState(false);
+  
+  // Dashboard summary state
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary>({
+    totalBuyers: 0,
+    totalReceivablesAmount: 0,
+    totalAnticipationsAmount: 0,
+    totalInvoices: 0
+  });
 
   useEffect(() => {
     const fetchProjectDetails = async () => {
@@ -144,12 +161,27 @@ const ProjectDashboardPage = () => {
   }, [projectId, session]);
 
   useEffect(() => {
-    if (activeTab === "compradores" && projectId && session?.access_token) {
+    if (projectId && session?.access_token) {
+      // Load all data at once without waiting for tab clicks
       fetchProjectBuyers();
-    } else if (activeTab === "recebiveis" && projectId && session?.access_token) {
       fetchProjectReceivables();
+      fetchProjectAnticipations();
     }
-  }, [activeTab, projectId, session]);
+  }, [projectId, session]);
+
+  // Effect to update dashboard summary whenever data changes
+  useEffect(() => {
+    updateDashboardSummary();
+  }, [projectBuyers, receivables, anticipations]);
+
+  const updateDashboardSummary = () => {
+    setDashboardSummary({
+      totalBuyers: projectBuyers.length,
+      totalReceivablesAmount: receivables.reduce((sum, r) => sum + Number(r.amount), 0),
+      totalAnticipationsAmount: anticipations.reduce((sum, a) => sum + Number(a.valor_total), 0),
+      totalInvoices: 0 // Currently not implemented
+    });
+  };
 
   const fetchProjectBuyers = async () => {
     if (!projectId || !session?.access_token) return;
@@ -219,6 +251,54 @@ const ProjectDashboardPage = () => {
       });
     } finally {
       setIsLoadingReceivables(false);
+    }
+  };
+  
+  const fetchProjectAnticipations = async () => {
+    if (!projectId || !session?.access_token) return;
+    
+    try {
+      setIsLoadingAnticipations(true);
+      
+      // Get project to get company ID
+      const { data: projectData } = await supabase.functions.invoke('project-management', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          method: 'GET',
+          endpoint: `projects/${projectId}`
+        }
+      });
+      
+      if (!projectData || !projectData.project) {
+        throw new Error('Project not found');
+      }
+      
+      const companyId = projectData.project.company_id;
+      
+      // Get anticipations
+      const { data: anticipationsData, error: anticipationsError } = await supabase
+        .rpc('get_project_anticipations', {
+          p_company_id: companyId,
+          p_project_id: projectId
+        });
+      
+      if (anticipationsError) {
+        console.error('Error fetching anticipations:', anticipationsError);
+        throw anticipationsError;
+      }
+      
+      // Parse the result and ensure proper typing
+      if (Array.isArray(anticipationsData)) {
+        setAnticipations(anticipationsData as unknown as Anticipation[]);
+      } else {
+        setAnticipations([]);
+      }
+    } catch (error) {
+      console.error('Error fetching anticipations:', error);
+    } finally {
+      setIsLoadingAnticipations(false);
     }
   };
 
@@ -550,7 +630,7 @@ const ProjectDashboardPage = () => {
               <CardTitle className="text-sm font-medium text-gray-500">Total de Compradores</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{projectBuyers.length}</div>
+              <div className="text-2xl font-bold">{dashboardSummary.totalBuyers}</div>
             </CardContent>
           </Card>
           
@@ -559,8 +639,8 @@ const ProjectDashboardPage = () => {
               <CardTitle className="text-sm font-medium text-gray-500">Recebíveis</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(receivables.reduce((sum, r) => sum + Number(r.amount), 0))}
+              <div className="text-2xl font-bold truncate">
+                {formatCompactCurrency(dashboardSummary.totalReceivablesAmount)}
               </div>
             </CardContent>
           </Card>
@@ -570,7 +650,9 @@ const ProjectDashboardPage = () => {
               <CardTitle className="text-sm font-medium text-gray-500">Antecipações</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">R$ 0,00</div>
+              <div className="text-2xl font-bold truncate">
+                {formatCompactCurrency(dashboardSummary.totalAnticipationsAmount)}
+              </div>
             </CardContent>
           </Card>
           
@@ -579,7 +661,7 @@ const ProjectDashboardPage = () => {
               <CardTitle className="text-sm font-medium text-gray-500">Boletos Emitidos</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{dashboardSummary.totalInvoices}</div>
             </CardContent>
           </Card>
         </div>
