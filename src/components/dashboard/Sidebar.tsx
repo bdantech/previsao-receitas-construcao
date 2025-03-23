@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Building, FolderKanban, LayoutDashboard, LogOut, Link2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building, FolderKanban, LayoutDashboard, LogOut, Link2, Home, Briefcase, Plug, Key } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -65,26 +64,36 @@ export const Sidebar = () => {
     }
   };
 
-  const sidebarItems = [
+  const menuItems = [
     {
-      icon: LayoutDashboard,
-      label: "Dashboard",
-      href: "/dashboard"
+      title: "Dashboard",
+      href: "/dashboard",
+      icon: Home,
+      active: location.pathname === "/dashboard",
     },
     {
-      icon: FolderKanban,
-      label: "Projetos",
-      href: "/projects"
+      title: "Projects",
+      href: "/projects",
+      icon: Briefcase,
+      active: location.pathname === "/projects" || location.pathname.startsWith("/projects/"),
     },
     {
+      title: "Company",
+      href: "/company",
       icon: Building,
-      label: "Minha Empresa",
-      href: "/company"
+      active: location.pathname === "/company",
     },
     {
-      icon: Link2,
-      label: "Integrações",
-      href: "/integrations"
+      title: "Integrations",
+      href: "/integrations",
+      icon: Plug,
+      active: location.pathname === "/integrations",
+    },
+    {
+      title: "API Credentials",
+      href: "/api-credentials",
+      icon: Key,
+      active: location.pathname === "/api-credentials",
     }
   ];
 
@@ -118,14 +127,14 @@ export const Sidebar = () => {
 
       <div className="flex-1 px-3 py-4">
         <nav className="space-y-1">
-          {sidebarItems.map((item) => (
+          {menuItems.map((item) => (
             <SidebarItem 
               key={item.href}
               icon={item.icon} 
-              label={item.label} 
+              label={item.title} 
               href={item.href}
               isCollapsed={isCollapsed}
-              isActive={location.pathname === item.href}
+              isActive={item.active}
             />
           ))}
         </nav>

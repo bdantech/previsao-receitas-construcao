@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Building, Users, FileText, ReceiptText, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building, Users, FileText, ReceiptText, LogOut, LayoutDashboard, Banknote, Key } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -41,8 +40,8 @@ const SidebarItem = ({
 
 export const AdminSidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   
   const toggleSidebar = () => {
@@ -65,26 +64,36 @@ export const AdminSidebar = () => {
     }
   };
 
-  const sidebarItems = [
+  const menuItems = [
     {
-      icon: Building,
-      label: "Empresas",
-      href: "/admin/dashboard"
+      title: "Dashboard",
+      href: "/admin",
+      icon: LayoutDashboard,
+      active: location.pathname === "/admin",
     },
     {
+      title: "Buyers",
+      href: "/admin/buyers",
       icon: Users,
-      label: "Compradores",
-      href: "/admin/buyers"
+      active: location.pathname === "/admin/buyers",
     },
     {
+      title: "Receivables",
+      href: "/admin/receivables",
       icon: FileText,
-      label: "Recebíveis",
-      href: "/admin/receivables"
+      active: location.pathname === "/admin/receivables",
     },
     {
-      icon: ReceiptText,
-      label: "Antecipações",
-      href: "/admin/anticipations"
+      title: "Anticipations",
+      href: "/admin/anticipations",
+      icon: Banknote,
+      active: location.pathname === "/admin/anticipations",
+    },
+    {
+      title: "API Credentials",
+      href: "/api-credentials",
+      icon: Key,
+      active: location.pathname === "/api-credentials",
     }
   ];
 
@@ -119,14 +128,14 @@ export const AdminSidebar = () => {
 
       <div className="flex-1 px-3 py-4">
         <nav className="space-y-1">
-          {sidebarItems.map((item) => (
+          {menuItems.map((item) => (
             <SidebarItem 
               key={item.href}
               icon={item.icon} 
-              label={item.label} 
+              label={item.title} 
               href={item.href}
               isCollapsed={isCollapsed}
-              isActive={location.pathname === item.href}
+              isActive={item.active}
             />
           ))}
         </nav>
