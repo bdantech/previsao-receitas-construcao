@@ -6,16 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Create a Supabase client with the Auth context of the function
-const supabaseClient = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-  {
-    global: { headers: { Authorization: req.headers.get('Authorization')! } },
-  }
-)
-
 Deno.serve(async (req) => {
+  // Create a Supabase client with the Auth context of the function
+  const supabaseClient = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    {
+      global: { headers: { Authorization: req.headers.get('Authorization')! } },
+    }
+  )
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -74,8 +74,8 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } else if (req.method === 'POST') {
-      const { data: body } = await req.json()
-      const action = body?.action
+      const requestData = await req.json();
+      const action = requestData?.action;
 
       if (action === 'generate') {
         // First, invalidate any existing active credentials by setting active = false
@@ -120,12 +120,12 @@ Deno.serve(async (req) => {
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
-      } else if (action === 'deactivate' && body?.credentialId) {
+      } else if (action === 'deactivate' && requestData?.credentialId) {
         // Deactivate a specific credential
         const { error } = await supabaseClient
           .from('company_api_credentials')
           .update({ active: false })
-          .eq('id', body.credentialId)
+          .eq('id', requestData.credentialId)
           .eq('company_id', companyId)
 
         if (error) {
