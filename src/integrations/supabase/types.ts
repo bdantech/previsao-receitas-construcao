@@ -141,47 +141,6 @@ export type Database = {
         }
         Relationships: []
       }
-      company_api_credentials: {
-        Row: {
-          active: boolean
-          client_id: string
-          client_secret: string
-          company_id: string
-          created_at: string
-          created_by: string
-          id: string
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          client_id: string
-          client_secret: string
-          company_id: string
-          created_at?: string
-          created_by: string
-          id?: string
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          client_id?: string
-          client_secret?: string
-          company_id?: string
-          created_at?: string
-          created_by?: string
-          id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "company_api_credentials_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       company_credit_analysis: {
         Row: {
           available_credit: number | null

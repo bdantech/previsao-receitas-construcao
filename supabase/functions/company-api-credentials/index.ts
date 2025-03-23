@@ -1,210 +1,164 @@
 
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 
-// CORS configuration
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+// Create a Supabase client with the Auth context of the function
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+  {
+    global: { headers: { Authorization: req.headers.get('Authorization')! } },
+  }
+)
+
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Get environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    // Get user ID from auth
+    const {
+      data: { user },
+    } = await supabaseClient.auth.getUser()
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing environment variables')
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    // Get authorization header
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401 
-        }
-      )
-    }
-
-    // Initialize Supabase clients
-    const supabase = createClient(
-      supabaseUrl,
-      supabaseServiceKey
-    )
-
-    const reqClient = createClient(
-      supabaseUrl,
-      supabaseServiceKey,
-      {
-        global: {
-          headers: {
-            Authorization: authHeader
-          },
-        },
-      }
-    )
-
-    // Authenticate user
-    const { data: { user }, error: authError } = await reqClient.auth.getUser()
-    
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401 
-        }
-      )
-    }
-
-    // Parse request
-    const { action, companyId } = await req.json()
-
-    // Check if user has access to the company
-    const { data: userCompany, error: userCompanyError } = await reqClient
+    // Check if user belongs to a company
+    const { data: userCompany, error: userCompanyError } = await supabaseClient
       .from('user_companies')
       .select('company_id')
       .eq('user_id', user.id)
-      .eq('company_id', companyId)
       .single()
 
-    const { data: userProfile, error: userProfileError } = await reqClient
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const isAdmin = userProfile?.role === 'admin'
-    
-    if (!isAdmin && (userCompanyError || !userCompany)) {
+    if (userCompanyError || !userCompany) {
       return new Response(
-        JSON.stringify({ error: 'Access denied to this company' }),
-        { 
+        JSON.stringify({ error: 'User not associated with any company' }),
+        {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403 
         }
       )
     }
 
-    // Handle different actions
-    if (action === 'getCredentials') {
-      // Get company API credentials
-      const { data, error } = await reqClient
+    const companyId = userCompany.company_id
+
+    // Process based on HTTP method
+    if (req.method === 'GET') {
+      // Get existing API credentials for this company
+      const { data, error } = await supabaseClient
         .from('company_api_credentials')
         .select('*')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false })
-      
+
       if (error) {
-        throw error
-      }
-      
-      return new Response(
-        JSON.stringify({ credentials: data }),
-        { 
+        console.error('Error fetching API credentials:', error)
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      )
-    }
-    else if (action === 'generateCredentials') {
-      // Deactivate any existing active credentials
-      await reqClient
-        .from('company_api_credentials')
-        .update({ active: false })
-        .eq('company_id', companyId)
-        .eq('active', true)
-      
-      // Generate new client_id and client_secret
-      const clientId = crypto.randomUUID()
-      
-      // Generate a secure random string for client_secret
-      const randomBytes = new Uint8Array(32)
-      crypto.getRandomValues(randomBytes)
-      const clientSecret = Array.from(randomBytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-      
-      // Insert new credentials
-      const { data, error } = await reqClient
-        .from('company_api_credentials')
-        .insert({
-          company_id: companyId,
-          client_id: clientId,
-          client_secret: clientSecret,
-          created_by: user.id,
         })
-        .select()
-        .single()
-      
-      if (error) {
-        throw error
       }
-      
-      return new Response(
-        JSON.stringify({ 
-          credential: {
-            ...data,
-            client_id: clientId,
-            client_secret: clientSecret
-          } 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      )
-    }
-    else if (action === 'deactivateCredentials') {
-      const { credentialId } = await req.json()
-      
-      // Deactivate the credential
-      const { data, error } = await reqClient
-        .from('company_api_credentials')
-        .update({ active: false })
-        .eq('id', credentialId)
-        .eq('company_id', companyId)
-        .select()
-        .single()
-      
-      if (error) {
-        throw error
-      }
-      
-      return new Response(
-        JSON.stringify({ success: true, credential: data }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
-      )
-    }
-    else {
-      return new Response(
-        JSON.stringify({ error: 'Invalid action' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400 
-        }
-      )
-    }
-  } catch (error) {
-    console.error('Error:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
+
+      return new Response(JSON.stringify({ credentials: data }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
+      })
+    } else if (req.method === 'POST') {
+      const { data: body } = await req.json()
+      const action = body?.action
+
+      if (action === 'generate') {
+        // First, invalidate any existing active credentials by setting active = false
+        await supabaseClient
+          .from('company_api_credentials')
+          .update({ active: false })
+          .eq('company_id', companyId)
+          .eq('active', true)
+
+        // Generate new client ID and secret
+        const clientId = crypto.randomUUID()
+        // Generate a longer, more secure secret
+        const clientSecret = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('')
+
+        // Insert new credentials
+        const { data, error } = await supabaseClient
+          .from('company_api_credentials')
+          .insert({
+            company_id: companyId,
+            client_id: clientId,
+            client_secret: clientSecret,
+            active: true,
+            created_by: user.id
+          })
+          .select()
+          .single()
+
+        if (error) {
+          console.error('Error creating API credentials:', error)
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          credentials: data,
+          message: 'Novas credenciais geradas com sucesso'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      } else if (action === 'deactivate' && body?.credentialId) {
+        // Deactivate a specific credential
+        const { error } = await supabaseClient
+          .from('company_api_credentials')
+          .update({ active: false })
+          .eq('id', body.credentialId)
+          .eq('company_id', companyId)
+
+        if (error) {
+          console.error('Error deactivating API credentials:', error)
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true,
+          message: 'Credencial desativada com sucesso'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
-    )
+
+      return new Response(JSON.stringify({ error: 'Invalid action' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  } catch (error) {
+    console.error('Edge function error:', error)
+    return new Response(JSON.stringify({ error: 'Internal Server Error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 })
