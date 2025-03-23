@@ -1,210 +1,309 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
+// CORS configuration
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Create a Supabase client
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-)
+// Function to validate a CPF number
+function isValidCPF(cpf: string): boolean {
+  // Remove non-numeric characters
+  cpf = cpf.replace(/\D/g, '');
+  
+  // Check if the length is 11 digits
+  if (cpf.length !== 11) {
+    return false;
+  }
+  
+  // Check if all digits are the same
+  if (/^(\d)\1+$/.test(cpf)) {
+    return false;
+  }
+  
+  // Calculate first check digit
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(cpf.charAt(i)) * (10 - i);
+  }
+  
+  let remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) {
+    remainder = 0;
+  }
+  
+  if (remainder !== parseInt(cpf.charAt(9))) {
+    return false;
+  }
+  
+  // Calculate second check digit
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(cpf.charAt(i)) * (11 - i);
+  }
+  
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) {
+    remainder = 0;
+  }
+  
+  if (remainder !== parseInt(cpf.charAt(10))) {
+    return false;
+  }
+  
+  return true;
+}
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Basic Auth handling
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Basic ')) {
-      return new Response(JSON.stringify({ error: 'Credenciais não fornecidas' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    // Get environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing environment variables')
     }
 
-    // Extract credentials from Basic Auth
+    // Get authorization header for Basic Auth
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Basic ')) {
+      return new Response(
+        JSON.stringify({ error: 'Basic authentication required' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401 
+        }
+      )
+    }
+
+    // Decode base64 credentials
     const base64Credentials = authHeader.split(' ')[1]
     const credentials = atob(base64Credentials).split(':')
     const clientId = credentials[0]
     const clientSecret = credentials[1]
 
     if (!clientId || !clientSecret) {
-      return new Response(JSON.stringify({ error: 'Credenciais inválidas' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return new Response(
+        JSON.stringify({ error: 'Invalid credentials format' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401 
+        }
+      )
     }
 
-    // Verify credentials
-    const { data: credentialData, error: credentialError } = await supabase
+    // Initialize Supabase client with service role key (bypasses RLS)
+    const supabase = createClient(
+      supabaseUrl,
+      supabaseServiceKey
+    )
+
+    // Check if API credentials are valid
+    const { data: apiCredential, error: apiCredentialError } = await supabase
       .from('company_api_credentials')
-      .select('company_id')
+      .select('*, companies:company_id(id, name)')
       .eq('client_id', clientId)
       .eq('client_secret', clientSecret)
       .eq('active', true)
       .single()
 
-    if (credentialError || !credentialData) {
-      return new Response(JSON.stringify({ error: 'Credenciais inválidas ou inativas' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    if (apiCredentialError || !apiCredential) {
+      console.error('API credential error:', apiCredentialError)
+      return new Response(
+        JSON.stringify({ error: 'Invalid or inactive API credentials' }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401 
+        }
+      )
     }
 
-    const companyId = credentialData.company_id
+    const companyId = apiCredential.company_id
 
-    if (req.method === 'POST') {
-      const { data: reqData } = await req.json()
-      
-      // Validate required fields
-      if (!reqData.project_id || !reqData.receivables || !Array.isArray(reqData.receivables) || reqData.receivables.length === 0) {
-        return new Response(JSON.stringify({ error: 'Dados incompletos ou inválidos' }), {
-          status: 400, 
+    // Only handle POST requests for creating receivables
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-      
-      // Verify project belongs to company
-      const { data: projectData, error: projectError } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('id', reqData.project_id)
-        .eq('company_id', companyId)
-        .single()
-        
-      if (projectError || !projectData) {
-        return new Response(JSON.stringify({ error: 'Projeto não encontrado ou não pertence a esta empresa' }), {
-          status: 404,
+          status: 405 
+        }
+      )
+    }
+
+    // Parse request body
+    const requestData = await req.json()
+
+    // Validate required fields
+    if (!requestData.projectId || !requestData.receivables || !Array.isArray(requestData.receivables)) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields' }),
+        { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-      
-      const projectId = reqData.project_id
-      const receivablesToInsert = []
-      const errors = []
-      
-      // Prepare receivables for insertion
-      for (const receivable of reqData.receivables) {
+          status: 400 
+        }
+      )
+    }
+
+    // Check if project exists and belongs to the company
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id, name')
+      .eq('id', requestData.projectId)
+      .eq('company_id', companyId)
+      .single()
+
+    if (projectError || !project) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Project not found or does not belong to this company',
+          details: projectError?.message
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404 
+        }
+      )
+    }
+
+    // Process receivables
+    const receivables = requestData.receivables
+    const results = {
+      success: [] as any[],
+      errors: [] as any[]
+    }
+
+    for (const receivable of receivables) {
+      try {
         // Validate required fields
-        if (!receivable.buyer_name || !receivable.buyer_cpf || !receivable.amount || !receivable.due_date) {
-          errors.push({
+        if (!receivable.buyerName || !receivable.buyerCpf || !receivable.amount || !receivable.dueDate) {
+          results.errors.push({
             receivable,
-            error: 'Campos obrigatórios ausentes: buyer_name, buyer_cpf, amount, due_date são obrigatórios'
+            error: 'Missing required fields'
           })
           continue
         }
-        
-        try {
-          // Format and validate amount
-          const amount = typeof receivable.amount === 'string' 
-            ? parseFloat(receivable.amount.replace(/[^\d.,]/g, '').replace(',', '.'))
-            : Number(receivable.amount)
-            
-          if (isNaN(amount) || amount <= 0) {
-            errors.push({
-              receivable,
-              error: 'Valor inválido'
-            })
-            continue
-          }
-          
-          // Validate and format due_date
-          let dueDate
-          try {
-            dueDate = new Date(receivable.due_date)
-            if (isNaN(dueDate.getTime())) {
-              throw new Error('Data inválida')
-            }
-          } catch (e) {
-            errors.push({
-              receivable,
-              error: 'Data de vencimento inválida'
-            })
-            continue
-          }
-          
-          // Clean CPF
-          const buyerCpf = receivable.buyer_cpf.replace(/\D/g, '')
-          
-          // Check if there's a buyer entry, determine initial status
-          const { data: statusData, error: statusError } = await supabase.rpc(
-            'get_initial_receivable_status',
-            { project_id: projectId, buyer_cpf: buyerCpf }
-          )
-          
-          const status = statusError ? 'enviado' : statusData || 'enviado'
-          
-          // Prepare receivable for insertion
-          receivablesToInsert.push({
-            project_id: projectId,
-            buyer_name: receivable.buyer_name,
-            buyer_cpf: buyerCpf,
-            amount: amount,
-            due_date: dueDate.toISOString().split('T')[0],
-            description: receivable.description || '',
-            external_id: receivable.external_id || null,
-            status: status
-          })
-        } catch (e) {
-          errors.push({
+
+        // Validate CPF
+        const cleanCpf = receivable.buyerCpf.replace(/\D/g, '')
+        if (!isValidCPF(cleanCpf)) {
+          results.errors.push({
             receivable,
-            error: `Erro ao processar: ${e.message}`
+            error: 'Invalid CPF'
           })
+          continue
         }
-      }
-      
-      // Insert valid receivables
-      let insertedCount = 0
-      if (receivablesToInsert.length > 0) {
-        const { data: insertedData, error: insertError } = await supabase
+
+        // Validate amount is a number
+        const amount = parseFloat(receivable.amount)
+        if (isNaN(amount) || amount <= 0) {
+          results.errors.push({
+            receivable,
+            error: 'Invalid amount'
+          })
+          continue
+        }
+
+        // Validate due date is in the future
+        const dueDate = new Date(receivable.dueDate)
+        if (isNaN(dueDate.getTime()) || dueDate <= new Date()) {
+          results.errors.push({
+            receivable,
+            error: 'Invalid due date or date is not in the future'
+          })
+          continue
+        }
+
+        // Check if project has a buyer with this CPF
+        let buyerStatus = null
+        const { data: buyer } = await supabase
+          .from('project_buyers')
+          .select('buyer_status')
+          .eq('project_id', requestData.projectId)
+          .eq('cpf', cleanCpf)
+          .single()
+
+        if (buyer) {
+          buyerStatus = buyer.buyer_status
+        }
+
+        // Determine initial status based on buyer status
+        let initialStatus = 'enviado' as string
+        if (buyerStatus === 'aprovado') {
+          initialStatus = 'elegivel_para_antecipacao'
+        } else if (buyerStatus === 'reprovado') {
+          initialStatus = 'reprovado'
+        }
+
+        // Insert receivable
+        const { data: newReceivable, error: receivableError } = await supabase
           .from('receivables')
-          .insert(receivablesToInsert)
-          .select()
-        
-        if (insertError) {
-          return new Response(JSON.stringify({ 
-            error: 'Erro ao inserir recebíveis', 
-            details: insertError.message,
-            processed: insertedCount,
-            errors
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          .insert({
+            project_id: requestData.projectId,
+            buyer_name: receivable.buyerName,
+            buyer_cpf: cleanCpf,
+            amount: amount,
+            due_date: receivable.dueDate,
+            description: receivable.description || null,
+            status: initialStatus,
+            created_by: apiCredential.created_by // Use the user who created the API credential
           })
+          .select()
+          .single()
+
+        if (receivableError) {
+          console.error('Error creating receivable:', receivableError)
+          results.errors.push({
+            receivable,
+            error: receivableError.message
+          })
+          continue
         }
-        
-        insertedCount = insertedData?.length || 0
+
+        results.success.push(newReceivable)
+      } catch (error) {
+        console.error('Error processing receivable:', error)
+        results.errors.push({
+          receivable,
+          error: error.message
+        })
       }
-      
-      // Prepare response
-      const response = {
-        success: true,
-        message: `${insertedCount} recebíveis processados com sucesso`,
-        processed: insertedCount,
-        total: reqData.receivables.length,
-        errors: errors.length > 0 ? errors : null
-      }
-      
-      return new Response(JSON.stringify(response), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
     }
-    
-    return new Response(JSON.stringify({ error: 'Método não permitido' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+
+    return new Response(
+      JSON.stringify({
+        project: {
+          id: project.id,
+          name: project.name
+        },
+        results: {
+          total: receivables.length,
+          success: results.success.length,
+          errors: results.errors.length,
+          successRecords: results.success,
+          errorRecords: results.errors
+        }
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
+    )
   } catch (error) {
-    console.error('Edge function error:', error)
-    return new Response(JSON.stringify({ error: 'Erro interno do servidor' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    console.error('Error:', error)
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
+      }
+    )
   }
 })
