@@ -19,6 +19,7 @@ import ProjectDashboardPage from "./pages/ProjectDashboardPage";
 import CreateAnticipationForm from "./components/anticipations/CreateAnticipationForm";
 import AnticipationDetails from "./components/anticipations/AnticipationDetails";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import IntegrationsPage from "./pages/IntegrationsPage";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -48,6 +49,7 @@ function App() {
             <Route path="/project-dashboard/:projectId/create-anticipation" element={<CreateAnticipationForm />} />
             <Route path="/project-dashboard/:projectId/anticipation/:anticipationId" element={<AnticipationDetails />} />
             <Route path="/company" element={<CompanyPage />} />
+            <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
             <Route path="/admin/buyers" element={<AdminBuyersPage />} />

@@ -1,8 +1,9 @@
+
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Building, FolderKanban, LayoutDashboard, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building, FolderKanban, LayoutDashboard, LogOut, Link2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -79,6 +80,11 @@ export const Sidebar = () => {
       icon: Building,
       label: "Minha Empresa",
       href: "/company"
+    },
+    {
+      icon: Link2,
+      label: "Integrações",
+      href: "/integrations"
     }
   ];
 
