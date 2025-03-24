@@ -416,6 +416,34 @@ serve(async (req) => {
           }
         }
         
+        // If document ID is provided, update the document record with new status
+        if (requestBody.documentId) {
+          console.log('Updating document record with ID:', requestBody.documentId);
+          console.log('Setting file path:', filePath);
+          console.log('Setting file name:', fileNameClean);
+          console.log('Setting status to: sent');
+          
+          const { data: updateData, error: updateError } = await adminSupabase
+            .from('documents')
+            .update({
+              file_path: filePath,
+              file_name: fileNameClean,
+              status: 'sent',
+              submitted_at: new Date().toISOString(),
+              submitted_by: requestBody.userId || null
+            })
+            .eq('id', requestBody.documentId)
+            .select();
+            
+          if (updateError) {
+            console.error('Error updating document record:', updateError);
+            // Don't throw here, still return success for the file upload
+            console.log('File was uploaded but document record was not updated');
+          } else {
+            console.log('Document record updated successfully:', updateData);
+          }
+        }
+        
         // If buyerId is provided, update the project_buyer record
         if (requestBody.buyerId && requestBody.resourceType === 'projects') {
           console.log('Updating project_buyer record with ID:', requestBody.buyerId);

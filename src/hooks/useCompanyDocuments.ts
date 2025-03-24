@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -191,7 +190,7 @@ export const useCompanyDocuments = (companyId?: string) => {
       // Upload the file
       const uploadResult = await uploadFile(file, 'company', companyId);
       
-      // Update the document record
+      // Update the document record with new status
       const { error } = await supabase
         .from('documents')
         .update({
@@ -199,6 +198,7 @@ export const useCompanyDocuments = (companyId?: string) => {
           file_path: uploadResult.filePath,
           status: 'sent',
           submitted_at: new Date().toISOString(),
+          submitted_by: session?.user?.id
         })
         .eq('id', documentId);
 
@@ -209,7 +209,7 @@ export const useCompanyDocuments = (companyId?: string) => {
         description: 'Document uploaded successfully.',
       });
 
-      // Refresh documents
+      // Refresh documents to get the updated status
       fetchDocuments();
     } catch (error) {
       console.error('Error uploading document:', error);
