@@ -26,11 +26,24 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   const handleFallbackDownload = async (doc: CompanyDocument) => {
     try {
       console.log('Using enhanced download method with access key for:', doc.file_path);
+      
+      // Try to download using the enhanced utility
       await downloadDocument(doc.file_path, doc.file_name);
     } catch (error) {
       console.error("Error with fallback download:", error);
-      // If the fallback fails, still try the original method
-      onDownload(doc);
+      
+      // If the error is about file not found, show a clear message
+      if (error instanceof Error && 
+          (error.message.includes("not found") || error.message.includes("does not exist"))) {
+        // Show toast or other notification
+        onDownload({
+          ...doc,
+          error: "Arquivo não encontrado. O arquivo pode ter sido removido."
+        } as any);
+      } else {
+        // If it's another error, still try the original method
+        onDownload(doc);
+      }
     }
   };
 

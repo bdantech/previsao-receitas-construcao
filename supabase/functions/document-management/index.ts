@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
 
@@ -77,10 +76,42 @@ serve(async (req) => {
           const bucketName = 'documents';
           const objectPath = filePath;
           
+          // First verify the file exists
+          try {
+            // List the directory contents to check if the file exists
+            const { data: fileList, error: listError } = await adminSupabase
+              .storage
+              .from(bucketName)
+              .list(objectPath.split('/').slice(0, -1).join('/'));
+            
+            if (listError) {
+              console.error('Error listing directory contents:', listError);
+            } else {
+              const fileName = objectPath.split('/').pop();
+              const fileExists = fileList?.some(file => file.name === fileName);
+              
+              if (!fileExists) {
+                console.error('File not found in storage:', objectPath);
+                return new Response(
+                  JSON.stringify({ error: 'File not found', details: 'The requested file does not exist' }),
+                  { 
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 404 
+                  }
+                );
+              }
+              
+              console.log('File verified, exists in storage');
+            }
+          } catch (verifyError) {
+            console.error('Error verifying file existence:', verifyError);
+            // Continue anyway as the list operation might not be permitted
+          }
+          
           // Build a URL with the access key that will have full access to the storage
           const directUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${objectPath}`;
           
-          // Try to fetch the object directly to verify it exists
+          // Try to fetch the object directly with the access keys
           const verificationHeaders = {
             'apikey': keyId,
             'Authorization': `Bearer ${accessKey}`
@@ -94,10 +125,22 @@ serve(async (req) => {
             
             if (!verifyResponse.ok) {
               console.error('File verification failed with status:', verifyResponse.status);
-              throw new Error(`File not found or inaccessible: ${verifyResponse.statusText}`);
+              
+              // If file not found (404), return a clear error
+              if (verifyResponse.status === 404) {
+                return new Response(
+                  JSON.stringify({ error: 'File not found', details: 'The requested file does not exist' }),
+                  { 
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 404 
+                  }
+                );
+              }
+              
+              throw new Error(`File not accessible: ${verifyResponse.statusText}`);
             }
             
-            console.log('File verified, exists in storage');
+            console.log('File verified, exists and is accessible');
             
             // If the file exists, return a direct download URL with the access key
             const downloadParams = new URLSearchParams();
@@ -128,6 +171,18 @@ serve(async (req) => {
           
           if (error) {
             console.error('Error creating signed URL:', error);
+            
+            // If file not found, return a clear error
+            if (error.message.includes('not found') || error.message.includes('does not exist')) {
+              return new Response(
+                JSON.stringify({ error: 'File not found', details: 'The requested file does not exist' }),
+                { 
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                  status: 404 
+                }
+              );
+            }
+            
             throw error;
           }
           

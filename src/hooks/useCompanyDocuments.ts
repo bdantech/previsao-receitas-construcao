@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -203,8 +202,8 @@ export const useCompanyDocuments = (companyId?: string) => {
   const downloadDocumentHandler = async (document: CompanyDocument) => {
     if (!document.file_path) {
       toast({
-        title: 'Error',
-        description: 'No file available to download.',
+        title: 'Erro',
+        description: 'Não há arquivo disponível para download.',
         variant: 'destructive',
       });
       return;
@@ -217,14 +216,21 @@ export const useCompanyDocuments = (companyId?: string) => {
       await downloadDocument(document.file_path, document.file_name);
       
       toast({
-        title: 'Success',
-        description: 'Document download started.',
+        title: 'Sucesso',
+        description: 'Download do documento iniciado.',
       });
     } catch (error) {
       console.error('Error downloading document:', error);
+      
+      // Check if the error is about file not found
+      const errorMessage = error instanceof Error ? error.message : "Erro ao baixar o documento";
+      const isFileNotFound = errorMessage.includes("not found") || errorMessage.includes("does not exist");
+      
       toast({
-        title: 'Error',
-        description: 'Failed to download document. Please try again.',
+        title: 'Erro',
+        description: isFileNotFound 
+          ? "Arquivo não encontrado. O arquivo pode ter sido removido."
+          : errorMessage,
         variant: 'destructive',
       });
     }

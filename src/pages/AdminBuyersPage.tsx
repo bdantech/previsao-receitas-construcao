@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { projectBuyersApi } from "@/integrations/supabase/client";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
@@ -21,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AdminBuyersTable } from "@/components/admin/AdminBuyersTable";
+import { downloadDocument } from "@/lib/downloadDocument";
 
 export default function AdminBuyersPage() {
   const { session, userRole, isLoading: isLoadingAuth } = useAuth();
@@ -30,7 +30,6 @@ export default function AdminBuyersPage() {
   const [selectedBuyerId, setSelectedBuyerId] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
 
-  // Protect the route
   useEffect(() => {
     if (!isLoadingAuth && (!session || userRole !== 'admin')) {
       navigate('/admin/auth');
@@ -57,7 +56,6 @@ export default function AdminBuyersPage() {
           userId: session.user.id
         });
 
-        // Make the API call directly with the session token
         const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
           method: 'POST',
           headers: {
@@ -110,7 +108,6 @@ export default function AdminBuyersPage() {
     if (!selectedBuyerId || !selectedStatus) return;
 
     try {
-      // Find the selected buyer to get company and project IDs
       const selectedBuyer = buyers?.find(buyer => buyer.id === selectedBuyerId);
       if (!selectedBuyer) {
         toast.error("Comprador não encontrado");
@@ -129,8 +126,6 @@ export default function AdminBuyersPage() {
             projectId: selectedBuyer.project_id
           };
 
-      // await projectBuyersApi.admin.updateBuyer(selectedBuyerId, updateData);
-      
       const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -152,7 +147,7 @@ export default function AdminBuyersPage() {
       
       toast.success("Status atualizado com sucesso");
       setStatusDialogOpen(false);
-      refetch(); // Refresh the buyers list
+      refetch();
     } catch (error) {
       console.error("Error updating status:", error);
       toast.error("Erro ao atualizar status");
@@ -168,31 +163,21 @@ export default function AdminBuyersPage() {
     try {
       console.log('Attempting to download file from path:', buyer.contract_file_path);
       
-      // Create a signed URL for the file instead of directly downloading it
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('documents')
-        .createSignedUrl(buyer.contract_file_path, 60); // 60 seconds expiry
-      
-      if (signedUrlError) {
-        console.error('Error creating signed URL:', signedUrlError);
-        throw signedUrlError;
-      }
-      
-      if (!signedUrlData || !signedUrlData.signedUrl) {
-        throw new Error('Failed to generate download URL');
-      }
-      
-      // Open the signed URL in a new tab
-      window.open(signedUrlData.signedUrl, '_blank');
+      await downloadDocument(buyer.contract_file_path, buyer.contract_file_name);
       
       toast.success("Download do contrato iniciado");
     } catch (error) {
       console.error('Error downloading contract:', error);
-      toast.error("Erro ao baixar o contrato");
+      
+      const errorMessage = error instanceof Error ? error.message : "Erro ao baixar o contrato";
+      const isFileNotFound = errorMessage.includes("not found") || errorMessage.includes("does not exist");
+      
+      toast.error(isFileNotFound 
+        ? "Contrato não encontrado. O arquivo pode ter sido removido."
+        : errorMessage);
     }
   };
 
-  // Show loading state while checking authentication
   if (isLoadingAuth) {
     return (
       <AdminDashboardLayout>
@@ -204,7 +189,6 @@ export default function AdminBuyersPage() {
     );
   }
 
-  // If not authenticated or not admin, the useEffect will handle redirection
   if (!session || userRole !== 'admin') {
     return null;
   }
@@ -315,7 +299,6 @@ export default function AdminBuyersPage() {
         )}
       </div>
 
-      {/* Status Change Dialog */}
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
         <DialogContent>
           <DialogHeader>

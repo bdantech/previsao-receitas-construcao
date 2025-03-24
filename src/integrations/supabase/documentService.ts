@@ -224,19 +224,40 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
   
   try {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://hshfqxjrilqzjpkcotgz.supabase.co';
+    
+    // First try: Check if file exists before attempting to download
+    try {
+      const { data: fileExistsData, error: fileExistsError } = await supabase.storage
+        .from('documents')
+        .list(filePath.split('/').slice(0, -1).join('/'));
+      
+      const fileExists = fileExistsData?.some(file => file.name === filePath.split('/').pop());
+      
+      if (fileExistsError || !fileExists) {
+        console.error('File does not exist in storage:', filePath);
+        throw new Error(`File does not exist: ${filePath}`);
+      }
+      
+      console.log('File exists in storage, proceeding with download');
+    } catch (existsError) {
+      console.error('Error checking if file exists:', existsError);
+      // Continue anyway, as the list API might be restricted
+    }
+    
+    // Try direct access with provided credentials
     const directUrl = `${supabaseUrl}/storage/v1/object/public/documents/${filePath}`;
     
-    console.log('Attempting direct storage access with provided access key');
+    console.log('Attempting direct access with provided credentials');
     
     try {
       const headers = {
-        'apikey': STORAGE_KEY_ID,
-        'Authorization': `Bearer ${STORAGE_ACCESS_KEY}`
+        'apikey': 'b4ccfb4b7d890511aaa3c6073ebe31d1',
+        'Authorization': `Bearer a70c36d0d9e86ece51aa6b424de087b9112855d1369139b8d1d8386c61be7c51`
       };
       
       const downloadUrl = `${directUrl}?download=true`;
       
-      console.log('Using direct download URL with access key:', downloadUrl);
+      console.log('Using direct download URL with access credentials:', downloadUrl);
       
       const response = await fetch(downloadUrl, { 
         headers,
@@ -244,7 +265,7 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
       });
       
       if (response.ok) {
-        console.log('Direct download with access key successful');
+        console.log('Direct download successful');
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -256,51 +277,23 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
         document.body.removeChild(a);
         return;
       } else {
-        console.error('Direct download failed:', await response.text());
+        console.error('Direct download failed with status:', response.status);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
       }
     } catch (directError) {
       console.error('Error with direct download:', directError);
     }
     
-    console.log('Attempting edge function download');
-    const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
-    
-    if (accessToken) {
-      try {
-        const { data: edgeFunctionData, error: edgeFunctionError } = await supabase.functions.invoke(
-          'document-management',
-          {
-            body: { 
-              action: 'downloadFile', 
-              filePath,
-              useAccessKey: true,
-              keyId: STORAGE_KEY_ID,
-              accessKey: STORAGE_ACCESS_KEY
-            },
-            headers: { Authorization: `Bearer ${accessToken}` }
-          }
-        );
-        
-        if (!edgeFunctionError && edgeFunctionData?.url) {
-          console.log('Edge function returned URL:', edgeFunctionData.url);
-          window.open(edgeFunctionData.url, '_blank');
-          return;
-        } else {
-          console.error('Edge function error:', edgeFunctionError || 'No URL returned');
-        }
-      } catch (edgeFunctionCallError) {
-        console.error('Error calling edge function:', edgeFunctionCallError);
-      }
-    }
-    
+    // Try S3 compatible API approach
     console.log('Attempting S3 compatible approach');
     try {
       const s3EndpointUrl = `${supabaseUrl}/storage/v1/s3/object/documents/${filePath}?download=true`;
       
       const response = await fetch(s3EndpointUrl, {
         headers: {
-          'x-amz-access-key-id': STORAGE_KEY_ID,
-          'x-amz-secret-access-key': STORAGE_ACCESS_KEY
+          'x-amz-access-key-id': 'b4ccfb4b7d890511aaa3c6073ebe31d1',
+          'x-amz-secret-access-key': 'a70c36d0d9e86ece51aa6b424de087b9112855d1369139b8d1d8386c61be7c51'
         },
         method: 'GET'
       });
@@ -318,52 +311,72 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
         document.body.removeChild(a);
         return;
       } else {
-        console.error('S3 compatible download failed:', await response.text());
+        console.error('S3 compatible download failed with status:', response.status);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
       }
     } catch (s3Error) {
       console.error('Error with S3 compatible download:', s3Error);
     }
     
-    console.log('Attempting to create signed URL');
-    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(filePath, 3600, {
-        download: true,
-        transform: { 
-          quality: 100  // Just to add a parameter and make sure the URL is properly formed
-        }
-      });
-    
-    if (!signedUrlError && signedUrlData?.signedUrl) {
-      console.log('Successfully created signed URL:', signedUrlData.signedUrl);
-      window.open(signedUrlData.signedUrl, '_blank');
-      return;
-    } else {
-      console.error('Error creating signed URL:', signedUrlError || 'No URL returned');
-    }
-    
-    console.log('Attempting direct download through SDK');
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .download(filePath);
+    // Try edge function as fallback
+    console.log('Attempting edge function download');
+    try {
+      const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
       
-    if (!error && data) {
-      console.log('SDK download successful');
-      const blob = new Blob([data], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName || filePath.split('/').pop() || 'document.pdf';
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      return;
-    } else {
-      console.error('Error downloading file through SDK:', error || 'No data returned');
+      if (accessToken) {
+        const { data: edgeFunctionData, error: edgeFunctionError } = await supabase.functions.invoke(
+          'document-management',
+          {
+            body: { 
+              action: 'downloadFile', 
+              filePath,
+              useAccessKey: true,
+              keyId: 'b4ccfb4b7d890511aaa3c6073ebe31d1',
+              accessKey: 'a70c36d0d9e86ece51aa6b424de087b9112855d1369139b8d1d8386c61be7c51'
+            },
+            headers: { Authorization: `Bearer ${accessToken}` }
+          }
+        );
+        
+        if (!edgeFunctionError && edgeFunctionData?.url) {
+          console.log('Edge function returned URL:', edgeFunctionData.url);
+          window.open(edgeFunctionData.url, '_blank');
+          return;
+        } else {
+          console.error('Edge function error or no URL returned:', edgeFunctionError || 'No URL returned');
+        }
+      }
+    } catch (edgeFunctionError) {
+      console.error('Error calling edge function:', edgeFunctionError);
     }
     
-    throw new Error('All download methods failed');
+    // Try with signed URL as last resort
+    console.log('Attempting signed URL approach');
+    try {
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(filePath, 60, {
+          download: true,
+          transform: { quality: 100 }
+        });
+      
+      if (!signedUrlError && signedUrlData?.signedUrl) {
+        console.log('Successfully created signed URL:', signedUrlData.signedUrl);
+        window.open(signedUrlData.signedUrl, '_blank');
+        return;
+      } else {
+        console.error('Error creating signed URL:', signedUrlError || 'No URL returned');
+        if (signedUrlError?.message.includes("Object not found")) {
+          throw new Error(`File does not exist: ${filePath}`);
+        }
+      }
+    } catch (signedUrlError) {
+      console.error('Error with signed URL approach:', signedUrlError);
+      throw signedUrlError;
+    }
+    
+    throw new Error(`Unable to download file: ${filePath}. File may not exist.`);
   } catch (error) {
     console.error('Error downloading document:', error);
     throw error;

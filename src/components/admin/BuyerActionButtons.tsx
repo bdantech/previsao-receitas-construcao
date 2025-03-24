@@ -46,6 +46,29 @@ export function BuyerActionButtons({ buyer, onStatusUpdated }: BuyerActionButton
       // Log the file path being requested to help with debugging
       console.log('Attempting to download file from path:', buyer.contract_file_path);
       
+      // Verify if the file exists before attempting to download
+      try {
+        const { data: fileExistsData, error: fileExistsError } = await supabase.storage
+          .from('documents')
+          .list(`projects/${buyer.project_id}`);
+        
+        const fileName = buyer.contract_file_path?.split('/').pop();
+        const fileExists = fileExistsData?.some(file => file.name === fileName);
+        
+        if (fileExistsError || !fileExists) {
+          console.error('File does not exist check result:', { fileExistsData, fileExistsError, fileName });
+          toast({
+            title: "Arquivo não encontrado",
+            description: "O arquivo do contrato não foi encontrado no armazenamento.",
+            variant: "destructive"
+          });
+          return;
+        }
+      } catch (existsError) {
+        console.error('Error checking if file exists:', existsError);
+        // Continue anyway, as the list API might be restricted
+      }
+      
       // Call the enhanced downloadDocument utility
       await downloadDocument(buyer.contract_file_path, buyer.contract_file_name);
       
