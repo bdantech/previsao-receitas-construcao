@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
 
@@ -53,13 +52,60 @@ serve(async (req) => {
       );
     }
 
-    // Parse the request body
-    const { action, file, fileName, resourceType, resourceId, buyerId } = await req.json();
+    // Parse the URL path to see if this is a direct file request
+    const url = new URL(req.url);
+    const pathParts = url.pathname.split('/');
+    const lastPart = pathParts[pathParts.length - 1];
+    
+    // Check if this is a downloadFile request
+    const requestBody = await req.json().catch(() => ({}));
+    const { action, filePath, fileName } = requestBody;
 
-    console.log('Received request:', { action, fileName, resourceType, resourceId, buyerId });
-
-    if (action === 'uploadFile') {
-      if (!file || !fileName || !resourceType || !resourceId) {
+    // Handle downloadFile action - providing a signed URL with token
+    if (action === 'downloadFile' && filePath) {
+      console.log('Processing downloadFile request for path:', filePath);
+      
+      try {
+        // Create a signed URL with an expiration of 60 minutes
+        const { data, error } = await adminSupabase
+          .storage
+          .from('documents')
+          .createSignedUrl(filePath, 60 * 60);
+        
+        if (error) {
+          console.error('Error creating signed URL:', error);
+          throw error;
+        }
+        
+        if (!data.signedUrl) {
+          throw new Error('Failed to generate signed URL');
+        }
+        
+        console.log('Successfully created signed URL with token');
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            url: data.signedUrl
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        );
+      } catch (error) {
+        console.error('Error handling download file request:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate download URL', details: error.message }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
+      }
+    } else if (action === 'uploadFile') {
+      // Keep the existing uploadFile logic
+      if (!requestBody.file || !requestBody.fileName || !requestBody.resourceType || !requestBody.resourceId) {
         return new Response(
           JSON.stringify({ error: 'Missing required fields' }),
           { 
@@ -71,14 +117,14 @@ serve(async (req) => {
 
       try {
         // Convert base64 to Uint8Array
-        const base64Str = file.split('base64,')[1];
+        const base64Str = requestBody.file.split('base64,')[1];
         const bytes = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
 
         // Create a unique file path
         const timestamp = new Date().getTime();
-        const fileNameClean = fileName.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize the filename
+        const fileNameClean = requestBody.fileName.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize the filename
         const uniqueFileName = `${timestamp}-${fileNameClean}`;
-        const filePath = `${resourceType}/${resourceId}/${uniqueFileName}`;
+        const filePath = `${requestBody.resourceType}/${requestBody.resourceId}/${uniqueFileName}`;
 
         console.log('Uploading file to path:', filePath);
 
@@ -153,8 +199,8 @@ serve(async (req) => {
         }
         
         // If buyerId is provided, update the project_buyer record
-        if (buyerId && resourceType === 'projects') {
-          console.log('Updating project_buyer record with ID:', buyerId);
+        if (requestBody.buyerId && requestBody.resourceType === 'projects') {
+          console.log('Updating project_buyer record with ID:', requestBody.buyerId);
           console.log('Setting file path:', filePath);
           console.log('Setting file name:', fileNameClean);
           
@@ -165,7 +211,7 @@ serve(async (req) => {
               contract_file_name: fileNameClean,
               contract_status: 'a_analisar'
             })
-            .eq('id', buyerId)
+            .eq('id', requestBody.buyerId)
             .select();
             
           if (updateError) {

@@ -1,4 +1,3 @@
-
 import { supabase } from "./client";
 import { Session } from "@supabase/supabase-js";
 
@@ -232,24 +231,13 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
   console.log('downloadDocument called with path:', filePath);
   
   try {
-    // First, try direct download with fetch (this is the most reliable method for public files)
-    const publicUrl = supabase.storage.from('documents').getPublicUrl(filePath).data.publicUrl;
+    // First, try to use the getPublicUrl method and append the token
+    const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+    let publicUrl = publicUrlData.publicUrl;
+    
     console.log('Generated public URL:', publicUrl);
     
-    // Test if the public URL is accessible
-    try {
-      const response = await fetch(publicUrl, { method: 'HEAD' });
-      if (response.ok) {
-        console.log('Public URL is accessible, using it for download');
-        window.open(publicUrl, '_blank');
-        return;
-      }
-      console.log('Public URL is not accessible, status:', response.status);
-    } catch (e) {
-      console.log('Error checking public URL:', e);
-    }
-    
-    // If public URL failed, try signed URL
+    // Create a signed URL with token
     console.log('Attempting to create signed URL for:', filePath);
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from('documents')
@@ -262,11 +250,12 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
     
     if (signedUrlData?.signedUrl) {
       console.log('Successfully created signed URL:', signedUrlData.signedUrl);
+      // The signed URL already includes the token parameter
       window.open(signedUrlData.signedUrl, '_blank');
       return;
     }
     
-    // Edge function fallback (uses the document-management edge function)
+    // If signed URL failed, try edge function fallback
     console.log('Falling back to edge function for download');
     const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
     if (!accessToken) {
@@ -288,11 +277,12 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
     
     if (edgeFunctionData?.url) {
       console.log('Edge function returned URL:', edgeFunctionData.url);
+      // The edge function should return a URL with the token already included
       window.open(edgeFunctionData.url, '_blank');
       return;
     }
     
-    // Last resort: try direct download through the JS SDK
+    // Last resort: direct download through the JS SDK
     console.log('Attempting direct download through SDK');
     const { data, error } = await supabase.storage
       .from('documents')
