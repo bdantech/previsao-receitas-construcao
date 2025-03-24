@@ -1,4 +1,3 @@
-
 import { supabase } from "./client";
 import { Session } from "@supabase/supabase-js";
 
@@ -42,9 +41,7 @@ export type DocumentFilter = {
   status?: DocumentStatus;
 };
 
-// Generate the URL for the document management edge function
 const getDocumentManagementUrl = (endpoint: string, params?: Record<string, string>) => {
-  // Correctly build the URL for the edge function
   const baseUrl = `${import.meta.env.VITE_SUPABASE_URL || 'https://hshfqxjrilqzjpkcotgz.supabase.co'}/functions/v1/document-management/${endpoint}`;
   const url = new URL(baseUrl);
   
@@ -59,7 +56,6 @@ const getDocumentManagementUrl = (endpoint: string, params?: Record<string, stri
   return url.toString();
 };
 
-// Function to fetch all document types
 export const getDocumentTypes = async (session: Session) => {
   const response = await fetch(getDocumentManagementUrl('document-types'), {
     method: 'GET',
@@ -78,7 +74,6 @@ export const getDocumentTypes = async (session: Session) => {
   return data.documentTypes as DocumentType[];
 };
 
-// Function to create a new document type (admin only)
 export const createDocumentType = async (
   session: Session, 
   documentType: { name: string; resource: string; description?: string; required?: boolean }
@@ -101,7 +96,6 @@ export const createDocumentType = async (
   return data.documentType as DocumentType;
 };
 
-// Function to fetch documents with optional filters
 export const getDocuments = async (session: Session, filters?: DocumentFilter) => {
   const params: Record<string, string> = {};
   
@@ -128,7 +122,6 @@ export const getDocuments = async (session: Session, filters?: DocumentFilter) =
   return data.documents as Document[];
 };
 
-// Function to submit a new document
 export const submitDocument = async (
   session: Session,
   document: {
@@ -159,7 +152,6 @@ export const submitDocument = async (
   return data.document as Document;
 };
 
-// Function to update document status (admin approves/rejects, user resubmits)
 export const updateDocumentStatus = async (
   session: Session,
   id: string,
@@ -184,14 +176,12 @@ export const updateDocumentStatus = async (
   return data.document as Document;
 };
 
-// Function to upload a file to storage
 export const uploadDocumentFile = async (
   session: Session,
   resourceType: string,
   resourceId: string,
   file: File
 ) => {
-  // Create a path in the format: resourceType/resourceId/timestamp-filename
   const timestamp = new Date().getTime();
   const filePath = `${resourceType}/${resourceId}/${timestamp}-${file.name}`;
   
@@ -214,7 +204,6 @@ export const uploadDocumentFile = async (
   };
 };
 
-// Function to get a public URL for a document
 export const getDocumentUrl = (filePath: string) => {
   const { data } = supabase.storage
     .from('documents')
@@ -223,11 +212,9 @@ export const getDocumentUrl = (filePath: string) => {
   return data.publicUrl;
 };
 
-// Storage access credentials - these will bypass RLS policies
 const STORAGE_KEY_ID = 'b4ccfb4b7d890511aaa3c6073ebe31d1';
 const STORAGE_ACCESS_KEY = 'a70c36d0d9e86ece51aa6b424de087b9112855d1369139b8d1d8386c61be7c51';
 
-// Improved function to safely download a file with multiple fallback methods
 export const downloadDocument = async (filePath: string, fileName?: string) => {
   if (!filePath) {
     throw new Error('File path is required');
@@ -236,20 +223,22 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
   console.log('downloadDocument called with path:', filePath);
   
   try {
-    // Build direct URL with access key authentication
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://hshfqxjrilqzjpkcotgz.supabase.co';
     const directUrl = `${supabaseUrl}/storage/v1/object/public/documents/${filePath}`;
     
-    console.log('Attempting direct storage access with key:', directUrl);
+    console.log('Attempting direct storage access with provided access key');
     
-    // First attempt: Direct download with access key
     try {
       const headers = {
         'apikey': STORAGE_KEY_ID,
         'Authorization': `Bearer ${STORAGE_ACCESS_KEY}`
       };
       
-      const response = await fetch(directUrl, { 
+      const downloadUrl = `${directUrl}?download=true`;
+      
+      console.log('Using direct download URL with access key:', downloadUrl);
+      
+      const response = await fetch(downloadUrl, { 
         headers,
         method: 'GET'
       });
@@ -273,7 +262,6 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
       console.error('Error with direct download:', directError);
     }
     
-    // Second attempt: Use the document-management edge function
     console.log('Attempting edge function download');
     const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
     
@@ -305,7 +293,37 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
       }
     }
     
-    // Third attempt: Signed URL via Supabase client (traditional way)
+    console.log('Attempting S3 compatible approach');
+    try {
+      const s3EndpointUrl = `${supabaseUrl}/storage/v1/s3/object/documents/${filePath}?download=true`;
+      
+      const response = await fetch(s3EndpointUrl, {
+        headers: {
+          'x-amz-access-key-id': STORAGE_KEY_ID,
+          'x-amz-secret-access-key': STORAGE_ACCESS_KEY
+        },
+        method: 'GET'
+      });
+      
+      if (response.ok) {
+        console.log('S3 compatible download successful');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || filePath.split('/').pop() || 'document.pdf';
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        return;
+      } else {
+        console.error('S3 compatible download failed:', await response.text());
+      }
+    } catch (s3Error) {
+      console.error('Error with S3 compatible download:', s3Error);
+    }
+    
     console.log('Attempting to create signed URL');
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from('documents')
@@ -324,7 +342,6 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
       console.error('Error creating signed URL:', signedUrlError || 'No URL returned');
     }
     
-    // Fourth attempt: Direct download through the JS SDK
     console.log('Attempting direct download through SDK');
     const { data, error } = await supabase.storage
       .from('documents')

@@ -46,7 +46,7 @@ export function BuyerActionButtons({ buyer, onStatusUpdated }: BuyerActionButton
       // Log the file path being requested to help with debugging
       console.log('Attempting to download file from path:', buyer.contract_file_path);
       
-      // Use the downloadDocument utility from documentService
+      // Call the enhanced downloadDocument utility
       await downloadDocument(buyer.contract_file_path, buyer.contract_file_name);
       
       toast({

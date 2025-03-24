@@ -100,10 +100,10 @@ serve(async (req) => {
             console.log('File verified, exists in storage');
             
             // If the file exists, return a direct download URL with the access key
-            const downloadHeaders = new URLSearchParams();
-            downloadHeaders.append('download', 'true');
+            const downloadParams = new URLSearchParams();
+            downloadParams.append('download', 'true');
             
-            downloadUrl = `${directUrl}?${downloadHeaders.toString()}`;
+            downloadUrl = `${directUrl}?${downloadParams.toString()}`;
             console.log('Using direct access URL for download:', downloadUrl);
           } catch (verifyError) {
             console.error('Error verifying file:', verifyError);
@@ -115,11 +115,11 @@ serve(async (req) => {
         if (!downloadUrl) {
           console.log('Falling back to signed URL generation');
           
-          // Create a signed URL with an expiration of 5 minutes
+          // Create a signed URL with an expiration of 60 minutes (3600 seconds)
           const { data, error } = await adminSupabase
             .storage
             .from('documents')
-            .createSignedUrl(filePath, 300, {
+            .createSignedUrl(filePath, 3600, {
               download: true,  // Explicitly mark for download
               transform: {
                 quality: 100  // Just to add a parameter and make sure the URL is properly formed
