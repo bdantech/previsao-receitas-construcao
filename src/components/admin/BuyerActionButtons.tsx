@@ -39,27 +39,25 @@ export function BuyerActionButtons({ buyer, onStatusUpdated }: BuyerActionButton
     }
     
     try {
-      const { data, error } = await supabase.storage
-        .from('documents')
-        .download(buyer.contract_file_path);
+      // Log the file path being requested to help with debugging
+      console.log('Attempting to download file from path:', buyer.contract_file_path);
       
-      if (error) {
-        console.error('Error downloading contract:', error);
-        throw error;
+      // Create a signed URL for the file instead of directly downloading it
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(buyer.contract_file_path, 60); // 60 seconds expiry
+      
+      if (signedUrlError) {
+        console.error('Error creating signed URL:', signedUrlError);
+        throw signedUrlError;
       }
       
-      // Create a download link
-      const blob = new Blob([data], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = buyer.contract_file_name || 'contrato.pdf';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
+      if (!signedUrlData || !signedUrlData.signedUrl) {
+        throw new Error('Failed to generate download URL');
+      }
+      
+      // Open the signed URL in a new tab
+      window.open(signedUrlData.signedUrl, '_blank');
       
       toast({
         title: "Download iniciado",

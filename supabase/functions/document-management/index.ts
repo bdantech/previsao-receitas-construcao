@@ -76,8 +76,11 @@ serve(async (req) => {
 
         // Create a unique file path
         const timestamp = new Date().getTime();
-        const uniqueFileName = `${timestamp}-${fileName}`;
+        const fileNameClean = fileName.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize the filename
+        const uniqueFileName = `${timestamp}-${fileNameClean}`;
         const filePath = `${resourceType}/${resourceId}/${uniqueFileName}`;
+
+        console.log('Uploading file to path:', filePath);
 
         // Upload file to storage using admin client
         const { data: uploadData, error: uploadError } = await adminSupabase
@@ -95,13 +98,28 @@ serve(async (req) => {
 
         console.log('File uploaded successfully:', uploadData);
         
+        // Create a signed URL for immediate access
+        const { data: urlData, error: urlError } = await adminSupabase
+          .storage
+          .from('documents')
+          .createSignedUrl(filePath, 60 * 60 * 24); // 24 hours expiry
+          
+        if (urlError) {
+          console.error('Error creating signed URL:', urlError);
+          // Continue anyway as it's not critical
+        }
+        
         // If buyerId is provided, update the project_buyer record
         if (buyerId && resourceType === 'projects') {
+          console.log('Updating project_buyer record with ID:', buyerId);
+          console.log('Setting file path:', filePath);
+          console.log('Setting file name:', fileNameClean);
+          
           const { data: updateData, error: updateError } = await adminSupabase
             .from('project_buyers')
             .update({
               contract_file_path: filePath,
-              contract_file_name: fileName,
+              contract_file_name: fileNameClean,
               contract_status: 'a_analisar'
             })
             .eq('id', buyerId)
@@ -120,7 +138,8 @@ serve(async (req) => {
           JSON.stringify({ 
             success: true, 
             filePath: filePath,
-            fileName: fileName
+            fileName: fileNameClean,
+            signedUrl: urlData?.signedUrl
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -210,22 +210,29 @@ export const useCompanyDocuments = (companyId?: string) => {
     }
 
     try {
+      console.log('Attempting to download file from path:', document.file_path);
+      
+      // Create a signed URL for the file instead of directly downloading it
       const { data, error } = await supabase.storage
         .from('documents')
-        .download(document.file_path);
-
-      if (error) throw error;
-
-      // Create a download link - fixed to use window.document instead of the document parameter
-      const blob = new Blob([data], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const a = window.document.createElement('a');
-      a.href = url;
-      a.download = document.file_name || 'document';
-      window.document.body.appendChild(a);
-      a.click();
-      window.document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+        .createSignedUrl(document.file_path, 60); // 60 seconds expiry
+      
+      if (error) {
+        console.error('Error creating signed URL:', error);
+        throw error;
+      }
+      
+      if (!data || !data.signedUrl) {
+        throw new Error('Failed to generate download URL');
+      }
+      
+      // Open the signed URL in a new tab
+      window.open(data.signedUrl, '_blank');
+      
+      toast({
+        title: 'Success',
+        description: 'Document download started.',
+      });
     } catch (error) {
       console.error('Error downloading document:', error);
       toast({
