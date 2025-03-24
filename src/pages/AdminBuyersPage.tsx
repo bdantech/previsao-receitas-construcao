@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AdminBuyersTable } from "@/components/admin/AdminBuyersTable";
-import { downloadDocument } from "@/lib/downloadDocument";
+import { downloadDocument } from "@/integrations/supabase/documentService";
 
 export default function AdminBuyersPage() {
   const { session, userRole, isLoading: isLoadingAuth } = useAuth();
