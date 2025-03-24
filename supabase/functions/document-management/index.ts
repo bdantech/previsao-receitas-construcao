@@ -127,6 +127,19 @@ serve(async (req) => {
         
         console.log(`Updating document ${documentId} status to ${status}`);
         
+        // First get the document to know the company ID
+        const { data: documentData, error: documentError } = await adminSupabase
+          .from('documents')
+          .select('resource_id, resource_type')
+          .eq('id', documentId)
+          .single();
+          
+        if (documentError) {
+          console.error('Error fetching document:', documentError);
+          throw documentError;
+        }
+        
+        // Update the document
         const { data: document, error: updateError } = await adminSupabase
           .from('documents')
           .update(updateData)
@@ -140,6 +153,61 @@ serve(async (req) => {
         }
         
         console.log('Document status updated successfully:', document);
+        
+        // If document is for a company and status changed to approved,
+        // check if all required documents are approved
+        if (documentData.resource_type === 'company' && status === 'approved') {
+          const companyId = documentData.resource_id;
+          
+          try {
+            // Check if all required documents are approved for this company
+            const { data: requiredDocuments, error: requiredDocsError } = await adminSupabase
+              .from('documents')
+              .select(`
+                id, 
+                status, 
+                document_type:document_type_id(id, name, required)
+              `)
+              .eq('resource_type', 'company')
+              .eq('resource_id', companyId);
+              
+            if (requiredDocsError) {
+              console.error('Error fetching required documents:', requiredDocsError);
+              throw requiredDocsError;
+            }
+            
+            // Check if any required documents are not approved
+            const pendingRequiredDocs = requiredDocuments.filter(doc => 
+              doc.document_type.required && doc.status !== 'approved'
+            );
+            
+            // If all required documents are approved, update company status to approved
+            if (pendingRequiredDocs.length === 0) {
+              console.log('All required documents are approved, updating company status');
+              
+              // Update using service role - bypassing RLS policies
+              const { data: updateResult, error: companyUpdateError } = await adminSupabase
+                .from('companies')
+                .update({ documents_status: 'approved' })
+                .eq('id', companyId)
+                .select();
+                
+              if (companyUpdateError) {
+                console.error('Error updating company status:', companyUpdateError);
+                // Log error but don't throw - we still want to return success for the document update
+                console.log('Company status update failed but document was updated successfully');
+              } else {
+                console.log('Company status updated to approved:', updateResult);
+              }
+            } else {
+              console.log('Not all required documents are approved yet, remaining:', 
+                pendingRequiredDocs.map(d => d.document_type.name).join(', '));
+            }
+          } catch (companyCheckError) {
+            console.error('Error checking company documents status:', companyCheckError);
+            // Continue and return success for document update even if company status check fails
+          }
+        }
         
         return new Response(
           JSON.stringify({ 
