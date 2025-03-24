@@ -1,147 +1,92 @@
 
-import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Building, FolderKanban, LayoutDashboard, LogOut, Link2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
-
-interface SidebarItemProps {
-  icon: React.ElementType;
-  label: string;
-  href: string;
-  isCollapsed: boolean;
-  isActive: boolean;
-}
-
-const SidebarItem = ({ 
-  icon: Icon, 
-  label, 
-  href, 
-  isCollapsed,
-  isActive
-}: SidebarItemProps) => {
-  return (
-    <Link to={href}>
-      <Button 
-        variant="ghost" 
-        className={cn(
-          "w-full justify-start gap-3 px-3 py-2 my-1",
-          isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : 
-          "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        )}
-      >
-        <Icon className="h-5 w-5" />
-        {!isCollapsed && <span>{label}</span>}
-      </Button>
-    </Link>
-  );
-};
+import { LayoutDashboard, CreditCard, Building2, ArrowRightLeft, CogIcon } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { Button } from "../ui/button";
+import { Separator } from "../ui/separator";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Sidebar = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  
-  const toggleSidebar = () => {
-    setIsCollapsed(prev => !prev);
-  };
+  const { signOut, userRole } = useAuth();
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate('/auth');
-      toast({
-        description: "Logout realizado com sucesso",
-      });
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        variant: "destructive",
-        description: "Erro ao realizar logout",
-      });
-    }
-  };
-
-  const sidebarItems = [
-    {
-      icon: LayoutDashboard,
-      label: "Dashboard",
-      href: "/dashboard"
-    },
-    {
-      icon: FolderKanban,
-      label: "Projetos",
-      href: "/projects"
-    },
-    {
-      icon: Building,
-      label: "Minha Empresa",
-      href: "/company"
-    },
-    {
-      icon: Link2,
-      label: "Integrações",
-      href: "/integrations"
-    }
-  ];
+  const isAdmin = userRole === 'admin';
 
   return (
-    <div 
-      className={cn(
-        "h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 flex flex-col",
-        isCollapsed ? "w-[70px]" : "w-[250px]"
-      )}
-    >
-      <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
-        {!isCollapsed ? (
-          <div className="flex items-center space-x-1">
-            <span className="font-bold text-2xl text-gray-500">ONE</span>
-            <span className="font-bold text-2xl text-green-500">PAY</span>
-          </div>
-        ) : (
-          <div className="w-full flex justify-center">
-            <span className="font-bold text-xl text-green-500">OP</span>
-          </div>
-        )}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={toggleSidebar}
-          className="ml-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        >
-          {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
-        </Button>
-      </div>
-
-      <div className="flex-1 px-3 py-4">
-        <nav className="space-y-1">
-          {sidebarItems.map((item) => (
-            <SidebarItem 
-              key={item.href}
-              icon={item.icon} 
-              label={item.label} 
-              href={item.href}
-              isCollapsed={isCollapsed}
-              isActive={location.pathname === item.href}
-            />
-          ))}
+    <div className="flex flex-col h-full border-r border-gray-200">
+      <div className="flex-1 py-4">
+        <div className="px-4 mb-4">
+          <h2 className="text-lg font-semibold text-gray-800">Financify</h2>
+          <p className="text-sm text-gray-500">Painel de Controle</p>
+        </div>
+        
+        <Separator className="mb-4" />
+        
+        <nav className="px-2 space-y-1">
+          <NavLink 
+            to="/dashboard" 
+            className={({ isActive }) => `
+              flex items-center px-2 py-2 text-sm font-medium rounded-md
+              ${isActive 
+                ? 'bg-blue-100 text-blue-800' 
+                : 'text-gray-600 hover:bg-gray-100'
+              }
+            `}
+          >
+            <LayoutDashboard className="mr-3 h-5 w-5" />
+            Dashboard
+          </NavLink>
+          
+          <NavLink 
+            to="/projects" 
+            className={({ isActive }) => `
+              flex items-center px-2 py-2 text-sm font-medium rounded-md
+              ${isActive 
+                ? 'bg-blue-100 text-blue-800' 
+                : 'text-gray-600 hover:bg-gray-100'
+              }
+            `}
+          >
+            <CreditCard className="mr-3 h-5 w-5" />
+            Projetos
+          </NavLink>
+          
+          <NavLink 
+            to="/company" 
+            className={({ isActive }) => `
+              flex items-center px-2 py-2 text-sm font-medium rounded-md
+              ${isActive 
+                ? 'bg-blue-100 text-blue-800' 
+                : 'text-gray-600 hover:bg-gray-100'
+              }
+            `}
+          >
+            <Building2 className="mr-3 h-5 w-5" />
+            Minha Empresa
+          </NavLink>
+          
+          <NavLink 
+            to="/integrations" 
+            className={({ isActive }) => `
+              flex items-center px-2 py-2 text-sm font-medium rounded-md
+              ${isActive 
+                ? 'bg-blue-100 text-blue-800' 
+                : 'text-gray-600 hover:bg-gray-100'
+              }
+            `}
+          >
+            <ArrowRightLeft className="mr-3 h-5 w-5" />
+            Integrações
+          </NavLink>
         </nav>
       </div>
-
-      <div className="px-3 py-4 border-t border-sidebar-border">
-        <Button 
-          variant="ghost" 
-          className={cn(
-            "w-full justify-start gap-3 px-3 py-2",
-            "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          )}
-          onClick={handleLogout}
+      
+      <div className="p-4">
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          onClick={signOut}
         >
-          <LogOut className="h-5 w-5" />
-          {!isCollapsed && <span>Sair</span>}
+          <CogIcon className="mr-2 h-4 w-4" />
+          Sair
         </Button>
       </div>
     </div>
