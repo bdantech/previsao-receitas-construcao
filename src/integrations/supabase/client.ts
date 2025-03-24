@@ -51,6 +51,13 @@ export const documentManagementApi = {
     });
     return data;
   },
+
+  getDocumentSignedUrl: async (filePath: string) => {
+    const data = await supabase.storage.from('documents').createSignedUrl(filePath, 60);
+    
+    return data
+  },
+
   
   // Documents
   getDocuments: async (filters?: { resourceType?: string, resourceId?: string, status?: string, userId?: string }) => {

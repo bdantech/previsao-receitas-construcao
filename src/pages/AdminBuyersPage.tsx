@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { projectBuyersApi } from "@/integrations/supabase/client";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -9,18 +10,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, FileText, PenSquare } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { formatCPF } from "@/lib/formatters";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { documentManagementApi, supabase } from "@/integrations/supabase/client";
+import { formatCPF } from "@/lib/formatters";
+import { useQuery } from "@tanstack/react-query";
+import { FileText, Loader2, PenSquare } from "lucide-react";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AdminBuyersTable } from "@/components/admin/AdminBuyersTable";
-import { downloadDocument } from "@/integrations/supabase/documentService";
 
 export default function AdminBuyersPage() {
   const { session, userRole, isLoading: isLoadingAuth } = useAuth();
@@ -162,9 +159,27 @@ export default function AdminBuyersPage() {
 
     try {
       console.log('Attempting to download file from path:', buyer.contract_file_path);
-      
-      await downloadDocument(buyer.contract_file_path, buyer.contract_file_name);
-      
+
+      const { data, error } = await documentManagementApi.getDocumentSignedUrl(buyer.contract_file_path);
+      if (error) {
+        console.error('Error downloading contract:', error);
+        throw error;
+      }
+
+      if(data.signedUrl){
+        const response = await fetch(data.signedUrl);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = buyer.contract_file_path.split('/').pop();
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+      }
+
+
       toast.success("Download do contrato iniciado");
     } catch (error) {
       console.error('Error downloading contract:', error);
