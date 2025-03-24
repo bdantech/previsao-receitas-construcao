@@ -222,3 +222,61 @@ export const getDocumentUrl = (filePath: string) => {
   
   return data.publicUrl;
 };
+
+// New function to safely download a file with multiple fallback methods
+export const downloadDocument = async (filePath: string, fileName?: string) => {
+  if (!filePath) {
+    throw new Error('File path is required');
+  }
+  
+  try {
+    // Try public URL first (most reliable)
+    const { data: publicUrlData } = supabase.storage
+      .from('documents')
+      .getPublicUrl(filePath);
+      
+    if (publicUrlData?.publicUrl) {
+      window.open(publicUrlData.publicUrl, '_blank');
+      return;
+    }
+    
+    // If public URL fails, try signed URL
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(filePath, 60);
+      
+    if (signedUrlError) {
+      console.error('Error creating signed URL:', signedUrlError);
+      throw signedUrlError;
+    }
+    
+    if (signedUrlData?.signedUrl) {
+      window.open(signedUrlData.signedUrl, '_blank');
+      return;
+    }
+    
+    // Last resort: try direct download 
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .download(filePath);
+      
+    if (error) {
+      console.error('Error downloading file:', error);
+      throw error;
+    }
+    
+    // Create a blob URL and trigger download
+    const blob = new Blob([data], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName || filePath.split('/').pop() || 'document.pdf';
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (error) {
+    console.error('Error downloading document:', error);
+    throw error;
+  }
+};

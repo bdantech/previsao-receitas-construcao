@@ -82,6 +82,29 @@ serve(async (req) => {
 
         console.log('Uploading file to path:', filePath);
 
+        // Make sure the bucket exists before uploading
+        const { data: buckets, error: bucketsError } = await adminSupabase
+          .storage
+          .listBuckets();
+          
+        if (bucketsError) {
+          console.error('Error listing buckets:', bucketsError);
+          throw new Error(`Failed to check storage buckets: ${bucketsError.message}`);
+        }
+        
+        const documentsBucketExists = buckets?.some(bucket => bucket.name === 'documents');
+        if (!documentsBucketExists) {
+          console.log('Creating documents bucket as it does not exist');
+          const { error: createBucketError } = await adminSupabase
+            .storage
+            .createBucket('documents', { public: true });
+            
+          if (createBucketError) {
+            console.error('Error creating documents bucket:', createBucketError);
+            throw new Error(`Failed to create documents bucket: ${createBucketError.message}`);
+          }
+        }
+
         // Upload file to storage using admin client
         const { data: uploadData, error: uploadError } = await adminSupabase
           .storage
@@ -93,7 +116,7 @@ serve(async (req) => {
 
         if (uploadError) {
           console.error('Upload error:', uploadError);
-          throw uploadError;
+          throw new Error(`Erro ao fazer upload do arquivo: ${uploadError.message}`);
         }
 
         console.log('File uploaded successfully:', uploadData);
@@ -107,6 +130,26 @@ serve(async (req) => {
         if (urlError) {
           console.error('Error creating signed URL:', urlError);
           // Continue anyway as it's not critical
+        }
+        
+        // Verify the file exists in the bucket
+        const { data: verifyData, error: verifyError } = await adminSupabase
+          .storage
+          .from('documents')
+          .list(filePath.split('/').slice(0, -1).join('/'));
+          
+        if (verifyError) {
+          console.error('Error verifying file upload:', verifyError);
+        } else {
+          const fileExists = verifyData?.some(file => 
+            file.name === filePath.split('/').pop()
+          );
+          
+          if (!fileExists) {
+            console.error('File was not found after upload:', filePath);
+          } else {
+            console.log('File successfully verified in storage:', filePath);
+          }
         }
         
         // If buyerId is provided, update the project_buyer record
@@ -132,6 +175,21 @@ serve(async (req) => {
           } else {
             console.log('Project buyer record updated successfully:', updateData);
           }
+        }
+
+        // Set the file to be publicly accessible
+        const { error: updatePublicError } = await adminSupabase
+          .storage
+          .from('documents')
+          .update(filePath, bytes, {
+            contentType: 'application/pdf',
+            upsert: true,
+            cacheControl: '3600',
+            allowedMimeTypes: ['application/pdf']
+          });
+          
+        if (updatePublicError) {
+          console.error('Error setting file to public:', updatePublicError);
         }
 
         return new Response(
