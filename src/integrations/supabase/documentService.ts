@@ -223,50 +223,88 @@ export const getDocumentUrl = (filePath: string) => {
   return data.publicUrl;
 };
 
-// New function to safely download a file with multiple fallback methods
+// Improved function to safely download a file with multiple fallback methods
 export const downloadDocument = async (filePath: string, fileName?: string) => {
   if (!filePath) {
     throw new Error('File path is required');
   }
   
+  console.log('downloadDocument called with path:', filePath);
+  
   try {
-    // Try public URL first (most reliable)
-    const { data: publicUrlData } = supabase.storage
-      .from('documents')
-      .getPublicUrl(filePath);
-      
-    if (publicUrlData?.publicUrl) {
-      window.open(publicUrlData.publicUrl, '_blank');
-      return;
+    // First, try direct download with fetch (this is the most reliable method for public files)
+    const publicUrl = supabase.storage.from('documents').getPublicUrl(filePath).data.publicUrl;
+    console.log('Generated public URL:', publicUrl);
+    
+    // Test if the public URL is accessible
+    try {
+      const response = await fetch(publicUrl, { method: 'HEAD' });
+      if (response.ok) {
+        console.log('Public URL is accessible, using it for download');
+        window.open(publicUrl, '_blank');
+        return;
+      }
+      console.log('Public URL is not accessible, status:', response.status);
+    } catch (e) {
+      console.log('Error checking public URL:', e);
     }
     
-    // If public URL fails, try signed URL
+    // If public URL failed, try signed URL
+    console.log('Attempting to create signed URL for:', filePath);
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from('documents')
-      .createSignedUrl(filePath, 60);
-      
+      .createSignedUrl(filePath, 3600); // 1 hour expiry
+    
     if (signedUrlError) {
       console.error('Error creating signed URL:', signedUrlError);
-      throw signedUrlError;
+      throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
     }
     
     if (signedUrlData?.signedUrl) {
+      console.log('Successfully created signed URL:', signedUrlData.signedUrl);
       window.open(signedUrlData.signedUrl, '_blank');
       return;
     }
     
-    // Last resort: try direct download 
+    // Edge function fallback (uses the document-management edge function)
+    console.log('Falling back to edge function for download');
+    const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
+    if (!accessToken) {
+      throw new Error('No authentication token available');
+    }
+    
+    const { data: edgeFunctionData, error: edgeFunctionError } = await supabase.functions.invoke(
+      'document-management',
+      {
+        body: { action: 'downloadFile', filePath },
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    );
+    
+    if (edgeFunctionError) {
+      console.error('Edge function error:', edgeFunctionError);
+      throw new Error(`Edge function failed: ${edgeFunctionError.message}`);
+    }
+    
+    if (edgeFunctionData?.url) {
+      console.log('Edge function returned URL:', edgeFunctionData.url);
+      window.open(edgeFunctionData.url, '_blank');
+      return;
+    }
+    
+    // Last resort: try direct download through the JS SDK
+    console.log('Attempting direct download through SDK');
     const { data, error } = await supabase.storage
       .from('documents')
       .download(filePath);
       
     if (error) {
-      console.error('Error downloading file:', error);
-      throw error;
+      console.error('Error downloading file through SDK:', error);
+      throw new Error(`SDK download failed: ${error.message}`);
     }
     
     // Create a blob URL and trigger download
-    const blob = new Blob([data], { type: 'application/pdf' });
+    const blob = new Blob([data], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -275,6 +313,8 @@ export const downloadDocument = async (filePath: string, fileName?: string) => {
     a.click();
     URL.revokeObjectURL(url);
     document.body.removeChild(a);
+    
+    console.log('Download completed successfully');
   } catch (error) {
     console.error('Error downloading document:', error);
     throw error;

@@ -5,6 +5,7 @@ import { DownloadCloud, FileText, Search } from "lucide-react";
 import { BuyerStatusDialog } from "./BuyerStatusDialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { downloadDocument } from "@/integrations/supabase/documentService";
 
 interface BuyerActionButtonsProps {
   buyer: {
@@ -45,57 +46,8 @@ export function BuyerActionButtons({ buyer, onStatusUpdated }: BuyerActionButton
       // Log the file path being requested to help with debugging
       console.log('Attempting to download file from path:', buyer.contract_file_path);
       
-      // Check if the file exists first
-      const { data: fileData, error: fileError } = await supabase.storage
-        .from('documents')
-        .list(buyer.contract_file_path.split('/').slice(0, -1).join('/'));
-      
-      if (fileError) {
-        console.error('Error checking file existence:', fileError);
-        throw new Error(`Error checking if file exists: ${fileError.message}`);
-      }
-      
-      const fileName = buyer.contract_file_path.split('/').pop();
-      const fileExists = fileData?.some(file => file.name === fileName);
-      
-      if (!fileExists) {
-        console.error('File does not exist in storage:', buyer.contract_file_path);
-        throw new Error('O arquivo do contrato não foi encontrado no armazenamento.');
-      }
-      
-      // Try to download with public URL first, as it's more reliable
-      const { data: publicUrlData } = await supabase.storage
-        .from('documents')
-        .getPublicUrl(buyer.contract_file_path);
-      
-      if (publicUrlData?.publicUrl) {
-        // Open the public URL in a new tab
-        window.open(publicUrlData.publicUrl, '_blank');
-        
-        toast({
-          title: "Download iniciado",
-          description: "O contrato está sendo baixado."
-        });
-        return;
-      }
-      
-      // Fallback to signed URL if public URL is not available
-      console.log('Public URL not available, attempting to create signed URL');
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('documents')
-        .createSignedUrl(buyer.contract_file_path, 60); // 60 seconds expiry
-      
-      if (signedUrlError) {
-        console.error('Error creating signed URL:', signedUrlError);
-        throw new Error(`Erro ao gerar URL de download: ${signedUrlError.message}`);
-      }
-      
-      if (!signedUrlData || !signedUrlData.signedUrl) {
-        throw new Error('Falha ao gerar URL de download');
-      }
-      
-      // Open the signed URL in a new tab
-      window.open(signedUrlData.signedUrl, '_blank');
+      // Use the downloadDocument utility from documentService
+      await downloadDocument(buyer.contract_file_path, buyer.contract_file_name);
       
       toast({
         title: "Download iniciado",

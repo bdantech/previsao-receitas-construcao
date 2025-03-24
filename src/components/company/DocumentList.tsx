@@ -1,8 +1,8 @@
-
 import { Button } from "@/components/ui/button";
 import { Upload, Download, Loader } from "lucide-react";
 import { DocumentStatusBadge } from "./DocumentStatusBadge";
 import { CompanyDocument } from "@/types/document";
+import { downloadDocument } from "@/integrations/supabase/documentService";
 
 interface DocumentListProps {
   documents: CompanyDocument[];
@@ -20,6 +20,17 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   // Helper function to determine if a document has a file
   const hasFile = (doc: CompanyDocument) => {
     return doc.file_path && doc.file_path.trim().length > 0;
+  };
+
+  // Fallback download method that uses our improved documentService
+  const handleFallbackDownload = async (doc: CompanyDocument) => {
+    try {
+      await downloadDocument(doc.file_path, doc.file_name);
+    } catch (error) {
+      console.error("Error with fallback download:", error);
+      // If the fallback fails, still try the original method
+      onDownload(doc);
+    }
   };
 
   return (
@@ -51,7 +62,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onDownload(doc)}
+                    onClick={() => handleFallbackDownload(doc)}
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Download
