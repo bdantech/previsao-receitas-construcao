@@ -1,12 +1,12 @@
 
 import { Button } from "@/components/ui/button";
-import { Upload, Download, Loader, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import { DocumentStatusBadge } from "./DocumentStatusBadge";
+import { useAuth } from "@/hooks/useAuth";
+import { documentManagementApi } from "@/integrations/supabase/client";
 import { CompanyDocument } from "@/types/document";
-import { downloadDocument } from "@/integrations/supabase/documentService";
+import { AlertCircle, CheckCircle, Download, Loader, Upload, XCircle } from "lucide-react";
 import { useState } from "react";
 import { DocumentReviewDialog } from "./DocumentReviewDialog";
-import { useAuth } from "@/hooks/useAuth";
+import { DocumentStatusBadge } from "./DocumentStatusBadge";
 
 interface DocumentListProps {
   documents: CompanyDocument[];
@@ -49,7 +49,24 @@ export const DocumentList: React.FC<DocumentListProps> = ({
       console.log('Using enhanced download method with access key for:', doc.file_path);
       
       // Try to download using the enhanced utility
-      await downloadDocument(doc.file_path, doc.file_name);
+      const { data, error } = await documentManagementApi.getDocumentSignedUrl(doc.file_path);
+      if (error) {
+        console.error('Error downloading contract:', error);
+        throw error;
+      }
+
+      if(data.signedUrl){
+        const response = await fetch(data.signedUrl);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = doc.file_name;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+      }
     } catch (error) {
       console.error("Error with fallback download:", error);
       
