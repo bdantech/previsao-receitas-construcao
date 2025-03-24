@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { formatCNPJ } from "@/lib/formatters";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CompanyDocuments } from "@/components/company/CompanyDocuments";
 
 interface Company {
   id: string;
@@ -171,46 +174,61 @@ const CompanyPage = () => {
               <p className="text-gray-500">CNPJ: {formatCNPJ(company.cnpj)}</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-4 max-w-xl">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome da Empresa</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
+            <Tabs defaultValue="info" className="w-full">
+              <TabsList className="mb-6">
+                <TabsTrigger value="info">Informações Gerais</TabsTrigger>
+                <TabsTrigger value="documents">Documentos</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="info">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid gap-4 max-w-xl">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nome da Empresa</Label>
+                      <Input
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="website">Website (opcional)</Label>
-                  <Input
-                    id="website"
-                    name="website"
-                    type="url"
-                    value={formData.website}
-                    onChange={handleInputChange}
-                    placeholder="https://www.exemplo.com.br"
-                  />
-                </div>
-              </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="website">Website (opcional)</Label>
+                      <Input
+                        id="website"
+                        name="website"
+                        type="url"
+                        value={formData.website}
+                        onChange={handleInputChange}
+                        placeholder="https://www.exemplo.com.br"
+                      />
+                    </div>
+                  </div>
 
-              <Button type="submit" disabled={updating}>
-                {updating ? (
-                  <>
-                    <Loader className="h-4 w-4 mr-2 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Salvar Alterações
-                  </>
+                  <Button type="submit" disabled={updating}>
+                    {updating ? (
+                      <>
+                        <Loader className="h-4 w-4 mr-2 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Salvar Alterações
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="documents">
+                {company && (
+                  <CompanyDocuments companyId={company.id} />
                 )}
-              </Button>
-            </form>
+              </TabsContent>
+            </Tabs>
           </>
         ) : (
           <div className="text-center py-8 text-gray-500">
