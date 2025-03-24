@@ -75,9 +75,9 @@ export const useCompanyDocuments = (companyId?: string) => {
     }
   }, [companyId, fetchDocuments]);
 
-  const uploadFile = async (file: File, resourceType: string, resourceId: string) => {
+  const uploadFile = async (file: File, resourceType: string, resourceId: string, documentId?: string) => {
     try {
-      const headers = getAuthHeader();
+      const headers = await getAuthHeader();
       
       // Convert file to base64
       const base64File = await new Promise<string>((resolve, reject) => {
@@ -93,7 +93,9 @@ export const useCompanyDocuments = (companyId?: string) => {
           file: base64File,
           fileName: file.name,
           resourceType,
-          resourceId
+          resourceId,
+          documentId,
+          userId: session?.user?.id
         },
         headers: headers
       });
@@ -187,23 +189,9 @@ export const useCompanyDocuments = (companyId?: string) => {
     setUploading(prev => ({ ...prev, [documentId]: true }));
 
     try {
-      // Upload the file
-      const uploadResult = await uploadFile(file, 'company', companyId);
+      // Upload the file with document ID included
+      const uploadResult = await uploadFile(file, 'company', companyId, documentId);
       
-      // Update the document record with new status
-      const { error } = await supabase
-        .from('documents')
-        .update({
-          file_name: file.name,
-          file_path: uploadResult.filePath,
-          status: 'sent',
-          submitted_at: new Date().toISOString(),
-          submitted_by: session?.user?.id
-        })
-        .eq('id', documentId);
-
-      if (error) throw error;
-
       toast({
         title: 'Success',
         description: 'Document uploaded successfully.',

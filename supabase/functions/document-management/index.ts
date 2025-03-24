@@ -419,24 +419,44 @@ serve(async (req) => {
         // If document ID is provided, update the document record with new status
         if (requestBody.documentId) {
           console.log('Updating document record with ID:', requestBody.documentId);
-          console.log('Setting file path:', filePath);
-          console.log('Setting file name:', fileNameClean);
-          console.log('Setting status to: sent');
+          
+          const now = new Date().toISOString();
+          
+          // Create update object with all required fields
+          const documentUpdate = {
+            file_path: filePath,
+            file_name: fileNameClean,
+            status: 'sent',
+            submitted_at: now,
+            updated_at: now,
+            submitted_by: requestBody.userId || user.id, // Use provided userId or default to current user
+            file_size: bytes.length, // Add file size information
+            mime_type: 'application/pdf' // Add mime type information
+          };
+          
+          console.log('Updating document with data:', documentUpdate);
           
           const { data: updateData, error: updateError } = await adminSupabase
             .from('documents')
-            .update({
-              file_path: filePath,
-              file_name: fileNameClean,
-              status: 'sent',
-              submitted_at: new Date().toISOString(),
-              submitted_by: requestBody.userId || null
-            })
+            .update(documentUpdate)
             .eq('id', requestBody.documentId)
             .select();
             
           if (updateError) {
             console.error('Error updating document record:', updateError);
+            // Get more details about the specific error
+            const { data: docInfo, error: docInfoError } = await adminSupabase
+              .from('documents')
+              .select('*')
+              .eq('id', requestBody.documentId)
+              .single();
+            
+            if (docInfoError) {
+              console.error('Error checking document:', docInfoError);
+            } else {
+              console.log('Current document state:', docInfo);
+            }
+            
             // Don't throw here, still return success for the file upload
             console.log('File was uploaded but document record was not updated');
           } else {
