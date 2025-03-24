@@ -9,7 +9,7 @@ export interface DocumentType {
 export interface CompanyDocument {
   id: string;
   document_type: DocumentType;
-  status: "not_sent" | "sent" | "approved" | "needs_revision";
+  status: "not_sent" | "sent" | "approved" | "needs_revision" | "rejected";
   file_name: string;
   file_path: string;
   review_notes?: string;
