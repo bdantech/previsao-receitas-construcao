@@ -57,24 +57,129 @@ serve(async (req) => {
     const pathParts = url.pathname.split('/');
     const lastPart = pathParts[pathParts.length - 1];
     
-    // Check if this is a downloadFile request
+    // Get the request body
     const requestBody = await req.json().catch(() => ({}));
-    const { action, filePath, fileName, useAccessKey, keyId, accessKey } = requestBody;
+    const { action } = requestBody;
 
+    console.log('Document management function called with action:', action);
+    
+    // Handle getDocuments action
+    if (action === 'getDocuments') {
+      const { resourceType, resourceId } = requestBody;
+      
+      if (!resourceType || !resourceId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required fields: resourceType and resourceId' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        );
+      }
+      
+      console.log(`Fetching documents for ${resourceType} with ID ${resourceId}`);
+      
+      try {
+        // For company users, check if they belong to the company
+        if (resourceType === 'company') {
+          const { data: userCompanies, error: userCompaniesError } = await adminSupabase
+            .from('user_companies')
+            .select('company_id')
+            .eq('user_id', user.id);
+            
+          if (userCompaniesError) {
+            console.error('Error checking user companies:', userCompaniesError);
+            throw userCompaniesError;
+          }
+          
+          // Check if user is admin or belongs to this company
+          const { data: userProfile, error: profileError } = await adminSupabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+            
+          const isAdmin = userProfile?.role === 'admin';
+          const isCompanyUser = userCompanies?.some(uc => uc.company_id === resourceId);
+          
+          if (!isAdmin && !isCompanyUser) {
+            console.error('User does not have access to this company');
+            return new Response(
+              JSON.stringify({ error: 'Access denied to this company' }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 403 
+              }
+            );
+          }
+        }
+        
+        // Get documents with their types and related user information
+        const { data: documents, error: documentsError } = await adminSupabase
+          .from('documents')
+          .select(`
+            id,
+            document_type_id,
+            resource_type,
+            resource_id,
+            status,
+            file_path,
+            file_name,
+            submitted_by,
+            submitted_at,
+            reviewed_by,
+            reviewed_at,
+            review_notes,
+            document_type:document_type_id(id, name, description, required),
+            submitter:submitted_by(id, email),
+            reviewer:reviewed_by(id, email)
+          `)
+          .eq('resource_type', resourceType)
+          .eq('resource_id', resourceId);
+        
+        if (documentsError) {
+          console.error('Error fetching documents:', documentsError);
+          throw documentsError;
+        }
+        
+        console.log(`Found ${documents?.length || 0} documents`);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            documents: documents || [] 
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        );
+      } catch (error) {
+        console.error('Error handling getDocuments request:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch documents', details: error.message }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
+      }
+    }
+    
     // Handle downloadFile action - providing a signed URL with token
-    if (action === 'downloadFile' && filePath) {
-      console.log('Processing downloadFile request for path:', filePath);
+    if (action === 'downloadFile' && requestBody.filePath) {
+      console.log('Processing downloadFile request for path:', requestBody.filePath);
       
       try {
         let downloadUrl;
         
         // Check if we should use direct access with key
-        if (useAccessKey && keyId && accessKey) {
+        if (requestBody.useAccessKey && requestBody.keyId && requestBody.accessKey) {
           console.log('Using access key for storage access');
           
           // Create a direct URL with access key authentication
           const bucketName = 'documents';
-          const objectPath = filePath;
+          const objectPath = requestBody.filePath;
           
           // First verify the file exists
           try {
@@ -113,8 +218,8 @@ serve(async (req) => {
           
           // Try to fetch the object directly with the access keys
           const verificationHeaders = {
-            'apikey': keyId,
-            'Authorization': `Bearer ${accessKey}`
+            'apikey': requestBody.keyId,
+            'Authorization': `Bearer ${requestBody.accessKey}`
           };
           
           try {
@@ -162,7 +267,7 @@ serve(async (req) => {
           const { data, error } = await adminSupabase
             .storage
             .from('documents')
-            .createSignedUrl(filePath, 3600, {
+            .createSignedUrl(requestBody.filePath, 3600, {
               download: true,  // Explicitly mark for download
               transform: {
                 quality: 100  // Just to add a parameter and make sure the URL is properly formed
@@ -214,8 +319,10 @@ serve(async (req) => {
           }
         );
       }
-    } else if (action === 'uploadFile') {
-      // Keep the existing uploadFile logic
+    }
+    
+    // Handle uploadFile action
+    if (action === 'uploadFile') {
       if (!requestBody.file || !requestBody.fileName || !requestBody.resourceType || !requestBody.resourceId) {
         return new Response(
           JSON.stringify({ error: 'Missing required fields' }),

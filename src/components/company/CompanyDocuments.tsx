@@ -23,9 +23,13 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
 
   useEffect(() => {
     if (companyId) {
+      console.log('CompanyDocuments: Fetching documents for company ID:', companyId);
       fetchDocuments();
     }
   }, [companyId, fetchDocuments]);
+
+  console.log('CompanyDocuments: Current documents:', documents);
+  console.log('CompanyDocuments: Loading state:', loading);
 
   // Check the overall status of documents
   const getDocumentsStatus = () => {

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -21,7 +22,7 @@ interface Document {
 }
 
 export const useCompanyDocuments = (companyId?: string) => {
-  const { getAuthHeader } = useAuth();
+  const { session, getAuthHeader } = useAuth();
   const { toast } = useToast();
   const [documents, setDocuments] = useState<CompanyDocument[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,8 +33,30 @@ export const useCompanyDocuments = (companyId?: string) => {
     
     setLoading(true);
     try {
-      const result = await getDocuments('company', companyId);
-      setDocuments(result as unknown as CompanyDocument[]);
+      console.log('Fetching documents for company:', companyId);
+      
+      const { data, error } = await supabase.functions.invoke('document-management', {
+        body: {
+          action: 'getDocuments',
+          resourceType: 'company',
+          resourceId: companyId
+        },
+        headers: await getAuthHeader()
+      });
+      
+      if (error) {
+        console.error('Error from document-management function:', error);
+        throw error;
+      }
+      
+      console.log('Documents data received:', data);
+      
+      if (data && data.documents) {
+        setDocuments(data.documents as CompanyDocument[]);
+      } else {
+        console.warn('No documents data returned from function');
+        setDocuments([]);
+      }
     } catch (error) {
       console.error('Error fetching documents:', error);
       toast({
@@ -41,10 +64,11 @@ export const useCompanyDocuments = (companyId?: string) => {
         description: 'Failed to load documents. Please try again.',
         variant: 'destructive',
       });
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
-  }, [companyId, toast]);
+  }, [companyId, toast, getAuthHeader]);
 
   useEffect(() => {
     if (companyId) {
@@ -240,7 +264,7 @@ export const useCompanyDocuments = (companyId?: string) => {
     documents,
     loading,
     uploading,
-    getDocuments,
+    getDocuments: fetchDocuments,
     updateDocumentStatus,
     uploadFile,
     handleFileUpload,
