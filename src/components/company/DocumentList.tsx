@@ -26,6 +26,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   // Fallback download method that uses our improved documentService
   const handleFallbackDownload = async (doc: CompanyDocument) => {
     try {
+      console.log('Using enhanced download method with access key for:', doc.file_path);
       await downloadDocument(doc.file_path, doc.file_name);
     } catch (error) {
       console.error("Error with fallback download:", error);

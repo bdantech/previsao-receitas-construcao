@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { CompanyDocument } from '@/types/document';
 import { useToast } from '@/components/ui/use-toast';
+import { downloadDocument } from '@/integrations/supabase/documentService';
 
 interface Document {
   id: string;
@@ -199,7 +200,7 @@ export const useCompanyDocuments = (companyId?: string) => {
     }
   };
 
-  const downloadDocument = async (document: CompanyDocument) => {
+  const downloadDocumentHandler = async (document: CompanyDocument) => {
     if (!document.file_path) {
       toast({
         title: 'Error',
@@ -212,22 +213,8 @@ export const useCompanyDocuments = (companyId?: string) => {
     try {
       console.log('Attempting to download file from path:', document.file_path);
       
-      // Create a signed URL for the file instead of directly downloading it
-      const { data, error } = await supabase.storage
-        .from('documents')
-        .createSignedUrl(document.file_path, 60); // 60 seconds expiry
-      
-      if (error) {
-        console.error('Error creating signed URL:', error);
-        throw error;
-      }
-      
-      if (!data || !data.signedUrl) {
-        throw new Error('Failed to generate download URL');
-      }
-      
-      // Open the signed URL in a new tab
-      window.open(data.signedUrl, '_blank');
+      // Use the enhanced downloadDocument function with access key
+      await downloadDocument(document.file_path, document.file_name);
       
       toast({
         title: 'Success',
@@ -251,7 +238,7 @@ export const useCompanyDocuments = (companyId?: string) => {
     updateDocumentStatus,
     uploadFile,
     handleFileUpload,
-    downloadDocument,
+    downloadDocument: downloadDocumentHandler,
     fetchDocuments
   };
 };

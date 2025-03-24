@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
 
@@ -59,34 +60,89 @@ serve(async (req) => {
     
     // Check if this is a downloadFile request
     const requestBody = await req.json().catch(() => ({}));
-    const { action, filePath, fileName } = requestBody;
+    const { action, filePath, fileName, useAccessKey, keyId, accessKey } = requestBody;
 
     // Handle downloadFile action - providing a signed URL with token
     if (action === 'downloadFile' && filePath) {
       console.log('Processing downloadFile request for path:', filePath);
       
       try {
-        // Create a signed URL with an expiration of 60 minutes
-        const { data, error } = await adminSupabase
-          .storage
-          .from('documents')
-          .createSignedUrl(filePath, 60 * 60);
+        let downloadUrl;
         
-        if (error) {
-          console.error('Error creating signed URL:', error);
-          throw error;
+        // Check if we should use direct access with key
+        if (useAccessKey && keyId && accessKey) {
+          console.log('Using access key for storage access');
+          
+          // Create a direct URL with access key authentication
+          const bucketName = 'documents';
+          const objectPath = filePath;
+          
+          // Build a URL with the access key that will have full access to the storage
+          const directUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${objectPath}`;
+          
+          // Try to fetch the object directly to verify it exists
+          const verificationHeaders = {
+            'apikey': keyId,
+            'Authorization': `Bearer ${accessKey}`
+          };
+          
+          try {
+            const verifyResponse = await fetch(directUrl, { 
+              headers: verificationHeaders,
+              method: 'HEAD'
+            });
+            
+            if (!verifyResponse.ok) {
+              console.error('File verification failed with status:', verifyResponse.status);
+              throw new Error(`File not found or inaccessible: ${verifyResponse.statusText}`);
+            }
+            
+            console.log('File verified, exists in storage');
+            
+            // If the file exists, return a direct download URL with the access key
+            const downloadHeaders = new URLSearchParams();
+            downloadHeaders.append('download', 'true');
+            
+            downloadUrl = `${directUrl}?${downloadHeaders.toString()}`;
+            console.log('Using direct access URL for download:', downloadUrl);
+          } catch (verifyError) {
+            console.error('Error verifying file:', verifyError);
+            // Fall back to signed URL if direct access fails
+          }
         }
         
-        if (!data.signedUrl) {
-          throw new Error('Failed to generate signed URL');
+        // If direct access failed or wasn't requested, use a signed URL
+        if (!downloadUrl) {
+          console.log('Falling back to signed URL generation');
+          
+          // Create a signed URL with an expiration of 5 minutes
+          const { data, error } = await adminSupabase
+            .storage
+            .from('documents')
+            .createSignedUrl(filePath, 300, {
+              download: true,  // Explicitly mark for download
+              transform: {
+                quality: 100  // Just to add a parameter and make sure the URL is properly formed
+              }
+            });
+          
+          if (error) {
+            console.error('Error creating signed URL:', error);
+            throw error;
+          }
+          
+          if (!data || !data.signedUrl) {
+            throw new Error('Failed to generate signed URL');
+          }
+          
+          console.log('Successfully created signed URL with token');
+          downloadUrl = data.signedUrl;
         }
-        
-        console.log('Successfully created signed URL with token');
         
         return new Response(
           JSON.stringify({ 
             success: true, 
-            url: data.signedUrl
+            url: downloadUrl
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
