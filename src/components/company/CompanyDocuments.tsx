@@ -6,12 +6,17 @@ import { useCompanyDocuments } from "@/hooks/useCompanyDocuments";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import { CompanyStatusBadge } from "./CompanyStatusBadge";
+import { useAuth } from "@/hooks/useAuth"; 
 
 interface CompanyDocumentsProps {
   companyId: string;
+  isAdmin?: boolean;
 }
 
-export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId }) => {
+export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ 
+  companyId,
+  isAdmin = false 
+}) => {
   const { 
     documents, 
     loading, 
@@ -91,7 +96,9 @@ export const CompanyDocuments: React.FC<CompanyDocumentsProps> = ({ companyId })
           documents={documents} 
           uploading={uploading} 
           onFileUpload={handleFileUpload} 
-          onDownload={downloadDocument} 
+          onDownload={downloadDocument}
+          onRefresh={fetchDocuments}
+          isAdmin={isAdmin}
         />
       )}
     </div>

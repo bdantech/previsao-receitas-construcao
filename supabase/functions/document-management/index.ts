@@ -63,6 +63,107 @@ serve(async (req) => {
 
     console.log('Document management function called with action:', action);
     
+    // Handle updateDocumentStatus action
+    if (action === 'updateDocumentStatus') {
+      const { documentId, status, reviewNotes } = requestBody;
+      
+      if (!documentId || !status) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required fields: documentId and status' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        );
+      }
+      
+      // Validate status
+      const validStatuses = ['approved', 'needs_revision', 'rejected'];
+      if (!validStatuses.includes(status)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid status. Must be one of: approved, needs_revision, rejected' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        );
+      }
+      
+      try {
+        // Check if user is admin
+        const { data: userProfile, error: profileError } = await adminSupabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError);
+          throw profileError;
+        }
+        
+        if (userProfile.role !== 'admin') {
+          return new Response(
+            JSON.stringify({ error: 'Only admin users can update document status' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 403 
+            }
+          );
+        }
+        
+        // Update the document status
+        const now = new Date().toISOString();
+        
+        const updateData: Record<string, any> = {
+          status: status,
+          reviewed_by: user.id,
+          reviewed_at: now
+        };
+        
+        if (reviewNotes !== undefined) {
+          updateData.review_notes = reviewNotes;
+        }
+        
+        console.log(`Updating document ${documentId} status to ${status}`);
+        
+        const { data: document, error: updateError } = await adminSupabase
+          .from('documents')
+          .update(updateData)
+          .eq('id', documentId)
+          .select('*, document_type:document_type_id(*)')
+          .single();
+        
+        if (updateError) {
+          console.error('Error updating document status:', updateError);
+          throw updateError;
+        }
+        
+        console.log('Document status updated successfully:', document);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Document status updated successfully',
+            document
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        );
+      } catch (error) {
+        console.error('Error handling updateDocumentStatus request:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to update document status', details: error.message }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
+      }
+    }
+    
     // Handle getDocuments action
     if (action === 'getDocuments') {
       const { resourceType, resourceId } = requestBody;

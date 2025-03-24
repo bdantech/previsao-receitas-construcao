@@ -1,22 +1,43 @@
+
 import { Button } from "@/components/ui/button";
-import { Upload, Download, Loader } from "lucide-react";
+import { Upload, Download, Loader, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { DocumentStatusBadge } from "./DocumentStatusBadge";
 import { CompanyDocument } from "@/types/document";
 import { downloadDocument } from "@/integrations/supabase/documentService";
+import { useState } from "react";
+import { DocumentReviewDialog } from "./DocumentReviewDialog";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DocumentListProps {
   documents: CompanyDocument[];
   uploading: Record<string, boolean>;
   onFileUpload: (documentId: string, documentTypeId: string, event: React.ChangeEvent<HTMLInputElement>) => void;
   onDownload: (document: CompanyDocument) => void;
+  onRefresh?: () => void;
+  isAdmin?: boolean;
 }
 
 export const DocumentList: React.FC<DocumentListProps> = ({ 
   documents, 
   uploading, 
   onFileUpload, 
-  onDownload 
+  onDownload,
+  onRefresh,
+  isAdmin = false
 }) => {
+  const { session } = useAuth();
+  const [reviewDialogState, setReviewDialogState] = useState<{
+    isOpen: boolean;
+    documentId: string;
+    documentName: string;
+    actionType: "approve" | "reject" | "revision";
+  }>({
+    isOpen: false,
+    documentId: "",
+    documentName: "",
+    actionType: "approve"
+  });
+
   // Helper function to determine if a document has a file
   const hasFile = (doc: CompanyDocument) => {
     return doc.file_path && doc.file_path.trim().length > 0;
@@ -45,6 +66,76 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         onDownload(doc);
       }
     }
+  };
+
+  const openReviewDialog = (documentId: string, documentName: string, actionType: "approve" | "reject" | "revision") => {
+    setReviewDialogState({
+      isOpen: true,
+      documentId,
+      documentName,
+      actionType
+    });
+  };
+
+  const closeReviewDialog = () => {
+    setReviewDialogState({
+      ...reviewDialogState,
+      isOpen: false
+    });
+  };
+
+  const handleReviewSuccess = () => {
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
+
+  const renderAdminActions = (doc: CompanyDocument) => {
+    if (!isAdmin || !hasFile(doc)) return null;
+
+    // Don't show review buttons for documents that are not sent
+    if (doc.status === "not_sent") return null;
+
+    // Don't show approve button for already approved documents
+    const showApprove = doc.status !== "approved";
+    
+    // Don't show reject/revision buttons for already rejected documents
+    const showRejectRevision = doc.status !== "rejected";
+
+    return (
+      <div className="flex flex-wrap gap-2 mt-3">
+        {showApprove && (
+          <Button
+            variant="success"
+            size="sm"
+            onClick={() => openReviewDialog(doc.id, doc.file_name, "approve")}
+          >
+            <CheckCircle className="h-4 w-4 mr-1" />
+            Aprovar
+          </Button>
+        )}
+        {showRejectRevision && (
+          <>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => openReviewDialog(doc.id, doc.file_name, "reject")}
+            >
+              <XCircle className="h-4 w-4 mr-1" />
+              Reprovar
+            </Button>
+            <Button
+              variant="warning"
+              size="sm"
+              onClick={() => openReviewDialog(doc.id, doc.file_name, "revision")}
+            >
+              <AlertCircle className="h-4 w-4 mr-1" />
+              Solicitar Revisão
+            </Button>
+          </>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -81,7 +172,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>
-                  {(doc.status === "not_sent" || doc.status === "needs_revision") && (
+                  {!isAdmin && (doc.status === "not_sent" || doc.status === "needs_revision") && (
                     <DocumentUploader 
                       documentId={doc.id}
                       documentTypeId={doc.document_type.id}
@@ -92,7 +183,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                   )}
                 </>
               ) : (
-                (doc.status === "not_sent" || doc.status === "needs_revision") && (
+                !isAdmin && (doc.status === "not_sent" || doc.status === "needs_revision") && (
                   <DocumentUploader 
                     documentId={doc.id}
                     documentTypeId={doc.document_type.id}
@@ -112,6 +203,8 @@ export const DocumentList: React.FC<DocumentListProps> = ({
             </div>
           )}
           
+          {renderAdminActions(doc)}
+          
           <DocumentMetadata 
             submittedAt={doc.submitted_at} 
             submittedBy={doc.submitted_by?.email} 
@@ -120,6 +213,15 @@ export const DocumentList: React.FC<DocumentListProps> = ({
           />
         </div>
       ))}
+
+      <DocumentReviewDialog 
+        documentId={reviewDialogState.documentId}
+        documentName={reviewDialogState.documentName}
+        isOpen={reviewDialogState.isOpen}
+        onClose={closeReviewDialog}
+        onSuccess={handleReviewSuccess}
+        actionType={reviewDialogState.actionType}
+      />
     </div>
   );
 };

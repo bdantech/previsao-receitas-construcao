@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +27,6 @@ const AdminCompanyDetail = () => {
       try {
         setLoading(true);
         
-        // Use the company-data edge function to get company details as admin
         const { data, error } = await supabase.functions.invoke('company-data', {
           method: 'POST',
           headers: await getAuthHeader(),
@@ -122,7 +120,7 @@ const AdminCompanyDetail = () => {
               <TabsTrigger value="credit">Análise de Crédito</TabsTrigger>
             </TabsList>
             <TabsContent value="documents">
-              <CompanyDocuments companyId={companyId!} />
+              <CompanyDocuments companyId={companyId!} isAdmin={true} />
             </TabsContent>
             <TabsContent value="projects">
               <AdminCompanyProjects companyId={companyId!} companyName={company.name} />
