@@ -186,28 +186,41 @@ serve(async (req) => {
             if (pendingRequiredDocs.length === 0) {
               console.log('All required documents are approved, updating company status');
               
-              // Use a direct SQL query with execute_sql function to bypass RLS
-              const updateCompanyQuery = `
-                UPDATE companies 
-                SET documents_status = 'approved' 
-                WHERE id = $1::uuid 
-                RETURNING id, name, documents_status
-              `;
-              
-              const { data: sqlResult, error: sqlError } = await adminSupabase.rpc(
-                'execute_sql',
-                {
-                  params: { companyId },
-                  query_text: updateCompanyQuery
+              // Use the execute_sql function that bypasses RLS, with service role client
+              try {
+                // Use a parameterized query with the execute_sql function
+                const updateCompanyQuery = `
+                  UPDATE companies 
+                  SET documents_status = 'approved' 
+                  WHERE id = $1 
+                  RETURNING id, name, documents_status
+                `;
+                
+                const params = JSON.stringify([companyId]);
+                
+                // Log the SQL and parameters for debugging
+                console.log('SQL Query:', updateCompanyQuery);
+                console.log('SQL Params:', params);
+                
+                // Execute the SQL using the service role client's RPC function
+                const { data: sqlResult, error: sqlError } = await adminSupabase.rpc(
+                  'execute_sql',
+                  {
+                    params: JSON.parse(params),
+                    query_text: updateCompanyQuery
+                  }
+                );
+                
+                if (sqlError) {
+                  console.error('Error executing SQL to update company status:', sqlError);
+                  throw new Error(`SQL execution error: ${JSON.stringify(sqlError)}`);
                 }
-              );
-              
-              if (sqlError) {
-                console.error('Error executing SQL to update company status:', sqlError);
-                // Log error but don't throw - we still want to return success for the document update
-                console.log('Company status update failed but document was updated successfully');
-              } else {
+                
                 console.log('Company status updated to approved via SQL:', sqlResult);
+              } catch (sqlExecError) {
+                console.error('Exception during SQL execution:', sqlExecError);
+                // Don't throw here - we still want to return success for the document update
+                console.log('Company status update failed but document was updated successfully');
               }
             } else {
               console.log('Not all required documents are approved yet, remaining:', 
