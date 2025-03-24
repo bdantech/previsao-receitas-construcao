@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
 
@@ -185,19 +186,28 @@ serve(async (req) => {
             if (pendingRequiredDocs.length === 0) {
               console.log('All required documents are approved, updating company status');
               
-              // Update using service role - bypassing RLS policies
-              const { data: updateResult, error: companyUpdateError } = await adminSupabase
-                .from('companies')
-                .update({ documents_status: 'approved' })
-                .eq('id', companyId)
-                .select();
-                
-              if (companyUpdateError) {
-                console.error('Error updating company status:', companyUpdateError);
+              // Use a direct SQL query with execute_sql function to bypass RLS
+              const updateCompanyQuery = `
+                UPDATE companies 
+                SET documents_status = 'approved' 
+                WHERE id = $1::uuid 
+                RETURNING id, name, documents_status
+              `;
+              
+              const { data: sqlResult, error: sqlError } = await adminSupabase.rpc(
+                'execute_sql',
+                {
+                  params: { companyId },
+                  query_text: updateCompanyQuery
+                }
+              );
+              
+              if (sqlError) {
+                console.error('Error executing SQL to update company status:', sqlError);
                 // Log error but don't throw - we still want to return success for the document update
                 console.log('Company status update failed but document was updated successfully');
               } else {
-                console.log('Company status updated to approved:', updateResult);
+                console.log('Company status updated to approved via SQL:', sqlResult);
               }
             } else {
               console.log('Not all required documents are approved yet, remaining:', 
