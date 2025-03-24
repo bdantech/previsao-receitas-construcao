@@ -54,9 +54,9 @@ serve(async (req) => {
     }
 
     // Parse the request body
-    const { action, file, fileName, resourceType, resourceId } = await req.json();
+    const { action, file, fileName, resourceType, resourceId, buyerId } = await req.json();
 
-    console.log('Received request:', { action, fileName, resourceType, resourceId });
+    console.log('Received request:', { action, fileName, resourceType, resourceId, buyerId });
 
     if (action === 'uploadFile') {
       if (!file || !fileName || !resourceType || !resourceId) {
@@ -74,11 +74,16 @@ serve(async (req) => {
         const base64Str = file.split('base64,')[1];
         const bytes = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
 
+        // Create a unique file path
+        const timestamp = new Date().getTime();
+        const uniqueFileName = `${timestamp}-${fileName}`;
+        const filePath = `${resourceType}/${resourceId}/${uniqueFileName}`;
+
         // Upload file to storage using admin client
         const { data: uploadData, error: uploadError } = await adminSupabase
           .storage
           .from('documents')
-          .upload(`${resourceType}/${resourceId}/${fileName}`, bytes, {
+          .upload(filePath, bytes, {
             contentType: 'application/pdf',
             upsert: true
           });
@@ -89,11 +94,33 @@ serve(async (req) => {
         }
 
         console.log('File uploaded successfully:', uploadData);
+        
+        // If buyerId is provided, update the project_buyer record
+        if (buyerId && resourceType === 'projects') {
+          const { data: updateData, error: updateError } = await adminSupabase
+            .from('project_buyers')
+            .update({
+              contract_file_path: filePath,
+              contract_file_name: fileName,
+              contract_status: 'a_analisar'
+            })
+            .eq('id', buyerId)
+            .select();
+            
+          if (updateError) {
+            console.error('Error updating project_buyer:', updateError);
+            // Don't throw here, still return success for the file upload
+            console.log('File was uploaded but project_buyer record was not updated');
+          } else {
+            console.log('Project buyer record updated successfully:', updateData);
+          }
+        }
 
         return new Response(
           JSON.stringify({ 
             success: true, 
-            filePath: uploadData.path 
+            filePath: filePath,
+            fileName: fileName
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

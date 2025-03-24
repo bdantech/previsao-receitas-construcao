@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -111,7 +110,6 @@ const ProjectDashboardPage = () => {
   const [selectedBuyer, setSelectedBuyer] = useState<ProjectBuyer | null>(null);
   const [isUploadingContract, setIsUploadingContract] = useState(false);
   
-  // Dashboard summary state
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary>({
     totalBuyers: 0,
     totalReceivablesAmount: 0,
@@ -162,14 +160,12 @@ const ProjectDashboardPage = () => {
 
   useEffect(() => {
     if (projectId && session?.access_token) {
-      // Load all data at once without waiting for tab clicks
       fetchProjectBuyers();
       fetchProjectReceivables();
       fetchProjectAnticipations();
     }
   }, [projectId, session]);
 
-  // Effect to update dashboard summary whenever data changes
   useEffect(() => {
     updateDashboardSummary();
   }, [projectBuyers, receivables, anticipations]);
@@ -179,7 +175,7 @@ const ProjectDashboardPage = () => {
       totalBuyers: projectBuyers.length,
       totalReceivablesAmount: receivables.reduce((sum, r) => sum + Number(r.amount), 0),
       totalAnticipationsAmount: anticipations.reduce((sum, a) => sum + Number(a.valor_total), 0),
-      totalInvoices: 0 // Currently not implemented
+      totalInvoices: 0
     });
   };
 
@@ -260,7 +256,6 @@ const ProjectDashboardPage = () => {
     try {
       setIsLoadingAnticipations(true);
       
-      // Get project to get company ID
       const { data: projectData } = await supabase.functions.invoke('project-management', {
         headers: {
           Authorization: `Bearer ${session.access_token}`
@@ -277,7 +272,6 @@ const ProjectDashboardPage = () => {
       
       const companyId = projectData.project.company_id;
       
-      // Get anticipations
       const { data: anticipationsData, error: anticipationsError } = await supabase
         .rpc('get_project_anticipations', {
           p_company_id: companyId,
@@ -289,7 +283,6 @@ const ProjectDashboardPage = () => {
         throw anticipationsError;
       }
       
-      // Parse the result and ensure proper typing
       if (Array.isArray(anticipationsData)) {
         setAnticipations(anticipationsData as unknown as Anticipation[]);
       } else {
@@ -413,10 +406,7 @@ const ProjectDashboardPage = () => {
         reader.readAsDataURL(file);
       });
       
-      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-      const filePath = `projects/${projectId}/contracts/${selectedBuyer.id}_${Date.now()}_${sanitizedFileName}`;
-      
-      console.log("Uploading contract to path:", filePath);
+      console.log("Uploading contract for buyer:", selectedBuyer.id);
       
       const uploadResponse = await supabase.functions.invoke('document-management', {
         headers: {
@@ -427,7 +417,8 @@ const ProjectDashboardPage = () => {
           file: fileBase64,
           fileName: file.name,
           resourceType: 'projects',
-          resourceId: projectId
+          resourceId: projectId,
+          buyerId: selectedBuyer.id
         }
       });
       
@@ -436,29 +427,8 @@ const ProjectDashboardPage = () => {
         throw new Error(uploadResponse.error.message || 'Upload failed');
       }
       
-      console.log('File uploaded successfully to:', uploadResponse.data.path);
+      console.log('File uploaded successfully:', uploadResponse.data);
       
-      const { data, error } = await supabase.functions.invoke('project-buyers', {
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`
-        },
-        body: { 
-          action: 'update',
-          buyerId: selectedBuyer.id,
-          buyerData: {
-            contract_file_path: uploadResponse.data.path,
-            contract_file_name: file.name,
-            contract_status: 'a_analisar'
-          }
-        }
-      });
-      
-      if (error) {
-        console.error('Error updating buyer:', error);
-        throw error;
-      }
-      
-      console.log('Buyer updated successfully:', data);
       await fetchProjectBuyers();
       
       toast({
