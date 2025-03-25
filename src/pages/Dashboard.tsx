@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { toast } from "@/hooks/use-toast";
+import { formatCNPJ } from "@/lib/formatters";
 
 // Placeholder dashboard for company users
 const Dashboard = () => {
@@ -127,7 +127,7 @@ const Dashboard = () => {
                 <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">CNPJ</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {companies[0].cnpj}
+                    {formatCNPJ(companies[0].cnpj)}
                   </dd>
                 </div>
                 {companies[0].website && (
