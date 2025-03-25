@@ -1,92 +1,135 @@
 
-import { LayoutDashboard, CreditCard, Building2, ArrowRightLeft, CogIcon } from "lucide-react";
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Button } from "../ui/button";
-import { Separator } from "../ui/separator";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
+import { Button } from "../ui/button";
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  LayoutDashboard, 
+  Building2, 
+  FileText, 
+  ArrowRightLeft, 
+  LogOut 
+} from "lucide-react";
+
+interface SidebarItemProps {
+  icon: React.ElementType;
+  label: string;
+  to: string;
+  isCollapsed: boolean;
+}
+
+const SidebarItem = ({ 
+  icon: Icon, 
+  label, 
+  to, 
+  isCollapsed 
+}: SidebarItemProps) => {
+  return (
+    <NavLink 
+      to={to} 
+      className={({ isActive }) => cn(
+        "flex items-center w-full px-3 py-2 my-1",
+        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium rounded-md" : 
+        "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
+      )}
+    >
+      {({ isActive }) => (
+        <>
+          <Icon className={cn("h-5 w-5", isActive && "text-sidebar-accent-foreground")} />
+          {!isCollapsed && <span className="ml-3">{label}</span>}
+        </>
+      )}
+    </NavLink>
+  );
+};
 
 export const Sidebar = () => {
-  const { signOut, userRole } = useAuth();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { signOut } = useAuth();
+  
+  const toggleSidebar = () => {
+    setIsCollapsed(prev => !prev);
+  };
 
-  const isAdmin = userRole === 'admin';
+  const sidebarItems = [
+    {
+      icon: LayoutDashboard,
+      label: "Dashboard",
+      to: "/dashboard"
+    },
+    {
+      icon: FileText,
+      label: "Projetos",
+      to: "/projects"
+    },
+    {
+      icon: Building2,
+      label: "Minha Empresa",
+      to: "/company"
+    },
+    {
+      icon: ArrowRightLeft,
+      label: "Integrações",
+      to: "/integrations"
+    }
+  ];
 
   return (
-    <div className="flex flex-col h-full border-r border-gray-200">
-      <div className="flex-1 py-4">
-        <div className="px-4 mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">Financify</h2>
-          <p className="text-sm text-gray-500">Painel de Controle</p>
-        </div>
-        
-        <Separator className="mb-4" />
-        
-        <nav className="px-2 space-y-1">
-          <NavLink 
-            to="/dashboard" 
-            className={({ isActive }) => `
-              flex items-center px-2 py-2 text-sm font-medium rounded-md
-              ${isActive 
-                ? 'bg-blue-100 text-blue-800' 
-                : 'text-gray-600 hover:bg-gray-100'
-              }
-            `}
-          >
-            <LayoutDashboard className="mr-3 h-5 w-5" />
-            Dashboard
-          </NavLink>
-          
-          <NavLink 
-            to="/projects" 
-            className={({ isActive }) => `
-              flex items-center px-2 py-2 text-sm font-medium rounded-md
-              ${isActive 
-                ? 'bg-blue-100 text-blue-800' 
-                : 'text-gray-600 hover:bg-gray-100'
-              }
-            `}
-          >
-            <CreditCard className="mr-3 h-5 w-5" />
-            Projetos
-          </NavLink>
-          
-          <NavLink 
-            to="/company" 
-            className={({ isActive }) => `
-              flex items-center px-2 py-2 text-sm font-medium rounded-md
-              ${isActive 
-                ? 'bg-blue-100 text-blue-800' 
-                : 'text-gray-600 hover:bg-gray-100'
-              }
-            `}
-          >
-            <Building2 className="mr-3 h-5 w-5" />
-            Minha Empresa
-          </NavLink>
-          
-          <NavLink 
-            to="/integrations" 
-            className={({ isActive }) => `
-              flex items-center px-2 py-2 text-sm font-medium rounded-md
-              ${isActive 
-                ? 'bg-blue-100 text-blue-800' 
-                : 'text-gray-600 hover:bg-gray-100'
-              }
-            `}
-          >
-            <ArrowRightLeft className="mr-3 h-5 w-5" />
-            Integrações
-          </NavLink>
+    <div 
+      className={cn(
+        "h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 flex flex-col",
+        isCollapsed ? "w-[70px]" : "w-[250px]"
+      )}
+    >
+      <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
+        {!isCollapsed ? (
+          <div className="flex items-center space-x-1">
+            <span className="font-bold text-xl text-gray-500">ONE</span>
+            <span className="font-bold text-xl text-green-500">PAY</span>
+          </div>
+        ) : (
+          <div className="w-full flex justify-center">
+            <span className="font-bold text-xl text-green-500">OP</span>
+          </div>
+        )}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={toggleSidebar}
+          className="ml-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          {isCollapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+        </Button>
+      </div>
+
+      <div className="flex-1 px-3 py-4">
+        <nav className="space-y-1">
+          {sidebarItems.map((item) => (
+            <SidebarItem 
+              key={item.to}
+              icon={item.icon} 
+              label={item.label} 
+              to={item.to}
+              isCollapsed={isCollapsed}
+            />
+          ))}
         </nav>
       </div>
-      
-      <div className="p-4">
-        <Button
-          variant="outline"
-          className="w-full justify-start"
+
+      <div className="px-3 py-4 border-t border-sidebar-border">
+        <Button 
+          variant="ghost" 
+          className={cn(
+            "w-full justify-start gap-3 px-3 py-2",
+            "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          )}
           onClick={signOut}
         >
-          <CogIcon className="mr-2 h-4 w-4" />
-          Sair
+          <LogOut className="h-5 w-5" />
+          {!isCollapsed && <span>Sair</span>}
         </Button>
       </div>
     </div>

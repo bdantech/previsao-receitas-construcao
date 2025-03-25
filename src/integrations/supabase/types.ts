@@ -616,6 +616,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      update_company_documents_status: {
+        Args: {
+          p_company_id: string
+          p_status: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       anticipation_status: "Solicitada" | "Aprovada" | "Reprovada" | "Concluída"
