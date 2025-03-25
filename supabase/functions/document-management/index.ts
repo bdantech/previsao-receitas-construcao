@@ -186,13 +186,12 @@ serve(async (req) => {
               console.log('All required documents are approved, updating company status');
               
               try {
-                // Use direct SQL query with admin client
+                // Call the stored procedure to update company status
                 const { data: companyData, error: companyError } = await adminSupabase
-                  .from('companies')
-                  .update({ documents_status: 'approved' })
-                  .eq('id', companyId)
-                  .select('id, name, documents_status')
-                  .single();
+                  .rpc('update_company_documents_status', {
+                    p_company_id: companyId,
+                    p_status: 'approved'
+                  });
                 
                 if (companyError) {
                   console.error('Error updating company status:', companyError);
