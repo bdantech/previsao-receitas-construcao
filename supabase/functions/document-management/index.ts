@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
 
@@ -186,39 +185,23 @@ serve(async (req) => {
             if (pendingRequiredDocs.length === 0) {
               console.log('All required documents are approved, updating company status');
               
-              // Use the execute_sql function that bypasses RLS, with service role client
               try {
-                // Use a parameterized query with the execute_sql function
-                const updateCompanyQuery = `
-                  UPDATE companies 
-                  SET documents_status = 'approved' 
-                  WHERE id = $1 
-                  RETURNING id, name, documents_status
-                `;
+                // Use direct SQL query with admin client
+                const { data: companyData, error: companyError } = await adminSupabase
+                  .from('companies')
+                  .update({ documents_status: 'approved' })
+                  .eq('id', companyId)
+                  .select('id, name, documents_status')
+                  .single();
                 
-                const params = JSON.stringify([companyId]);
-                
-                // Log the SQL and parameters for debugging
-                console.log('SQL Query:', updateCompanyQuery);
-                console.log('SQL Params:', params);
-                
-                // Execute the SQL using the service role client's RPC function
-                const { data: sqlResult, error: sqlError } = await adminSupabase.rpc(
-                  'execute_sql',
-                  {
-                    params: JSON.parse(params),
-                    query_text: updateCompanyQuery
-                  }
-                );
-                
-                if (sqlError) {
-                  console.error('Error executing SQL to update company status:', sqlError);
-                  throw new Error(`SQL execution error: ${JSON.stringify(sqlError)}`);
+                if (companyError) {
+                  console.error('Error updating company status:', companyError);
+                  throw new Error(`Company status update error: ${JSON.stringify(companyError)}`);
                 }
                 
-                console.log('Company status updated to approved via SQL:', sqlResult);
-              } catch (sqlExecError) {
-                console.error('Exception during SQL execution:', sqlExecError);
+                console.log('Company status updated to approved:', companyData);
+              } catch (companyUpdateError) {
+                console.error('Exception during company status update:', companyUpdateError);
                 // Don't throw here - we still want to return success for the document update
                 console.log('Company status update failed but document was updated successfully');
               }
