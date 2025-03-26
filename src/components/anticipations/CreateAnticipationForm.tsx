@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { 
@@ -212,11 +211,8 @@ const CreateAnticipationForm = () => {
         const valorTotal = selectedReceivables.reduce((total, rec) => total + Number(rec.amount), 0);
         const quantidade = selectedReceivables.length;
         
-        // Calculate fee deduction
-        const feeDeduction = quantidade * creditAnalysis.fee_per_receivable;
-        
         // Calculate interest deduction for each receivable
-        let interestDeduction = 0;
+        let valorLiquido = 0;
         const today = new Date();
         
         for (const receivable of selectedReceivables) {
@@ -235,12 +231,10 @@ const CreateAnticipationForm = () => {
             interestRate = creditAnalysis.interest_rate_long_term;
           }
           
-          // Calculate interest deduction for this receivable
-          interestDeduction += (Number(receivable.amount) * interestRate / 100);
+          // Calculate net value for this receivable using the new formula
+          const valorLiquidoRecebivel = receivable.amount - ((receivable.amount * (Math.pow((interestRate/100 + 1), daysTodue/30))) - receivable.amount) - creditAnalysis.fee_per_receivable;
+          valorLiquido += valorLiquidoRecebivel;
         }
-        
-        // Calculate final valor liquido
-        const valorLiquido = valorTotal - interestDeduction - feeDeduction;
         
         // Set calculation result
         setCalculationResult({
