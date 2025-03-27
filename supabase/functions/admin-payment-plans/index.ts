@@ -302,6 +302,7 @@ serve(async (req) => {
           .select(`
             id,
             receivable_id,
+            nova_data_vencimento,
             receivables (
               id,
               buyer_name,
@@ -325,6 +326,110 @@ serve(async (req) => {
         break
       }
 
+      case 'getEligibleBillingReceivables': {
+        const { paymentPlanId, installmentId } = data
+        
+        if (!paymentPlanId || !installmentId) {
+          throw new Error('Missing required parameters')
+        }
+
+        // Get payment plan details
+        const { data: paymentPlan, error: ppError } = await supabase
+          .from('payment_plan_settings')
+          .select(`
+            id,
+            project_id,
+            anticipation_request_id,
+            payment_plan_installments (
+              id,
+              data_vencimento
+            )
+          `)
+          .eq('id', paymentPlanId)
+          .single()
+
+        if (ppError) {
+          throw new Error(`Error getting payment plan: ${ppError.message}`)
+        }
+
+        // Get the first installment date to determine the cutoff date
+        const { data: installments, error: instError } = await supabase
+          .from('payment_plan_installments')
+          .select('data_vencimento')
+          .eq('payment_plan_settings_id', paymentPlanId)
+          .order('numero_parcela', { ascending: true })
+          .limit(1)
+
+        if (instError) {
+          throw new Error(`Error getting first installment: ${instError.message}`)
+        }
+
+        if (!installments || installments.length === 0) {
+          throw new Error('No installments found for this payment plan')
+        }
+
+        // Parse the date to extract year and month for the first day of the month
+        const firstInstallmentDate = new Date(installments[0].data_vencimento)
+        const cutoffDate = new Date(
+          firstInstallmentDate.getFullYear(),
+          firstInstallmentDate.getMonth(),
+          1
+        ).toISOString().split('T')[0]
+
+        // Get list of receivables already linked to any payment plan (to exclude them)
+        const { data: linkedPmtReceivables, error: linkedPmtError } = await supabase
+          .from('pmt_receivables')
+          .select('receivable_id')
+
+        if (linkedPmtError) {
+          throw new Error(`Error getting linked PMT receivables: ${linkedPmtError.message}`)
+        }
+
+        const { data: linkedBillingReceivables, error: linkedBillingError } = await supabase
+          .from('billing_receivables')
+          .select('receivable_id')
+
+        if (linkedBillingError) {
+          throw new Error(`Error getting linked billing receivables: ${linkedBillingError.message}`)
+        }
+
+        // Combine all linked receivable IDs
+        const linkedReceivableIds = [
+          ...(linkedPmtReceivables || []).map(item => item.receivable_id),
+          ...(linkedBillingReceivables || []).map(item => item.receivable_id)
+        ]
+
+        // Get eligible receivables
+        let query = supabase
+          .from('receivables')
+          .select(`
+            id,
+            buyer_name,
+            buyer_cpf,
+            amount,
+            due_date,
+            description,
+            status
+          `)
+          .eq('project_id', paymentPlan.project_id)
+          .gte('due_date', cutoffDate)
+          .not('status', 'eq', 'reprovado')
+
+        // Exclude already linked receivables if there are any
+        if (linkedReceivableIds.length > 0) {
+          query = query.not('id', 'in', `(${linkedReceivableIds.join(',')})`)
+        }
+
+        const { data: eligibleReceivables, error: eligibleError } = await query
+
+        if (eligibleError) {
+          throw new Error(`Error getting eligible receivables: ${eligibleError.message}`)
+        }
+
+        responseData = eligibleReceivables || []
+        break
+      }
+
       case 'updateBillingReceivables': {
         const { installmentId, receivableIds } = data
         
@@ -332,10 +437,18 @@ serve(async (req) => {
           throw new Error('Missing or invalid required fields')
         }
 
-        // Get installment details to check project ID
+        // Get installment details to check project ID and payment plan settings
         const { data: installment, error: installmentError } = await supabase
           .from('payment_plan_installments')
-          .select('project_id')
+          .select(`
+            id, 
+            project_id, 
+            payment_plan_settings_id,
+            data_vencimento,
+            payment_plan_settings (
+              dia_cobranca
+            )
+          `)
           .eq('id', installmentId)
           .single()
 
@@ -346,7 +459,7 @@ serve(async (req) => {
         // Verify that all receivables belong to the same project
         const { data: receivables, error: receivablesError } = await supabase
           .from('receivables')
-          .select('id, amount')
+          .select('id, amount, due_date')
           .in('id', receivableIds)
           .eq('project_id', installment.project_id)
 
@@ -368,11 +481,31 @@ serve(async (req) => {
           throw new Error(`Error deleting existing billing receivables: ${deleteError.message}`)
         }
 
-        // Insert new billing receivables
-        const billingReceivables = receivableIds.map(receivableId => ({
-          installment_id: installmentId,
-          receivable_id: receivableId
-        }))
+        // Get the dia_cobranca from the payment plan settings
+        const diaCobranca = installment.payment_plan_settings.dia_cobranca
+
+        // Insert new billing receivables with nova_data_vencimento
+        const billingReceivables = receivables.map(receivable => {
+          // Calculate the nova_data_vencimento based on the receivable due date and payment plan dia_cobranca
+          const dueDate = new Date(receivable.due_date)
+          const year = dueDate.getFullYear()
+          const month = dueDate.getMonth()
+          
+          // Create date with dia_cobranca
+          let novaDataVencimento = new Date(year, month, diaCobranca)
+          
+          // If dia_cobranca is greater than days in month, adjust to last day
+          const lastDayOfMonth = new Date(year, month + 1, 0).getDate()
+          if (diaCobranca > lastDayOfMonth) {
+            novaDataVencimento = new Date(year, month, lastDayOfMonth)
+          }
+          
+          return {
+            installment_id: installmentId,
+            receivable_id: receivable.id,
+            nova_data_vencimento: novaDataVencimento.toISOString().split('T')[0]
+          }
+        })
 
         const { error: insertError } = await supabase
           .from('billing_receivables')
@@ -398,20 +531,9 @@ serve(async (req) => {
         }
 
         // Recalculate payment plan
-        const { data: installmentData, error: getError } = await supabase
-          .from('payment_plan_installments')
-          .select('payment_plan_settings_id')
-          .eq('id', installmentId)
-          .single()
-
-        if (getError) {
-          throw new Error(`Error getting payment plan settings id: ${getError.message}`)
-        }
-
-        // Run the calculation function again to update fundo_reserva and devolucao
         const { error: calcError } = await supabase.rpc(
           'calculate_payment_plan_installments',
-          { p_payment_plan_settings_id: installmentData.payment_plan_settings_id }
+          { p_payment_plan_settings_id: installment.payment_plan_settings_id }
         )
 
         if (calcError) {
@@ -419,6 +541,95 @@ serve(async (req) => {
         }
 
         responseData = { success: true, updatedInstallment }
+        break
+      }
+
+      case 'removeBillingReceivable': {
+        const { installmentId, billingReceivableId } = data
+        
+        if (!installmentId || !billingReceivableId) {
+          throw new Error('Missing required parameters')
+        }
+
+        // Get the billing receivable to verify it belongs to the installment
+        const { data: billingReceivable, error: brError } = await supabase
+          .from('billing_receivables')
+          .select('id, receivable_id')
+          .eq('id', billingReceivableId)
+          .eq('installment_id', installmentId)
+          .single()
+
+        if (brError) {
+          throw new Error(`Error getting billing receivable: ${brError.message}`)
+        }
+
+        // Delete the billing receivable
+        const { error: deleteError } = await supabase
+          .from('billing_receivables')
+          .delete()
+          .eq('id', billingReceivableId)
+
+        if (deleteError) {
+          throw new Error(`Error removing billing receivable: ${deleteError.message}`)
+        }
+
+        // Get remaining billing receivables to recalculate total amount
+        const { data: remainingReceivables, error: remainingError } = await supabase
+          .from('billing_receivables')
+          .select(`
+            receivable_id,
+            receivables (
+              amount
+            )
+          `)
+          .eq('installment_id', installmentId)
+
+        if (remainingError) {
+          throw new Error(`Error getting remaining receivables: ${remainingError.message}`)
+        }
+
+        // Calculate new total amount
+        const totalAmount = (remainingReceivables || []).reduce(
+          (sum, item) => sum + parseFloat(item.receivables.amount), 
+          0
+        )
+
+        // Get payment plan settings ID for the installment
+        const { data: installment, error: installmentError } = await supabase
+          .from('payment_plan_installments')
+          .select('payment_plan_settings_id')
+          .eq('id', installmentId)
+          .single()
+
+        if (installmentError) {
+          throw new Error(`Error getting installment: ${installmentError.message}`)
+        }
+
+        // Update installment with new recebiveis value
+        const { error: updateError } = await supabase
+          .from('payment_plan_installments')
+          .update({ recebiveis: totalAmount })
+          .eq('id', installmentId)
+
+        if (updateError) {
+          throw new Error(`Error updating installment: ${updateError.message}`)
+        }
+
+        // Recalculate payment plan
+        const { error: calcError } = await supabase.rpc(
+          'calculate_payment_plan_installments',
+          { p_payment_plan_settings_id: installment.payment_plan_settings_id }
+        )
+
+        if (calcError) {
+          throw new Error(`Error recalculating payment plan: ${calcError.message}`)
+        }
+
+        responseData = { 
+          success: true,
+          removedReceivableId: billingReceivable.receivable_id,
+          newTotal: totalAmount
+        }
         break
       }
 

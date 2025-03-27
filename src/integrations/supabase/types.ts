@@ -116,18 +116,21 @@ export type Database = {
           created_at: string
           id: string
           installment_id: string
+          nova_data_vencimento: string | null
           receivable_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           installment_id: string
+          nova_data_vencimento?: string | null
           receivable_id: string
         }
         Update: {
           created_at?: string
           id?: string
           installment_id?: string
+          nova_data_vencimento?: string | null
           receivable_id?: string
         }
         Relationships: [

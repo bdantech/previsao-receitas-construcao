@@ -303,6 +303,7 @@ serve(async (req) => {
           .select(`
             id,
             receivable_id,
+            nova_data_vencimento,
             receivables (
               id,
               buyer_name,

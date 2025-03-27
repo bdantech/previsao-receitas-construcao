@@ -33,8 +33,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Loader, ArrowLeft, Trash2 } from "lucide-react";
+import { Loader, ArrowLeft, Trash2, Plus, X } from "lucide-react";
 import { format } from "date-fns";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface PaymentPlan {
   id: string;
@@ -77,8 +85,22 @@ interface Receivable {
   status: string;
 }
 
-interface ReceiableMap {
-  [key: string]: Receivable[];
+interface PmtReceivable {
+  id: string;
+  receivable_id: string;
+  receivables: Receivable;
+}
+
+interface BillingReceivable {
+  id: string;
+  receivable_id: string;
+  nova_data_vencimento?: string;
+  receivables: Receivable;
+}
+
+interface ReceivableMap {
+  pmt: PmtReceivable[];
+  billing: BillingReceivable[];
 }
 
 const AdminPaymentPlanDetailPage = () => {
@@ -88,13 +110,19 @@ const AdminPaymentPlanDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlan | null>(null);
   const [selectedInstallment, setSelectedInstallment] = useState<PaymentPlanInstallment | null>(null);
-  const [receivableMap, setReceivableMap] = useState<ReceiableMap>({
+  const [receivableMap, setReceivableMap] = useState<ReceivableMap>({
     pmt: [],
     billing: []
   });
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isReceivablesDialogOpen, setIsReceivablesDialogOpen] = useState(false);
+  const [isAddBillingReceivablesOpen, setIsAddBillingReceivablesOpen] = useState(false);
   const [deletingPlan, setDeletingPlan] = useState(false);
+  const [eligibleReceivables, setEligibleReceivables] = useState<Receivable[]>([]);
+  const [selectedReceivableIds, setSelectedReceivableIds] = useState<string[]>([]);
+  const [loadingEligibleReceivables, setLoadingEligibleReceivables] = useState(false);
+  const [updatingBillingReceivables, setUpdatingBillingReceivables] = useState(false);
+  const [removingBillingReceivable, setRemovingBillingReceivable] = useState<string | null>(null);
 
   useEffect(() => {
     if (session && userRole === 'admin' && paymentPlanId) {
@@ -167,12 +195,59 @@ const AdminPaymentPlanDetailPage = () => {
       
       if (data) {
         setReceivableMap({
-          pmt: data.data.pmtReceivables.map((item: any) => item.receivables),
-          billing: data.data.billingReceivables.map((item: any) => item.receivables)
+          pmt: data.data.pmtReceivables,
+          billing: data.data.billingReceivables
         });
       }
     } catch (error) {
       console.error("Error fetching installment receivables:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível carregar os recebíveis da parcela."
+      });
+    }
+  };
+
+  const fetchEligibleBillingReceivables = async () => {
+    if (!paymentPlanId || !selectedInstallment) return;
+    
+    try {
+      setLoadingEligibleReceivables(true);
+      
+      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: {
+          action: 'getEligibleBillingReceivables',
+          paymentPlanId,
+          installmentId: selectedInstallment.id
+        }
+      });
+      
+      if (error) {
+        console.error("Error fetching eligible receivables:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível carregar os recebíveis elegíveis."
+        });
+        return;
+      }
+      
+      setEligibleReceivables(data.data || []);
+      setSelectedReceivableIds([]);
+    } catch (error) {
+      console.error("Error fetching eligible receivables:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível carregar os recebíveis elegíveis."
+      });
+    } finally {
+      setLoadingEligibleReceivables(false);
     }
   };
 
@@ -226,6 +301,121 @@ const AdminPaymentPlanDetailPage = () => {
     setSelectedInstallment(installment);
     await fetchInstallmentReceivables(installment.id);
     setIsReceivablesDialogOpen(true);
+  };
+
+  const handleAddBillingReceivables = async () => {
+    if (!selectedInstallment) return;
+    
+    // Open dialog to select receivables
+    await fetchEligibleBillingReceivables();
+    setIsAddBillingReceivablesOpen(true);
+  };
+
+  const handleToggleReceivableSelection = (receivableId: string) => {
+    setSelectedReceivableIds(prevSelected => {
+      if (prevSelected.includes(receivableId)) {
+        return prevSelected.filter(id => id !== receivableId);
+      } else {
+        return [...prevSelected, receivableId];
+      }
+    });
+  };
+
+  const handleSaveBillingReceivables = async () => {
+    if (!selectedInstallment || selectedReceivableIds.length === 0) return;
+    
+    try {
+      setUpdatingBillingReceivables(true);
+      
+      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: {
+          action: 'updateBillingReceivables',
+          installmentId: selectedInstallment.id,
+          receivableIds: selectedReceivableIds
+        }
+      });
+      
+      if (error) {
+        console.error("Error updating billing receivables:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível adicionar os recebíveis de cobrança."
+        });
+        return;
+      }
+      
+      toast({
+        title: "Sucesso",
+        description: "Recebíveis de cobrança adicionados com sucesso."
+      });
+      
+      // Close dialogs and refresh data
+      setIsAddBillingReceivablesOpen(false);
+      await fetchInstallmentReceivables(selectedInstallment.id);
+      await fetchPaymentPlanDetails();
+    } catch (error) {
+      console.error("Error updating billing receivables:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível adicionar os recebíveis de cobrança."
+      });
+    } finally {
+      setUpdatingBillingReceivables(false);
+    }
+  };
+
+  const handleRemoveBillingReceivable = async (billingReceivableId: string) => {
+    if (!selectedInstallment) return;
+    
+    try {
+      setRemovingBillingReceivable(billingReceivableId);
+      
+      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: {
+          action: 'removeBillingReceivable',
+          installmentId: selectedInstallment.id,
+          billingReceivableId
+        }
+      });
+      
+      if (error) {
+        console.error("Error removing billing receivable:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível remover o recebível de cobrança."
+        });
+        return;
+      }
+      
+      toast({
+        title: "Sucesso",
+        description: "Recebível de cobrança removido com sucesso."
+      });
+      
+      // Refresh data
+      await fetchInstallmentReceivables(selectedInstallment.id);
+      await fetchPaymentPlanDetails();
+    } catch (error) {
+      console.error("Error removing billing receivable:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível remover o recebível de cobrança."
+      });
+    } finally {
+      setRemovingBillingReceivable(null);
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -343,60 +533,30 @@ const AdminPaymentPlanDetailPage = () => {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Parcela
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Vencimento
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Recebíveis
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        PMT
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Saldo Devedor
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Fundo de Reserva
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Devolução
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ações
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Parcela</TableHead>
+                      <TableHead>Vencimento</TableHead>
+                      <TableHead>Recebíveis</TableHead>
+                      <TableHead>PMT</TableHead>
+                      <TableHead>Saldo Devedor</TableHead>
+                      <TableHead>Fundo de Reserva</TableHead>
+                      <TableHead>Devolução</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {paymentPlan.payment_plan_installments.map((installment) => (
-                      <tr key={installment.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {installment.numero_parcela}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(installment.data_vencimento)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatCurrency(installment.recebiveis)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatCurrency(installment.pmt)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatCurrency(installment.saldo_devedor)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatCurrency(installment.fundo_reserva)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatCurrency(installment.devolucao)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <TableRow key={installment.id}>
+                        <TableCell className="font-medium">{installment.numero_parcela}</TableCell>
+                        <TableCell>{formatDate(installment.data_vencimento)}</TableCell>
+                        <TableCell>{formatCurrency(installment.recebiveis)}</TableCell>
+                        <TableCell>{formatCurrency(installment.pmt)}</TableCell>
+                        <TableCell>{formatCurrency(installment.saldo_devedor)}</TableCell>
+                        <TableCell>{formatCurrency(installment.fundo_reserva)}</TableCell>
+                        <TableCell>{formatCurrency(installment.devolucao)}</TableCell>
+                        <TableCell className="text-right">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -405,15 +565,16 @@ const AdminPaymentPlanDetailPage = () => {
                           >
                             Ver Recebíveis
                           </Button>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
 
+          {/* Dialog for viewing receivables */}
           <Dialog open={isReceivablesDialogOpen} onOpenChange={setIsReceivablesDialogOpen}>
             <DialogContent className="max-w-4xl">
               <DialogHeader>
@@ -427,51 +588,34 @@ const AdminPaymentPlanDetailPage = () => {
               
               <div className="mt-4 space-y-6">
                 <div>
-                  <h4 className="text-sm font-medium mb-2">Recebíveis de PMT ({receivableMap.pmt.length})</h4>
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-sm font-medium">Recebíveis de PMT ({receivableMap.pmt.length})</h4>
+                  </div>
+                  
                   {receivableMap.pmt.length > 0 ? (
                     <div className="overflow-x-auto border rounded-md">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Comprador
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              CPF
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Valor
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Vencimento
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {receivableMap.pmt.map((receivable) => (
-                            <tr key={receivable.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                                {receivable.buyer_name}
-                              </td>
-                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                                {receivable.buyer_cpf}
-                              </td>
-                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                                {formatCurrency(receivable.amount)}
-                              </td>
-                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                                {formatDate(receivable.due_date)}
-                              </td>
-                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                                {receivable.status}
-                              </td>
-                            </tr>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Comprador</TableHead>
+                            <TableHead>CPF</TableHead>
+                            <TableHead>Valor</TableHead>
+                            <TableHead>Vencimento</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {receivableMap.pmt.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.receivables.buyer_name}</TableCell>
+                              <TableCell>{item.receivables.buyer_cpf}</TableCell>
+                              <TableCell>{formatCurrency(item.receivables.amount)}</TableCell>
+                              <TableCell>{formatDate(item.receivables.due_date)}</TableCell>
+                              <TableCell>{item.receivables.status}</TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500 italic">Nenhum recebível de PMT encontrado.</p>
@@ -479,54 +623,68 @@ const AdminPaymentPlanDetailPage = () => {
                 </div>
                 
                 <div>
-                  <h4 className="text-sm font-medium mb-2">Recebíveis de Faturamento ({receivableMap.billing.length})</h4>
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-sm font-medium">Recebíveis de Cobrança ({receivableMap.billing.length})</h4>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex items-center gap-1"
+                      onClick={handleAddBillingReceivables}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Adicionar Recebíveis de Cobrança
+                    </Button>
+                  </div>
+                  
                   {receivableMap.billing.length > 0 ? (
                     <div className="overflow-x-auto border rounded-md">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Comprador
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              CPF
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Valor
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Vencimento
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Status
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {receivableMap.billing.map((receivable) => (
-                            <tr key={receivable.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                                {receivable.buyer_name}
-                              </td>
-                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                                {receivable.buyer_cpf}
-                              </td>
-                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                                {formatCurrency(receivable.amount)}
-                              </td>
-                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                                {formatDate(receivable.due_date)}
-                              </td>
-                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                                {receivable.status}
-                              </td>
-                            </tr>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Comprador</TableHead>
+                            <TableHead>CPF</TableHead>
+                            <TableHead>Valor</TableHead>
+                            <TableHead>Vencimento Original</TableHead>
+                            <TableHead>Nova Data Vencimento</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {receivableMap.billing.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.receivables.buyer_name}</TableCell>
+                              <TableCell>{item.receivables.buyer_cpf}</TableCell>
+                              <TableCell>{formatCurrency(item.receivables.amount)}</TableCell>
+                              <TableCell>{formatDate(item.receivables.due_date)}</TableCell>
+                              <TableCell>
+                                {item.nova_data_vencimento 
+                                  ? formatDate(item.nova_data_vencimento) 
+                                  : "Não definida"}
+                              </TableCell>
+                              <TableCell>{item.receivables.status}</TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-900"
+                                  disabled={!!removingBillingReceivable}
+                                  onClick={() => handleRemoveBillingReceivable(item.id)}
+                                >
+                                  {removingBillingReceivable === item.id ? (
+                                    <Loader className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <X className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-500 italic">Nenhum recebível de faturamento encontrado.</p>
+                    <p className="text-sm text-gray-500 italic">Nenhum recebível de cobrança encontrado.</p>
                   )}
                 </div>
               </div>
@@ -535,6 +693,94 @@ const AdminPaymentPlanDetailPage = () => {
                 <DialogClose asChild>
                   <Button variant="outline">Fechar</Button>
                 </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog for adding billing receivables */}
+          <Dialog open={isAddBillingReceivablesOpen} onOpenChange={setIsAddBillingReceivablesOpen}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>
+                  Adicionar Recebíveis de Cobrança
+                </DialogTitle>
+                <DialogDescription>
+                  Selecione os recebíveis que deseja vincular à parcela {selectedInstallment?.numero_parcela}
+                </DialogDescription>
+              </DialogHeader>
+              
+              {loadingEligibleReceivables ? (
+                <div className="flex justify-center my-6">
+                  <Loader className="h-8 w-8 animate-spin text-gray-500" />
+                </div>
+              ) : (
+                <>
+                  {eligibleReceivables.length > 0 ? (
+                    <div className="overflow-y-auto max-h-96 border rounded-md">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">Selecionar</TableHead>
+                            <TableHead>Comprador</TableHead>
+                            <TableHead>CPF</TableHead>
+                            <TableHead>Valor</TableHead>
+                            <TableHead>Vencimento</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {eligibleReceivables.map((receivable) => (
+                            <TableRow key={receivable.id} className="cursor-pointer hover:bg-gray-100">
+                              <TableCell className="text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedReceivableIds.includes(receivable.id)}
+                                  onChange={() => handleToggleReceivableSelection(receivable.id)}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                              </TableCell>
+                              <TableCell>{receivable.buyer_name}</TableCell>
+                              <TableCell>{receivable.buyer_cpf}</TableCell>
+                              <TableCell>{formatCurrency(receivable.amount)}</TableCell>
+                              <TableCell>{formatDate(receivable.due_date)}</TableCell>
+                              <TableCell>{receivable.status}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <p className="text-gray-500">Não foram encontrados recebíveis elegíveis para vincular a esta parcela.</p>
+                    </div>
+                  )}
+                  
+                  <div className="mt-2 text-sm text-gray-500">
+                    {selectedReceivableIds.length} recebíveis selecionados
+                  </div>
+                </>
+              )}
+              
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAddBillingReceivablesOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  disabled={selectedReceivableIds.length === 0 || updatingBillingReceivables}
+                  onClick={handleSaveBillingReceivables}
+                >
+                  {updatingBillingReceivables ? (
+                    <>
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    'Adicionar Recebíveis'
+                  )}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
