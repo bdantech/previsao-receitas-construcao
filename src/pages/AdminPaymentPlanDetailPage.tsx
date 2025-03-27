@@ -424,26 +424,7 @@ const AdminPaymentPlanDetailPage = () => {
     try {
       setUpdatingBillingReceivables(true);
       
-      console.log('Sending add-billing-receivables request:', {
-        installmentId: selectedInstallment.id,
-        receivableIds: selectedReceivableIds
-      });
-      
-      const { data: installmentCheck, error: installmentCheckError } = await supabase
-        .from('payment_plan_installments')
-        .select('id')
-        .eq('id', selectedInstallment.id)
-        .single();
-        
-      if (installmentCheckError) {
-        console.error("Installment not found in database:", installmentCheckError);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: `A parcela selecionada não existe: ${selectedInstallment.id}`
-        });
-        return;
-      }
+      console.log(`Sending add-billing-receivables request for installment: ${selectedInstallment.id} with receivables: ${selectedReceivableIds.length}`);
       
       const { data, error } = await supabase.functions.invoke('add-billing-receivables', {
         method: 'POST',

@@ -109,7 +109,8 @@ serve(async (req) => {
 
     console.log(`Processing request to add ${receivableIds.length} receivables to installment ${installmentId}`);
     
-    // Get installment details to determine the date constraints and project_id
+    // IMPORTANT: Use service role client (supabase) to verify installment existence
+    // This ensures we have the proper permissions to access the table
     const { data: installment, error: installmentError } = await supabase
       .from('payment_plan_installments')
       .select(`
@@ -127,7 +128,7 @@ serve(async (req) => {
     if (installmentError || !installment) {
       console.error('Error fetching installment:', installmentError);
       return new Response(
-        JSON.stringify({ error: `Installment not found: ${installmentId}` }),
+        JSON.stringify({ error: `Installment not found: ${installmentId}. Please check that this installment exists in the database.` }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 404 
