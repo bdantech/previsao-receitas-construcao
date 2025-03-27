@@ -235,7 +235,7 @@ const AdminPaymentPlansPage = () => {
                   <SelectValue placeholder="Selecione uma empresa" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as empresas</SelectItem>
+                  <SelectItem value="all">Todas as empresas</SelectItem>
                   {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
@@ -252,7 +252,7 @@ const AdminPaymentPlansPage = () => {
                   <SelectValue placeholder="Selecione um projeto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos os projetos</SelectItem>
+                  <SelectItem value="all">Todos os projetos</SelectItem>
                   {filteredProjects.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
