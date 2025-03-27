@@ -249,9 +249,13 @@ serve(async (req) => {
           .from('payment_plan_installments')
           .select(`
             id,
-            project_id,
-            projects!inner (
-              company_id
+            payment_plan_settings!inner (
+              project_id
+            ),
+            projects:payment_plan_settings!inner(
+              projects(
+                company_id
+              )
             )
           `)
           .eq('id', installmentId)
