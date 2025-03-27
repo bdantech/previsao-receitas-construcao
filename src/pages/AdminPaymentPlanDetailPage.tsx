@@ -262,6 +262,8 @@ const AdminPaymentPlanDetailPage = () => {
     try {
       setLoadingEligibleReceivables(true);
       
+      console.log(`Verifying installment: ${selectedInstallment.id}`);
+      
       const { data: verifyData, error: verifyError } = await supabase.functions.invoke('admin-payment-plans', {
         method: 'POST',
         headers: {
@@ -427,6 +429,22 @@ const AdminPaymentPlanDetailPage = () => {
         receivableIds: selectedReceivableIds
       });
       
+      const { data: installmentCheck, error: installmentCheckError } = await supabase
+        .from('payment_plan_installments')
+        .select('id')
+        .eq('id', selectedInstallment.id)
+        .single();
+        
+      if (installmentCheckError) {
+        console.error("Installment not found in database:", installmentCheckError);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: `A parcela selecionada não existe: ${selectedInstallment.id}`
+        });
+        return;
+      }
+      
       const { data, error } = await supabase.functions.invoke('add-billing-receivables', {
         method: 'POST',
         headers: {
@@ -463,7 +481,6 @@ const AdminPaymentPlanDetailPage = () => {
       if (data.warning) {
         console.warn("Warning when updating billing receivables:", data.warning);
         toast({
-          variant: "warning",
           title: "Atenção",
           description: "Recebíveis adicionados, mas com alertas: " + data.warning
         });
@@ -479,7 +496,6 @@ const AdminPaymentPlanDetailPage = () => {
       if (!billingReceivables || !Array.isArray(billingReceivables)) {
         console.warn("Response missing billing receivables data:", data);
         toast({
-          variant: "warning",
           title: "Atenção",
           description: "Verifique se os recebíveis foram adicionados corretamente."
         });
