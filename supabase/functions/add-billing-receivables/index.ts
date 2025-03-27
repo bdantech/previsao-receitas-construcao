@@ -318,16 +318,18 @@ serve(async (req) => {
         throw new Error(`Error fetching installments: ${installmentsError.message}`);
       }
       
-      // Calculate the values for each installment manually
-      let saldoDevedor = 0;
-      let fundoReserva = 0;
-      const tetoFundoReserva = await supabase
+      // Get the teto_fundo_reserva from payment plan settings
+      const { data: settings, error: settingsError } = await supabase
         .from('payment_plan_settings')
         .select('teto_fundo_reserva')
         .eq('id', installment.payment_plan_settings_id)
-        .single()
-        .then(result => result.data?.teto_fundo_reserva || 0);
+        .single();
         
+      if (settingsError) {
+        throw new Error(`Error fetching payment plan settings: ${settingsError.message}`);
+      }
+      
+      const tetoFundoReserva = settings.teto_fundo_reserva;
       console.log(`Manually recalculating installments with teto_fundo_reserva: ${tetoFundoReserva}`);
       
       // First get the valor_total from the anticipation request
@@ -337,32 +339,41 @@ serve(async (req) => {
       }
       
       // Get valor_total from anticipation_requests
-      const { data: anticipation } = await supabase
+      const { data: anticipation, error: anticipationError } = await supabase
         .from('anticipation_requests')
         .select('valor_total')
         .eq('id', anticipationRequestId)
         .single();
         
-      saldoDevedor = anticipation?.valor_total || 0;
+      if (anticipationError) {
+        throw new Error(`Error fetching anticipation request: ${anticipationError.message}`);
+      }
+      
+      let saldoDevedor = anticipation.valor_total || 0;
       console.log(`Starting saldo_devedor: ${saldoDevedor} from anticipation ${anticipationRequestId}`);
+      
+      let fundoReserva = 0;
       
       // Now update each installment
       for (const inst of installments) {
-        // Skip updates to installments if they have no pmt value
-        if (inst.pmt === null || inst.pmt === 0) continue;
+        if (inst.pmt === null || typeof inst.pmt !== 'number') continue;
         
         // First installment (number 0) - special handling
         if (inst.numero_parcela === 0) {
           // Deduct PMT from saldo_devedor
           saldoDevedor = Math.max(0, saldoDevedor - inst.pmt);
           
-          // Only update if this isn't the installment we're already updating
-          if (inst.id !== installmentId) {
-            await supabase
-              .from('payment_plan_installments')
-              .update({ saldo_devedor })
-              .eq('id', inst.id);
-          }
+          // Update the installment with new saldo_devedor
+          await supabase
+            .from('payment_plan_installments')
+            .update({ 
+              saldo_devedor,
+              fundo_reserva: 0, // First installment has no fundo_reserva
+              devolucao: 0 // First installment has no devolucao
+            })
+            .eq('id', inst.id);
+            
+          console.log(`Updated installment ${inst.numero_parcela} (${inst.id}): saldo_devedor=${saldoDevedor}`);
         }
         // Other installments
         else {
@@ -370,7 +381,9 @@ serve(async (req) => {
           saldoDevedor = Math.max(0, saldoDevedor - inst.pmt);
           
           // Add difference between recebiveis and PMT to fundo_reserva
-          fundoReserva += (inst.recebiveis - inst.pmt);
+          const recebiveis = inst.recebiveis || 0;
+          const contribution = recebiveis - inst.pmt;
+          fundoReserva += contribution;
           
           // Calculate devolucao if fundo_reserva exceeds teto
           let devolucao = 0;
@@ -379,17 +392,17 @@ serve(async (req) => {
             fundoReserva = tetoFundoReserva;
           }
           
-          // Only update if this isn't the installment we're already updating
-          if (inst.id !== installmentId) {
-            await supabase
-              .from('payment_plan_installments')
-              .update({ 
-                saldo_devedor,
-                fundo_reserva,
-                devolucao
-              })
-              .eq('id', inst.id);
-          }
+          // Update the installment with new values
+          await supabase
+            .from('payment_plan_installments')
+            .update({ 
+              saldo_devedor,
+              fundo_reserva,
+              devolucao
+            })
+            .eq('id', inst.id);
+            
+          console.log(`Updated installment ${inst.numero_parcela} (${inst.id}): saldo_devedor=${saldoDevedor}, fundo_reserva=${fundoReserva}, devolucao=${devolucao}`);
         }
       }
       
