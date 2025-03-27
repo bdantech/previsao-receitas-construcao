@@ -35,7 +35,13 @@ serve(async (req) => {
       )
     }
 
-    // Initialize Supabase client
+    // Initialize Supabase client with Service Role Key
+    const supabase = createClient(
+      supabaseUrl,
+      supabaseServiceKey
+    )
+
+    // Authenticate user
     const reqClient = createClient(
       supabaseUrl,
       supabaseServiceKey,
@@ -60,22 +66,16 @@ serve(async (req) => {
       )
     }
 
-    // Initialize admin client
-    const adminClient = createClient(
-      supabaseUrl,
-      supabaseServiceKey
-    )
-
-    // Check if user is company_user
-    const { data: profile, error: profileError } = await reqClient
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
+    // Get user's company
+    const { data: userCompany, error: userCompanyError } = await reqClient
+      .from('user_companies')
+      .select('company_id')
+      .eq('user_id', user.id)
       .single()
 
-    if (profileError) {
+    if (userCompanyError) {
       return new Response(
-        JSON.stringify({ error: 'Error checking user permissions' }),
+        JSON.stringify({ error: 'Error getting user company' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500 
@@ -83,48 +83,46 @@ serve(async (req) => {
       )
     }
 
-    if (profile.role !== 'company_user') {
+    if (!userCompany) {
       return new Response(
-        JSON.stringify({ error: 'Company user access required' }),
+        JSON.stringify({ error: 'User not associated with any company' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 403 
         }
       )
     }
-
-    // Get the company ID of the user
-    const { data: userCompanies, error: companiesError } = await reqClient
-      .from('user_companies')
-      .select('company_id')
-      .eq('user_id', user.id)
-
-    if (companiesError || !userCompanies || userCompanies.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'User is not associated with any company' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403 
-        }
-      )
-    }
-
-    const companyIds = userCompanies.map(uc => uc.company_id)
-
+    
     // Parse request to get action and data
     const { action, ...data } = await req.json()
     console.log(`Company payment plans action: ${action}`, data)
 
+    const companyId = userCompany.company_id
     let responseData
-    let error = null
-
+    
     // Handle different actions
     switch (action) {
-      case 'getPaymentPlans': {
-        const { projectId } = data
+      case 'getCompanyPaymentPlans': {
+        // Query payment plans from projects belonging to the company
+        const { data: companyProjects, error: projectsError } = await supabase
+          .from('projects')
+          .select('id')
+          .eq('company_id', companyId)
         
-        // Build base query to get payment plans for the company's projects
-        let query = adminClient
+        if (projectsError) {
+          throw new Error(`Error getting company projects: ${projectsError.message}`)
+        }
+        
+        if (!companyProjects || companyProjects.length === 0) {
+          // Return empty array if company has no projects
+          responseData = []
+          break
+        }
+        
+        const projectIds = companyProjects.map(project => project.id)
+        
+        // Get payment plans for company projects
+        const { data: paymentPlans, error: plansError } = await supabase
           .from('payment_plan_settings')
           .select(`
             id, 
@@ -140,25 +138,17 @@ serve(async (req) => {
               status
             ),
             projects (
-              id,
               name,
               cnpj
             )
           `)
-          .in('projects.company_id', companyIds)
-
-        // Add project filter if provided
-        if (projectId) {
-          query = query.eq('project_id', projectId)
-        }
-
-        const { data: paymentPlans, error: plansError } = await query
+          .in('project_id', projectIds)
         
         if (plansError) {
           throw new Error(`Error getting payment plans: ${plansError.message}`)
         }
-
-        responseData = paymentPlans
+        
+        responseData = paymentPlans || []
         break
       }
 
@@ -168,35 +158,34 @@ serve(async (req) => {
         if (!paymentPlanId) {
           throw new Error('Missing payment plan ID')
         }
-
-        // First check if this payment plan belongs to one of the user's companies
-        const { data: paymentPlan, error: checkError } = await adminClient
+        
+        // First verify this payment plan belongs to the company
+        const { data: planCheck, error: planCheckError } = await supabase
           .from('payment_plan_settings')
           .select(`
-            id,
             projects!inner (
               company_id
             )
           `)
           .eq('id', paymentPlanId)
           .single()
-
-        if (checkError) {
-          throw new Error(`Error checking payment plan: ${checkError.message}`)
+        
+        if (planCheckError) {
+          throw new Error(`Error checking payment plan: ${planCheckError.message}`)
         }
-
-        if (!companyIds.includes(paymentPlan.projects.company_id)) {
+        
+        if (planCheck.projects.company_id !== companyId) {
           return new Response(
-            JSON.stringify({ error: 'Access denied to this payment plan' }),
+            JSON.stringify({ error: 'Unauthorized to access this payment plan' }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 403 
             }
           )
         }
-
+        
         // Get payment plan details with installments
-        const { data: planDetails, error: ppError } = await adminClient
+        const { data: paymentPlan, error: ppError } = await supabase
           .from('payment_plan_settings')
           .select(`
             id, 
@@ -228,12 +217,12 @@ serve(async (req) => {
           `)
           .eq('id', paymentPlanId)
           .single()
-
+        
         if (ppError) {
           throw new Error(`Error getting payment plan details: ${ppError.message}`)
         }
-
-        responseData = planDetails
+        
+        responseData = paymentPlan
         break
       }
 
@@ -243,40 +232,36 @@ serve(async (req) => {
         if (!installmentId) {
           throw new Error('Missing installment ID')
         }
-
-        // First check if this installment belongs to one of the user's companies
-        const { data: installment, error: checkError } = await adminClient
+        
+        // First verify this installment belongs to the company
+        const { data: installmentCheck, error: installmentCheckError } = await supabase
           .from('payment_plan_installments')
           .select(`
-            id,
             payment_plan_settings!inner (
-              project_id
-            ),
-            projects:payment_plan_settings!inner(
-              projects(
+              projects!inner (
                 company_id
               )
             )
           `)
           .eq('id', installmentId)
           .single()
-
-        if (checkError) {
-          throw new Error(`Error checking installment: ${checkError.message}`)
+        
+        if (installmentCheckError) {
+          throw new Error(`Error checking installment: ${installmentCheckError.message}`)
         }
-
-        if (!companyIds.includes(installment.projects.company_id)) {
+        
+        if (installmentCheck.payment_plan_settings.projects.company_id !== companyId) {
           return new Response(
-            JSON.stringify({ error: 'Access denied to this installment' }),
+            JSON.stringify({ error: 'Unauthorized to access this installment' }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 403 
             }
           )
         }
-
+        
         // Get PMT receivables
-        const { data: pmtReceivables, error: pmtError } = await adminClient
+        const { data: pmtReceivables, error: pmtError } = await supabase
           .from('pmt_receivables')
           .select(`
             id,
@@ -292,13 +277,13 @@ serve(async (req) => {
             )
           `)
           .eq('installment_id', installmentId)
-
+        
         if (pmtError) {
           throw new Error(`Error getting PMT receivables: ${pmtError.message}`)
         }
-
-        // Get billing receivables
-        const { data: billingReceivables, error: billingError } = await adminClient
+        
+        // Get billing receivables - explicitly select nova_data_vencimento
+        const { data: billingReceivables, error: billingError } = await supabase
           .from('billing_receivables')
           .select(`
             id,
@@ -315,22 +300,22 @@ serve(async (req) => {
             )
           `)
           .eq('installment_id', installmentId)
-
+        
         if (billingError) {
           throw new Error(`Error getting billing receivables: ${billingError.message}`)
         }
-
+        
         responseData = {
-          pmtReceivables: pmtReceivables,
-          billingReceivables: billingReceivables
+          pmtReceivables: pmtReceivables || [],
+          billingReceivables: billingReceivables || []
         }
         break
       }
-
+      
       default:
         throw new Error(`Unknown action: ${action}`)
     }
-
+    
     return new Response(
       JSON.stringify({ data: responseData }),
       { 
@@ -339,7 +324,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
-    console.error(`Error handling company payment plans request:`, error)
+    console.error(`Error handling payment plans request:`, error)
     
     return new Response(
       JSON.stringify({ 

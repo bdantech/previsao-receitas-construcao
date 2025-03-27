@@ -470,7 +470,7 @@ serve(async (req) => {
         // Get the dia_cobranca from the payment plan settings
         const diaCobranca = installment.payment_plan_settings.dia_cobranca
 
-        // Insert new billing receivables with nova_data_vencimento
+        // Create billing receivables array
         const billingReceivables = receivables.map(receivable => {
           // Calculate the nova_data_vencimento based on the receivable due date and payment plan dia_cobranca
           const dueDate = new Date(receivable.due_date)
@@ -496,10 +496,11 @@ serve(async (req) => {
         // Log the receivables we're creating for debugging
         console.log('Creating billing receivables:', JSON.stringify(billingReceivables))
 
+        // Insert billing receivables
         const { data: inserted, error: insertError } = await supabase
           .from('billing_receivables')
           .insert(billingReceivables)
-          .select()
+          .select('*')
 
         if (insertError) {
           console.error('Error inserting billing receivables:', insertError)
@@ -533,7 +534,12 @@ serve(async (req) => {
           throw new Error(`Error recalculating payment plan: ${calcError.message}`)
         }
 
-        responseData = { success: true, updatedInstallment }
+        responseData = { 
+          success: true, 
+          updatedInstallment,
+          billingReceivables: inserted
+        }
+        
         break
       }
 
