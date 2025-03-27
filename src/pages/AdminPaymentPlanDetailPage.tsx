@@ -422,18 +422,17 @@ const AdminPaymentPlanDetailPage = () => {
     try {
       setUpdatingBillingReceivables(true);
       
-      console.log('Sending updateBillingReceivables request:', {
+      console.log('Sending add-billing-receivables request:', {
         installmentId: selectedInstallment.id,
         receivableIds: selectedReceivableIds
       });
       
-      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
+      const { data, error } = await supabase.functions.invoke('add-billing-receivables', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session?.access_token}`
         },
         body: {
-          action: 'updateBillingReceivables',
           installmentId: selectedInstallment.id,
           receivableIds: selectedReceivableIds
         }
@@ -449,8 +448,8 @@ const AdminPaymentPlanDetailPage = () => {
         return;
       }
       
-      if (!data?.data) {
-        console.error("No response data received:", data);
+      if (!data) {
+        console.error("No response data received");
         toast({
           variant: "destructive",
           title: "Erro",
@@ -459,12 +458,14 @@ const AdminPaymentPlanDetailPage = () => {
         return;
       }
       
-      if (data.data.warning) {
-        console.warn("Warning when updating billing receivables:", data.data.warning);
+      console.log("Response from add-billing-receivables:", data);
+      
+      if (data.warning) {
+        console.warn("Warning when updating billing receivables:", data.warning);
         toast({
           variant: "warning",
           title: "Atenção",
-          description: "Recebíveis adicionados, mas com alertas: " + data.data.warning
+          description: "Recebíveis adicionados, mas com alertas: " + data.warning
         });
       } else {
         toast({
@@ -473,14 +474,14 @@ const AdminPaymentPlanDetailPage = () => {
         });
       }
       
-      const billingReceivables = data.data.billingReceivables;
+      const billingReceivables = data.billingReceivables;
       
       if (!billingReceivables || !Array.isArray(billingReceivables)) {
-        console.warn("Response missing billing receivables data:", data.data);
+        console.warn("Response missing billing receivables data:", data);
         toast({
           variant: "warning",
           title: "Atenção",
-          description: "Resposta incompleta do servidor. Verifique se os recebíveis foram adicionados."
+          description: "Verifique se os recebíveis foram adicionados corretamente."
         });
       } else {
         console.log(`${billingReceivables.length} billing receivables created successfully`, billingReceivables);
@@ -489,7 +490,6 @@ const AdminPaymentPlanDetailPage = () => {
       setIsAddBillingReceivablesOpen(false);
       
       await fetchInstallmentReceivables(selectedInstallment.id);
-      
       await fetchPaymentPlanDetails();
     } catch (error) {
       console.error("Exception updating billing receivables:", error);
@@ -536,7 +536,8 @@ const AdminPaymentPlanDetailPage = () => {
         description: "Recebível de cobrança removido com sucesso."
       });
       
-      setRemovingBillingReceivable(null);
+      await fetchInstallmentReceivables(selectedInstallment.id);
+      await fetchPaymentPlanDetails();
     } catch (error) {
       console.error("Error removing billing receivable:", error);
       toast({
@@ -544,6 +545,8 @@ const AdminPaymentPlanDetailPage = () => {
         title: "Erro",
         description: "Não foi possível remover o recebível de cobrança."
       });
+    } finally {
+      setRemovingBillingReceivable(null);
     }
   };
 

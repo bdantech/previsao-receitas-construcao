@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.company-payment-plans]
 verify_jwt = true
+
+[functions.add-billing-receivables]
+verify_jwt = true
