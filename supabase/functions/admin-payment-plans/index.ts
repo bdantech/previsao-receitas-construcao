@@ -425,8 +425,65 @@ serve(async (req) => {
           throw new Error('Missing or invalid required fields')
         }
 
+        if (receivableIds.length === 0) {
+          throw new Error('At least one receivable ID is required')
+        }
+
         console.log(`Checking if installment ${installmentId} exists before proceeding`)
         
+        // Validate both installment and receivables in a single query for efficiency
+        const { data: validationData, error: validationError } = await supabase.rpc('execute_sql', {
+          query_text: `
+            WITH installment_check AS (
+              SELECT id, project_id, payment_plan_settings_id
+              FROM payment_plan_installments
+              WHERE id = $1
+            ),
+            receivables_check AS (
+              SELECT 
+                COUNT(*) as total_receivables,
+                COUNT(CASE WHEN r.id IS NOT NULL THEN 1 END) as found_receivables
+              FROM (
+                SELECT unnest($2::uuid[]) as id
+              ) as ids
+              LEFT JOIN receivables r ON ids.id = r.id
+            )
+            SELECT 
+              (SELECT to_jsonb(installment_check) FROM installment_check) as installment,
+              (SELECT to_jsonb(receivables_check) FROM receivables_check) as receivables
+          `,
+          params: [installmentId, receivableIds]
+        });
+
+        if (validationError) {
+          console.error('Error validating installment and receivables:', validationError)
+          throw new Error(`Error validating data: ${validationError.message}`)
+        }
+
+        console.log('Validation result:', validationData)
+
+        // Check if installment exists
+        if (!validationData || !validationData[0] || !validationData[0].installment) {
+          console.error('Installment not found in validation check:', installmentId)
+          throw new Error(`Installment not found: ${installmentId}`)
+        }
+
+        // Extract installment data from validation result
+        const validatedInstallment = validationData[0].installment
+        const projectId = validatedInstallment.project_id
+        const paymentPlanSettingsId = validatedInstallment.payment_plan_settings_id
+
+        // Check if all receivables exist
+        const receivablesCheck = validationData[0].receivables
+        if (!receivablesCheck || receivablesCheck.total_receivables !== receivablesCheck.found_receivables) {
+          console.error('Not all receivables found:', {
+            expected: receivablesCheck.total_receivables,
+            found: receivablesCheck.found_receivables
+          })
+          throw new Error(`Some receivables do not exist. Expected ${receivablesCheck.total_receivables}, found ${receivablesCheck.found_receivables}`)
+        }
+
+        // Now proceed with the regular flow, but using the validated data
         // Get installment details to check project ID and payment plan settings
         const { data: installment, error: installmentError } = await supabase
           .from('payment_plan_installments')

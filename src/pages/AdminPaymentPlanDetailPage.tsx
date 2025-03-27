@@ -265,6 +265,30 @@ const AdminPaymentPlanDetailPage = () => {
     try {
       setLoadingEligibleReceivables(true);
       
+      // First, verify the installment exists
+      console.log(`Verifying installment ID exists: ${selectedInstallment.id}`);
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('admin-payment-plans', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: {
+          action: 'getInstallmentReceivables',
+          installmentId: selectedInstallment.id
+        }
+      });
+      
+      if (verifyError) {
+        console.error("Error verifying installment:", verifyError);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: `A parcela selecionada não pode ser verificada: ${verifyError.message}`
+        });
+        return;
+      }
+      
+      // Proceed with getting eligible receivables
       const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
         method: 'POST',
         headers: {
@@ -282,19 +306,31 @@ const AdminPaymentPlanDetailPage = () => {
         toast({
           variant: "destructive",
           title: "Erro",
-          description: "Não foi possível carregar os recebíveis elegíveis."
+          description: `Não foi possível carregar os recebíveis elegíveis: ${error.message}`
         });
         return;
       }
       
+      if (!data || !data.data) {
+        console.warn("No eligible receivables data returned:", data);
+        toast({
+          variant: "warning",
+          title: "Atenção",
+          description: "Nenhum recebível elegível encontrado para esta parcela."
+        });
+        setEligibleReceivables([]);
+        return;
+      }
+      
+      console.log("Eligible receivables loaded:", data.data);
       setEligibleReceivables(data.data || []);
       setSelectedReceivableIds([]);
     } catch (error) {
-      console.error("Error fetching eligible receivables:", error);
+      console.error("Exception in fetchEligibleBillingReceivables:", error);
       toast({
         variant: "destructive",
         title: "Erro",
-        description: "Não foi possível carregar os recebíveis elegíveis."
+        description: `Erro ao carregar recebíveis elegíveis: ${error.message || 'Erro desconhecido'}`
       });
     } finally {
       setLoadingEligibleReceivables(false);
@@ -392,6 +428,35 @@ const AdminPaymentPlanDetailPage = () => {
     
     try {
       setUpdatingBillingReceivables(true);
+      
+      // Verify receivables exist before attempting to create billing receivables
+      console.log('Verifying receivables existence before sending request...');
+      const { data: receivablesData, error: receivablesError } = await supabase.from('receivables')
+        .select('id')
+        .in('id', selectedReceivableIds);
+      
+      if (receivablesError) {
+        console.error("Error verifying receivables:", receivablesError);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: `Erro ao verificar recebíveis: ${receivablesError.message}`
+        });
+        return;
+      }
+      
+      if (!receivablesData || receivablesData.length !== selectedReceivableIds.length) {
+        console.error("Some selected receivables don't exist:", {
+          selected: selectedReceivableIds,
+          found: receivablesData?.map(r => r.id) || []
+        });
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Alguns recebíveis selecionados não existem na base de dados."
+        });
+        return;
+      }
       
       // Log the request for debugging
       console.log('Sending updateBillingReceivables request:', {
@@ -893,3 +958,4 @@ const AdminPaymentPlanDetailPage = () => {
 };
 
 export default AdminPaymentPlanDetailPage;
+
