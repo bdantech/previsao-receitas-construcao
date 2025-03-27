@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -265,6 +264,64 @@ serve(async (req) => {
         }
 
         responseData = paymentPlan
+        break
+      }
+
+      case 'getInstallmentReceivables': {
+        const { installmentId } = data
+        
+        if (!installmentId) {
+          throw new Error('Missing installment ID')
+        }
+
+        // Get PMT receivables
+        const { data: pmtReceivables, error: pmtError } = await supabase
+          .from('pmt_receivables')
+          .select(`
+            id,
+            receivable_id,
+            receivables (
+              id,
+              buyer_name,
+              buyer_cpf,
+              amount,
+              due_date,
+              description,
+              status
+            )
+          `)
+          .eq('installment_id', installmentId)
+
+        if (pmtError) {
+          throw new Error(`Error getting PMT receivables: ${pmtError.message}`)
+        }
+
+        // Get billing receivables
+        const { data: billingReceivables, error: billingError } = await supabase
+          .from('billing_receivables')
+          .select(`
+            id,
+            receivable_id,
+            receivables (
+              id,
+              buyer_name,
+              buyer_cpf,
+              amount,
+              due_date,
+              description,
+              status
+            )
+          `)
+          .eq('installment_id', installmentId)
+
+        if (billingError) {
+          throw new Error(`Error getting billing receivables: ${billingError.message}`)
+        }
+
+        responseData = {
+          pmtReceivables: pmtReceivables,
+          billingReceivables: billingReceivables
+        }
         break
       }
 
