@@ -339,11 +339,7 @@ serve(async (req) => {
           .select(`
             id,
             project_id,
-            anticipation_request_id,
-            payment_plan_installments (
-              id,
-              data_vencimento
-            )
+            anticipation_request_id
           `)
           .eq('id', paymentPlanId)
           .single()
@@ -352,52 +348,41 @@ serve(async (req) => {
           throw new Error(`Error getting payment plan: ${ppError.message}`)
         }
 
-        // Get the first installment date to determine the cutoff date
-        const { data: installments, error: instError } = await supabase
+        // Get the selected installment to determine the month/year constraints
+        const { data: installment, error: instError } = await supabase
           .from('payment_plan_installments')
           .select('data_vencimento')
-          .eq('payment_plan_settings_id', paymentPlanId)
-          .order('numero_parcela', { ascending: true })
-          .limit(1)
+          .eq('id', installmentId)
+          .single()
 
         if (instError) {
-          throw new Error(`Error getting first installment: ${instError.message}`)
+          throw new Error(`Error getting installment: ${instError.message}`)
         }
+        
+        // Parse the installment date to extract year and month
+        const installmentDate = new Date(installment.data_vencimento)
+        const year = installmentDate.getFullYear()
+        const month = installmentDate.getMonth()
+        
+        // Calculate first and last day of the month
+        const firstDayOfMonth = new Date(year, month, 1).toISOString().split('T')[0]
+        const lastDayOfMonth = new Date(year, month + 1, 0).toISOString().split('T')[0]
 
-        if (!installments || installments.length === 0) {
-          throw new Error('No installments found for this payment plan')
-        }
+        console.log(`Date range: ${firstDayOfMonth} to ${lastDayOfMonth}`)
 
-        // Parse the date to extract year and month for the first day of the month
-        const firstInstallmentDate = new Date(installments[0].data_vencimento)
-        const cutoffDate = new Date(
-          firstInstallmentDate.getFullYear(),
-          firstInstallmentDate.getMonth(),
-          1
-        ).toISOString().split('T')[0]
-
-        // Get list of receivables already linked to any payment plan (to exclude them)
-        const { data: linkedPmtReceivables, error: linkedPmtError } = await supabase
-          .from('pmt_receivables')
-          .select('receivable_id')
-
-        if (linkedPmtError) {
-          throw new Error(`Error getting linked PMT receivables: ${linkedPmtError.message}`)
-        }
-
-        const { data: linkedBillingReceivables, error: linkedBillingError } = await supabase
+        // Get list of receivables already in billing_receivables (to exclude them)
+        const { data: existingBillingReceivables, error: existingError } = await supabase
           .from('billing_receivables')
           .select('receivable_id')
 
-        if (linkedBillingError) {
-          throw new Error(`Error getting linked billing receivables: ${linkedBillingError.message}`)
+        if (existingError) {
+          throw new Error(`Error getting existing billing receivables: ${existingError.message}`)
         }
 
-        // Combine all linked receivable IDs
-        const linkedReceivableIds = [
-          ...(linkedPmtReceivables || []).map(item => item.receivable_id),
-          ...(linkedBillingReceivables || []).map(item => item.receivable_id)
-        ]
+        // Extract the IDs of receivables already in billing_receivables
+        const existingReceivableIds = (existingBillingReceivables || [])
+          .map(item => item.receivable_id)
+          .filter(id => id !== null);
 
         // Get eligible receivables
         let query = supabase
@@ -412,12 +397,13 @@ serve(async (req) => {
             status
           `)
           .eq('project_id', paymentPlan.project_id)
-          .gte('due_date', cutoffDate)
+          .gte('due_date', firstDayOfMonth)
+          .lte('due_date', lastDayOfMonth)
           .not('status', 'eq', 'reprovado')
 
         // Exclude already linked receivables if there are any
-        if (linkedReceivableIds.length > 0) {
-          query = query.not('id', 'in', `(${linkedReceivableIds.join(',')})`)
+        if (existingReceivableIds.length > 0) {
+          query = query.not('id', 'in', `(${existingReceivableIds.join(',')})`)
         }
 
         const { data: eligibleReceivables, error: eligibleError } = await query
@@ -507,13 +493,20 @@ serve(async (req) => {
           }
         })
 
-        const { error: insertError } = await supabase
+        // Log the receivables we're creating for debugging
+        console.log('Creating billing receivables:', JSON.stringify(billingReceivables))
+
+        const { data: inserted, error: insertError } = await supabase
           .from('billing_receivables')
           .insert(billingReceivables)
+          .select()
 
         if (insertError) {
+          console.error('Error inserting billing receivables:', insertError)
           throw new Error(`Error inserting billing receivables: ${insertError.message}`)
         }
+
+        console.log('Inserted billing receivables:', inserted)
 
         // Calculate total amount of receivables
         const totalAmount = receivables.reduce((sum, receivable) => sum + parseFloat(receivable.amount), 0)
