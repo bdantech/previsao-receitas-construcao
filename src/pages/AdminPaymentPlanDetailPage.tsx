@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -131,13 +130,15 @@ const AdminPaymentPlanDetailPage = () => {
   }, [session, userRole, paymentPlanId]);
 
   const fetchPaymentPlanDetails = async () => {
+    if (!session || !paymentPlanId) return;
+    
     try {
       setLoading(true);
       
       const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session?.access_token}`
+          Authorization: `Bearer ${session.access_token}`
         },
         body: {
           action: 'getPaymentPlanDetails',
@@ -155,15 +156,43 @@ const AdminPaymentPlanDetailPage = () => {
         return;
       }
       
-      if (data) {
-        setPaymentPlan(data.data);
+      if (!data?.data) {
+        console.error("No payment plan data returned:", data);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Plano de pagamento não encontrado."
+        });
+        return;
       }
+      
+      setPaymentPlan(data.data);
+      
+      // Validate installments exist
+      if (!data.data.payment_plan_installments || data.data.payment_plan_installments.length === 0) {
+        console.warn("Payment plan has no installments:", data.data);
+        toast({
+          variant: "warning",
+          title: "Atenção",
+          description: "Este plano de pagamento não possui parcelas."
+        });
+        return;
+      }
+      
+      console.log("Payment plan loaded with installments:", data.data.payment_plan_installments);
+      
+      // Select the first installment by default
+      const firstInstallment = data.data.payment_plan_installments[0];
+      setSelectedInstallment(firstInstallment);
+      
+      // Fetch receivables for the first installment
+      await fetchInstallmentReceivables(firstInstallment.id);
     } catch (error) {
-      console.error("Error fetching payment plan details:", error);
+      console.error("Exception fetching payment plan details:", error);
       toast({
         variant: "destructive",
         title: "Erro",
-        description: "Não foi possível carregar os detalhes do plano de pagamento."
+        description: "Erro ao carregar detalhes do plano de pagamento."
       });
     } finally {
       setLoading(false);
@@ -171,11 +200,18 @@ const AdminPaymentPlanDetailPage = () => {
   };
 
   const fetchInstallmentReceivables = async (installmentId: string) => {
+    if (!session || !installmentId) {
+      console.error("Missing session or installment ID for fetchInstallmentReceivables");
+      return;
+    }
+    
     try {
+      console.log(`Fetching receivables for installment: ${installmentId}`);
+      
       const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session?.access_token}`
+          Authorization: `Bearer ${session.access_token}`
         },
         body: {
           action: 'getInstallmentReceivables',
@@ -188,23 +224,37 @@ const AdminPaymentPlanDetailPage = () => {
         toast({
           variant: "destructive",
           title: "Erro",
-          description: "Não foi possível carregar os recebíveis da parcela."
+          description: `Erro ao carregar recebíveis: ${error.message}`
         });
         return;
       }
       
-      if (data) {
-        setReceivableMap({
-          pmt: data.data.pmtReceivables,
-          billing: data.data.billingReceivables
+      if (!data?.data) {
+        console.warn("No receivables data returned:", data);
+        toast({
+          variant: "warning", 
+          title: "Atenção",
+          description: "Nenhum dado de recebíveis retornado pelo servidor."
         });
+        setReceivableMap({
+          pmt: [],
+          billing: []
+        });
+        return;
       }
+      
+      console.log("Receivables loaded:", data.data);
+      
+      setReceivableMap({
+        pmt: data.data.pmtReceivables || [],
+        billing: data.data.billingReceivables || []
+      });
     } catch (error) {
-      console.error("Error fetching installment receivables:", error);
+      console.error("Exception fetching installment receivables:", error);
       toast({
         variant: "destructive",
         title: "Erro",
-        description: "Não foi possível carregar os recebíveis da parcela."
+        description: `Erro ao carregar recebíveis: ${error.message || 'Erro desconhecido'}`
       });
     }
   };
@@ -322,10 +372,32 @@ const AdminPaymentPlanDetailPage = () => {
   };
 
   const handleSaveBillingReceivables = async () => {
-    if (!selectedInstallment || selectedReceivableIds.length === 0) return;
+    if (!selectedInstallment) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Nenhuma parcela selecionada. Por favor, selecione uma parcela primeiro."
+      });
+      return;
+    }
+
+    if (selectedReceivableIds.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Nenhum recebível selecionado. Por favor, selecione pelo menos um recebível."
+      });
+      return;
+    }
     
     try {
       setUpdatingBillingReceivables(true);
+      
+      // Log the request for debugging
+      console.log('Sending updateBillingReceivables request:', {
+        installmentId: selectedInstallment.id,
+        receivableIds: selectedReceivableIds
+      });
       
       const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
         method: 'POST',
@@ -344,26 +416,47 @@ const AdminPaymentPlanDetailPage = () => {
         toast({
           variant: "destructive",
           title: "Erro",
-          description: "Não foi possível adicionar os recebíveis de cobrança."
+          description: `Não foi possível adicionar os recebíveis de cobrança: ${error.message}`
         });
         return;
       }
       
-      toast({
-        title: "Sucesso",
-        description: "Recebíveis de cobrança adicionados com sucesso."
-      });
+      if (data?.warning) {
+        console.warn("Warning when updating billing receivables:", data.warning);
+        toast({
+          variant: "warning",
+          title: "Atenção",
+          description: "Recebíveis adicionados, mas com alertas: " + data.warning
+        });
+      } else {
+        toast({
+          title: "Sucesso",
+          description: "Recebíveis de cobrança adicionados com sucesso."
+        });
+      }
+      
+      // Verify the response contains the expected data
+      if (!data?.billingReceivables || !Array.isArray(data.billingReceivables)) {
+        console.warn("Response missing billing receivables data:", data);
+        toast({
+          variant: "warning",
+          title: "Atenção",
+          description: "Resposta incompleta do servidor. Verifique se os recebíveis foram adicionados."
+        });
+      } else {
+        console.log(`${data.billingReceivables.length} billing receivables created successfully`);
+      }
       
       // Close dialogs and refresh data
       setIsAddBillingReceivablesOpen(false);
       await fetchInstallmentReceivables(selectedInstallment.id);
       await fetchPaymentPlanDetails();
     } catch (error) {
-      console.error("Error updating billing receivables:", error);
+      console.error("Exception updating billing receivables:", error);
       toast({
         variant: "destructive",
         title: "Erro",
-        description: "Não foi possível adicionar os recebíveis de cobrança."
+        description: `Não foi possível adicionar os recebíveis de cobrança: ${error.message || 'Erro desconhecido'}`
       });
     } finally {
       setUpdatingBillingReceivables(false);

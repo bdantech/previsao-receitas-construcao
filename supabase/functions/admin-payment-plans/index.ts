@@ -425,6 +425,8 @@ serve(async (req) => {
           throw new Error('Missing or invalid required fields')
         }
 
+        console.log(`Checking if installment ${installmentId} exists before proceeding`)
+        
         // Get installment details to check project ID and payment plan settings
         const { data: installment, error: installmentError } = await supabase
           .from('payment_plan_installments')
@@ -440,9 +442,13 @@ serve(async (req) => {
           .eq('id', installmentId)
           .single()
 
-        if (installmentError) {
-          throw new Error(`Error getting installment: ${installmentError.message}`)
+        // More robust error handling for missing installment
+        if (installmentError || !installment) {
+          console.error('Installment not found or error:', installmentError, 'installmentId:', installmentId)
+          throw new Error(`Installment not found: ${installmentId}. Please check that this installment exists in the database.`)
         }
+        
+        console.log(`Installment found:`, installment)
 
         // Verify that all receivables belong to the same project
         const { data: receivables, error: receivablesError } = await supabase
@@ -452,10 +458,17 @@ serve(async (req) => {
           .eq('project_id', installment.project_id)
 
         if (receivablesError) {
+          console.error('Error getting receivables:', receivablesError)
           throw new Error(`Error getting receivables: ${receivablesError.message}`)
         }
 
+        if (!receivables || receivables.length === 0) {
+          console.error('No receivables found for the provided IDs')
+          throw new Error('No receivables found for the provided IDs')
+        }
+
         if (receivables.length !== receivableIds.length) {
+          console.error(`Receivable count mismatch: Found ${receivables.length}, expected ${receivableIds.length}`)
           throw new Error('Some receivables do not belong to the project or do not exist')
         }
 
@@ -466,7 +479,14 @@ serve(async (req) => {
           .eq('installment_id', installmentId)
 
         if (deleteError) {
+          console.error('Error deleting existing billing receivables:', deleteError)
           throw new Error(`Error deleting existing billing receivables: ${deleteError.message}`)
+        }
+
+        // Verify the payment_plan_settings data exists
+        if (!installment.payment_plan_settings || !installment.payment_plan_settings.dia_cobranca) {
+          console.error('Missing payment plan settings or dia_cobranca value:', installment)
+          throw new Error('Missing payment plan settings data needed for nova_data_vencimento calculation')
         }
 
         // Get the dia_cobranca from the payment plan settings
@@ -510,6 +530,18 @@ serve(async (req) => {
         }
 
         console.log('Inserted billing receivables:', inserted)
+        
+        // Verify the insertion succeeded by querying for the inserted records
+        const { data: verificationData, error: verificationError } = await supabase
+          .from('billing_receivables')
+          .select('id, receivable_id')
+          .eq('installment_id', installmentId)
+        
+        if (verificationError) {
+          console.error('Error verifying billing receivables insertion:', verificationError)
+        } else {
+          console.log(`Verification found ${verificationData?.length || 0} billing receivables for installment ${installmentId}:`, verificationData)
+        }
 
         // Calculate total amount of receivables
         const totalAmount = receivables.reduce((sum, receivable) => sum + parseFloat(receivable.amount), 0)
@@ -523,17 +555,42 @@ serve(async (req) => {
           .single()
 
         if (updateError) {
+          console.error('Error updating installment with new recebiveis value:', updateError)
           throw new Error(`Error updating installment: ${updateError.message}`)
         }
+        
+        if (!updatedInstallment) {
+          console.error('No installment was updated. This is unexpected as we already verified it exists')
+          throw new Error('Failed to update installment with new recebiveis value')
+        }
 
-        // Recalculate payment plan
-        const { error: calcError } = await supabase.rpc(
-          'calculate_payment_plan_installments',
-          { p_payment_plan_settings_id: installment.payment_plan_settings_id }
-        )
+        console.log('Updated installment:', updatedInstallment)
 
-        if (calcError) {
-          throw new Error(`Error recalculating payment plan: ${calcError.message}`)
+        // Safely attempt to recalculate payment plan
+        try {
+          // Recalculate payment plan
+          const { error: calcError } = await supabase.rpc(
+            'calculate_payment_plan_installments',
+            { p_payment_plan_settings_id: installment.payment_plan_settings_id }
+          )
+
+          if (calcError) {
+            console.error('Error recalculating payment plan:', calcError)
+            throw new Error(`Error recalculating payment plan: ${calcError.message}`)
+          }
+          
+          console.log('Payment plan recalculation succeeded')
+        } catch (recalcError) {
+          console.error('Exception during payment plan recalculation:', recalcError)
+          // Don't rethrow here to preserve the inserted billing receivables
+          responseData = { 
+            success: true, 
+            warning: 'Billing receivables were created but payment plan recalculation failed: ' + recalcError.message,
+            updatedInstallment,
+            billingReceivables: inserted
+          }
+          
+          break
         }
 
         responseData = { 
