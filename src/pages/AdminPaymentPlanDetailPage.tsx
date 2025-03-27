@@ -429,35 +429,6 @@ const AdminPaymentPlanDetailPage = () => {
     try {
       setUpdatingBillingReceivables(true);
       
-      // Verify receivables exist before attempting to create billing receivables
-      console.log('Verifying receivables existence before sending request...');
-      const { data: receivablesData, error: receivablesError } = await supabase.from('receivables')
-        .select('id')
-        .in('id', selectedReceivableIds);
-      
-      if (receivablesError) {
-        console.error("Error verifying receivables:", receivablesError);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: `Erro ao verificar recebíveis: ${receivablesError.message}`
-        });
-        return;
-      }
-      
-      if (!receivablesData || receivablesData.length !== selectedReceivableIds.length) {
-        console.error("Some selected receivables don't exist:", {
-          selected: selectedReceivableIds,
-          found: receivablesData?.map(r => r.id) || []
-        });
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Alguns recebíveis selecionados não existem na base de dados."
-        });
-        return;
-      }
-      
       // Log the request for debugging
       console.log('Sending updateBillingReceivables request:', {
         installmentId: selectedInstallment.id,

@@ -431,60 +431,7 @@ serve(async (req) => {
 
         console.log(`Checking if installment ${installmentId} exists before proceeding`)
         
-        // Validate both installment and receivables in a single query for efficiency
-        const { data: validationData, error: validationError } = await supabase.rpc('execute_sql', {
-          query_text: `
-            WITH installment_check AS (
-              SELECT id, project_id, payment_plan_settings_id
-              FROM payment_plan_installments
-              WHERE id = $1
-            ),
-            receivables_check AS (
-              SELECT 
-                COUNT(*) as total_receivables,
-                COUNT(CASE WHEN r.id IS NOT NULL THEN 1 END) as found_receivables
-              FROM (
-                SELECT unnest($2::uuid[]) as id
-              ) as ids
-              LEFT JOIN receivables r ON ids.id = r.id
-            )
-            SELECT 
-              (SELECT to_jsonb(installment_check) FROM installment_check) as installment,
-              (SELECT to_jsonb(receivables_check) FROM receivables_check) as receivables
-          `,
-          params: [installmentId, receivableIds]
-        });
-
-        if (validationError) {
-          console.error('Error validating installment and receivables:', validationError)
-          throw new Error(`Error validating data: ${validationError.message}`)
-        }
-
-        console.log('Validation result:', validationData)
-
-        // Check if installment exists
-        if (!validationData || !validationData[0] || !validationData[0].installment) {
-          console.error('Installment not found in validation check:', installmentId)
-          throw new Error(`Installment not found: ${installmentId}`)
-        }
-
-        // Extract installment data from validation result
-        const validatedInstallment = validationData[0].installment
-        const projectId = validatedInstallment.project_id
-        const paymentPlanSettingsId = validatedInstallment.payment_plan_settings_id
-
-        // Check if all receivables exist
-        const receivablesCheck = validationData[0].receivables
-        if (!receivablesCheck || receivablesCheck.total_receivables !== receivablesCheck.found_receivables) {
-          console.error('Not all receivables found:', {
-            expected: receivablesCheck.total_receivables,
-            found: receivablesCheck.found_receivables
-          })
-          throw new Error(`Some receivables do not exist. Expected ${receivablesCheck.total_receivables}, found ${receivablesCheck.found_receivables}`)
-        }
-
-        // Now proceed with the regular flow, but using the validated data
-        // Get installment details to check project ID and payment plan settings
+        // Simplify validation - check installment first
         const { data: installment, error: installmentError } = await supabase
           .from('payment_plan_installments')
           .select(`
@@ -508,11 +455,12 @@ serve(async (req) => {
         console.log(`Installment found:`, installment)
 
         // Verify that all receivables belong to the same project
+        // We're intentionally NOT checking if the receivable is already in billing_receivables
+        // since we'll be deleting/recreating them anyway
         const { data: receivables, error: receivablesError } = await supabase
           .from('receivables')
-          .select('id, amount, due_date')
+          .select('id, amount, due_date, project_id')
           .in('id', receivableIds)
-          .eq('project_id', installment.project_id)
 
         if (receivablesError) {
           console.error('Error getting receivables:', receivablesError)
@@ -524,9 +472,42 @@ serve(async (req) => {
           throw new Error('No receivables found for the provided IDs')
         }
 
+        // Log found receivables for debugging
+        console.log(`Found ${receivables.length} receivables out of ${receivableIds.length} requested:`, 
+          receivables.map(r => ({ id: r.id, project_id: r.project_id })))
+        
+        // Check if any receivables are missing
         if (receivables.length !== receivableIds.length) {
-          console.error(`Receivable count mismatch: Found ${receivables.length}, expected ${receivableIds.length}`)
-          throw new Error('Some receivables do not belong to the project or do not exist')
+          const foundIds = new Set(receivables.map(r => r.id))
+          const missingIds = receivableIds.filter(id => !foundIds.has(id))
+          console.error(`Missing receivables:`, missingIds)
+          throw new Error(`Some receivables do not exist: ${missingIds.join(', ')}`)
+        }
+        
+        // Check if all receivables belong to the correct project
+        const wrongProjectReceivables = receivables.filter(r => r.project_id !== installment.project_id)
+        if (wrongProjectReceivables.length > 0) {
+          console.error(`Receivables from wrong project:`, wrongProjectReceivables)
+          throw new Error(`Some receivables do not belong to the project: ${wrongProjectReceivables.map(r => r.id).join(', ')}`)
+        }
+
+        // Check if any of these receivables are already linked to other installments
+        // This is important to prevent the same receivable from being used in multiple installments
+        const { data: existingLinks, error: existingLinksError } = await supabase
+          .from('billing_receivables')
+          .select('receivable_id, installment_id')
+          .in('receivable_id', receivableIds)
+          .neq('installment_id', installmentId)
+        
+        if (existingLinksError) {
+          console.error('Error checking existing links:', existingLinksError)
+          throw new Error(`Error checking if receivables are already linked: ${existingLinksError.message}`)
+        }
+        
+        if (existingLinks && existingLinks.length > 0) {
+          console.error('Some receivables are already linked to other installments:', existingLinks)
+          const alreadyLinkedIds = existingLinks.map(link => link.receivable_id)
+          throw new Error(`These receivables are already linked to other installments: ${alreadyLinkedIds.join(', ')}`)
         }
 
         // Clear existing billing receivables for this installment
