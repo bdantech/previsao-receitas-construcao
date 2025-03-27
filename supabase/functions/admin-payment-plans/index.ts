@@ -296,7 +296,7 @@ serve(async (req) => {
           throw new Error(`Error getting PMT receivables: ${pmtError.message}`)
         }
 
-        // Get billing receivables
+        // Get billing receivables - explicitly select nova_data_vencimento
         const { data: billingReceivables, error: billingError } = await supabase
           .from('billing_receivables')
           .select(`
@@ -319,9 +319,11 @@ serve(async (req) => {
           throw new Error(`Error getting billing receivables: ${billingError.message}`)
         }
 
+        console.log("Billing receivables fetched:", billingReceivables);
+
         responseData = {
-          pmtReceivables: pmtReceivables,
-          billingReceivables: billingReceivables
+          pmtReceivables: pmtReceivables || [],
+          billingReceivables: billingReceivables || []
         }
         break
       }
@@ -496,7 +498,7 @@ serve(async (req) => {
         // Log the receivables we're creating for debugging
         console.log('Creating billing receivables:', JSON.stringify(billingReceivables))
 
-        // Insert billing receivables
+        // Insert billing receivables with returning * to get all columns back
         const { data: inserted, error: insertError } = await supabase
           .from('billing_receivables')
           .insert(billingReceivables)
