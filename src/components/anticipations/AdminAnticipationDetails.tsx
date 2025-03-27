@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   AlertDialog,
@@ -16,11 +15,17 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Loader, CheckCircle, XCircle } from "lucide-react";
+import { Loader, CheckCircle, XCircle, Plus, FileEdit } from "lucide-react";
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatCNPJ, formatCurrency } from "@/lib/formatters";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 interface Company {
   name: string;
@@ -66,6 +71,16 @@ interface AdminAnticipationDetailsProps {
   onStatusUpdate?: () => void;
 }
 
+const paymentPlanSchema = z.object({
+  diaCobranca: z.coerce.number()
+    .min(1, { message: "Dia de cobrança deve ser entre 1 e 31" })
+    .max(31, { message: "Dia de cobrança deve ser entre 1 e 31" }),
+  tetoFundoReserva: z.coerce.number()
+    .min(0, { message: "Teto do fundo de reserva deve ser um valor positivo" })
+});
+
+type PaymentPlanFormValues = z.infer<typeof paymentPlanSchema>;
+
 export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> = ({ anticipationId, onClose, onStatusUpdate }) => {
   const { session } = useAuth();
   const { toast } = useToast();
@@ -77,6 +92,16 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
   const [open, setOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [creditInfo, setCreditInfo] = useState<{ available: number, requested: number } | null>(null);
+  const [isPaymentPlanDialogOpen, setIsPaymentPlanDialogOpen] = useState(false);
+  const [isCreatingPaymentPlan, setIsCreatingPaymentPlan] = useState(false);
+  
+  const form = useForm<PaymentPlanFormValues>({
+    resolver: zodResolver(paymentPlanSchema),
+    defaultValues: {
+      diaCobranca: 10,
+      tetoFundoReserva: 0
+    }
+  });
   
   const fetchAnticipationDetails = async () => {
     if (!session?.access_token) return;
@@ -150,7 +175,6 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
       if (data.error) {
         console.error("Server reported an error:", data.error);
         
-        // Handle credit limit error specifically
         if (data.details && data.error === "Limite de crédito insuficiente") {
           setErrorMessage(data.details.message);
           setCreditInfo({
@@ -165,7 +189,6 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
           setIsUpdating(false);
           return;
         } else {
-          // Handle other errors
           setErrorMessage(data.error);
           toast({
             title: "Erro ao atualizar status",
@@ -183,7 +206,6 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
         variant: "default"
       });
       
-      // Reload anticipation details
       fetchAnticipationDetails();
       
       if (onStatusUpdate) {
@@ -247,7 +269,6 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
           </Button>
         </div>
         
-        {/* Error message section */}
         {errorMessage && (
           <Alert variant="destructive" className="mb-4">
             <AlertTitle>Erro ao aprovar antecipação</AlertTitle>
@@ -283,7 +304,6 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
           </div>
         </div>
         
-        {/* New section for interest rates and fees */}
         <div className="mt-4 bg-gray-50 p-4 rounded-md">
           <h3 className="text-md font-semibold mb-2">Taxas e Tarifas</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -342,7 +362,6 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
           )}
         </div>
         
-        {/* Status Update Actions */}
         <div className="mt-8 flex justify-end gap-4">
           {anticipation.status === 'Solicitada' && (
             <>
@@ -382,17 +401,104 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
           )}
           
           {anticipation.status === 'Aprovada' && (
+            <>
+              <Button 
+                className="bg-blue-500 text-white hover:bg-blue-600"
+                onClick={() => handleStatusChange('Concluída')}
+                disabled={isUpdating}
+              >
+                Concluir
+                {isUpdating && <Loader className="ml-2 h-4 w-4 animate-spin" />}
+              </Button>
+              
+              <Button 
+                variant="default"
+                onClick={() => setIsPaymentPlanDialogOpen(true)}
+                className="flex items-center gap-1"
+              >
+                <FileEdit className="h-4 w-4" />
+                Criar Plano de Pagamento
+              </Button>
+            </>
+          )}
+          
+          {anticipation.status === 'Concluída' && (
             <Button 
-              className="bg-blue-500 text-white hover:bg-blue-600"
-              onClick={() => handleStatusChange('Concluída')}
-              disabled={isUpdating}
+              variant="default"
+              onClick={() => setIsPaymentPlanDialogOpen(true)}
+              className="flex items-center gap-1"
             >
-              Concluir
-              {isUpdating && <Loader className="ml-2 h-4 w-4 animate-spin" />}
+              <FileEdit className="h-4 w-4" />
+              Criar Plano de Pagamento
             </Button>
           )}
         </div>
       </div>
+      
+      <Dialog open={isPaymentPlanDialogOpen} onOpenChange={setIsPaymentPlanDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Criar Plano de Pagamento</DialogTitle>
+            <DialogDescription>
+              Defina os parâmetros para o plano de pagamento da antecipação.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleCreatePaymentPlan)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="diaCobranca"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dia de Cobrança</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="1" max="31" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Dia do mês em que as cobranças serão realizadas (1-31).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="tetoFundoReserva"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Teto do Fundo de Reserva</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" step="0.01" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Valor máximo para o fundo de reserva.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsPaymentPlanDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isCreatingPaymentPlan}>
+                  {isCreatingPaymentPlan ? (
+                    <>
+                      <Loader className="mr-2 h-4 w-4 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    <>Criar Plano</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
