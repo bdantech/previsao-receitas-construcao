@@ -111,6 +111,42 @@ export type Database = {
           },
         ]
       }
+      billing_receivables: {
+        Row: {
+          created_at: string
+          id: string
+          installment_id: string
+          receivable_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          installment_id: string
+          receivable_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          installment_id?: string
+          receivable_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_receivables_installment_id_fkey"
+            columns: ["installment_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plan_installments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_receivables_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           cnpj: string
@@ -350,6 +386,157 @@ export type Database = {
           },
         ]
       }
+      payment_plan_installments: {
+        Row: {
+          anticipation_request_id: string
+          created_at: string
+          data_vencimento: string
+          devolucao: number | null
+          fundo_reserva: number | null
+          id: string
+          numero_parcela: number
+          payment_plan_settings_id: string
+          pmt: number | null
+          project_id: string
+          recebiveis: number | null
+          saldo_devedor: number | null
+          updated_at: string
+        }
+        Insert: {
+          anticipation_request_id: string
+          created_at?: string
+          data_vencimento: string
+          devolucao?: number | null
+          fundo_reserva?: number | null
+          id?: string
+          numero_parcela: number
+          payment_plan_settings_id: string
+          pmt?: number | null
+          project_id: string
+          recebiveis?: number | null
+          saldo_devedor?: number | null
+          updated_at?: string
+        }
+        Update: {
+          anticipation_request_id?: string
+          created_at?: string
+          data_vencimento?: string
+          devolucao?: number | null
+          fundo_reserva?: number | null
+          id?: string
+          numero_parcela?: number
+          payment_plan_settings_id?: string
+          pmt?: number | null
+          project_id?: string
+          recebiveis?: number | null
+          saldo_devedor?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_plan_installments_anticipation_request_id_fkey"
+            columns: ["anticipation_request_id"]
+            isOneToOne: false
+            referencedRelation: "anticipation_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_plan_installments_payment_plan_settings_id_fkey"
+            columns: ["payment_plan_settings_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plan_settings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_plan_installments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_plan_settings: {
+        Row: {
+          anticipation_request_id: string
+          created_at: string
+          dia_cobranca: number
+          id: string
+          project_id: string
+          teto_fundo_reserva: number
+          updated_at: string
+        }
+        Insert: {
+          anticipation_request_id: string
+          created_at?: string
+          dia_cobranca: number
+          id?: string
+          project_id: string
+          teto_fundo_reserva: number
+          updated_at?: string
+        }
+        Update: {
+          anticipation_request_id?: string
+          created_at?: string
+          dia_cobranca?: number
+          id?: string
+          project_id?: string
+          teto_fundo_reserva?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_plan_settings_anticipation_request_id_fkey"
+            columns: ["anticipation_request_id"]
+            isOneToOne: false
+            referencedRelation: "anticipation_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_plan_settings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pmt_receivables: {
+        Row: {
+          created_at: string
+          id: string
+          installment_id: string
+          receivable_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          installment_id: string
+          receivable_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          installment_id?: string
+          receivable_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pmt_receivables_installment_id_fkey"
+            columns: ["installment_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plan_installments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pmt_receivables_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -571,6 +758,12 @@ export type Database = {
           p_company_id: string
         }
         Returns: number
+      }
+      calculate_payment_plan_installments: {
+        Args: {
+          p_payment_plan_settings_id: string
+        }
+        Returns: undefined
       }
       execute_sql: {
         Args: {
