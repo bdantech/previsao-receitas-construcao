@@ -168,7 +168,6 @@ const AdminPaymentPlanDetailPage = () => {
       
       setPaymentPlan(data.data);
       
-      // Validate installments exist
       if (!data.data.payment_plan_installments || data.data.payment_plan_installments.length === 0) {
         console.warn("Payment plan has no installments:", data.data);
         toast({
@@ -181,11 +180,9 @@ const AdminPaymentPlanDetailPage = () => {
       
       console.log("Payment plan loaded with installments:", data.data.payment_plan_installments);
       
-      // Select the first installment by default
       const firstInstallment = data.data.payment_plan_installments[0];
       setSelectedInstallment(firstInstallment);
       
-      // Fetch receivables for the first installment
       await fetchInstallmentReceivables(firstInstallment.id);
     } catch (error) {
       console.error("Exception fetching payment plan details:", error);
@@ -265,8 +262,6 @@ const AdminPaymentPlanDetailPage = () => {
     try {
       setLoadingEligibleReceivables(true);
       
-      // First, verify the installment exists
-      console.log(`Verifying installment ID exists: ${selectedInstallment.id}`);
       const { data: verifyData, error: verifyError } = await supabase.functions.invoke('admin-payment-plans', {
         method: 'POST',
         headers: {
@@ -288,7 +283,6 @@ const AdminPaymentPlanDetailPage = () => {
         return;
       }
       
-      // Proceed with getting eligible receivables
       const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
         method: 'POST',
         headers: {
@@ -392,7 +386,6 @@ const AdminPaymentPlanDetailPage = () => {
   const handleAddBillingReceivables = async () => {
     if (!selectedInstallment) return;
     
-    // Open dialog to select receivables
     await fetchEligibleBillingReceivables();
     setIsAddBillingReceivablesOpen(true);
   };
@@ -429,7 +422,6 @@ const AdminPaymentPlanDetailPage = () => {
     try {
       setUpdatingBillingReceivables(true);
       
-      // Log the request for debugging
       console.log('Sending updateBillingReceivables request:', {
         installmentId: selectedInstallment.id,
         receivableIds: selectedReceivableIds
@@ -457,12 +449,22 @@ const AdminPaymentPlanDetailPage = () => {
         return;
       }
       
-      if (data?.warning) {
-        console.warn("Warning when updating billing receivables:", data.warning);
+      if (!data?.data) {
+        console.error("No response data received:", data);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Resposta vazia do servidor. Verifique os logs para mais detalhes."
+        });
+        return;
+      }
+      
+      if (data.data.warning) {
+        console.warn("Warning when updating billing receivables:", data.data.warning);
         toast({
           variant: "warning",
           title: "Atenção",
-          description: "Recebíveis adicionados, mas com alertas: " + data.warning
+          description: "Recebíveis adicionados, mas com alertas: " + data.data.warning
         });
       } else {
         toast({
@@ -471,21 +473,23 @@ const AdminPaymentPlanDetailPage = () => {
         });
       }
       
-      // Verify the response contains the expected data
-      if (!data?.billingReceivables || !Array.isArray(data.billingReceivables)) {
-        console.warn("Response missing billing receivables data:", data);
+      const billingReceivables = data.data.billingReceivables;
+      
+      if (!billingReceivables || !Array.isArray(billingReceivables)) {
+        console.warn("Response missing billing receivables data:", data.data);
         toast({
           variant: "warning",
           title: "Atenção",
           description: "Resposta incompleta do servidor. Verifique se os recebíveis foram adicionados."
         });
       } else {
-        console.log(`${data.billingReceivables.length} billing receivables created successfully`);
+        console.log(`${billingReceivables.length} billing receivables created successfully`, billingReceivables);
       }
       
-      // Close dialogs and refresh data
       setIsAddBillingReceivablesOpen(false);
+      
       await fetchInstallmentReceivables(selectedInstallment.id);
+      
       await fetchPaymentPlanDetails();
     } catch (error) {
       console.error("Exception updating billing receivables:", error);
@@ -532,9 +536,7 @@ const AdminPaymentPlanDetailPage = () => {
         description: "Recebível de cobrança removido com sucesso."
       });
       
-      // Refresh data
-      await fetchInstallmentReceivables(selectedInstallment.id);
-      await fetchPaymentPlanDetails();
+      setRemovingBillingReceivable(null);
     } catch (error) {
       console.error("Error removing billing receivable:", error);
       toast({
@@ -542,8 +544,6 @@ const AdminPaymentPlanDetailPage = () => {
         title: "Erro",
         description: "Não foi possível remover o recebível de cobrança."
       });
-    } finally {
-      setRemovingBillingReceivable(null);
     }
   };
 
@@ -703,7 +703,6 @@ const AdminPaymentPlanDetailPage = () => {
             </CardContent>
           </Card>
 
-          {/* Dialog for viewing receivables */}
           <Dialog open={isReceivablesDialogOpen} onOpenChange={setIsReceivablesDialogOpen}>
             <DialogContent className="max-w-4xl">
               <DialogHeader>
@@ -826,7 +825,6 @@ const AdminPaymentPlanDetailPage = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Dialog for adding billing receivables */}
           <Dialog open={isAddBillingReceivablesOpen} onOpenChange={setIsAddBillingReceivablesOpen}>
             <DialogContent className="max-w-4xl">
               <DialogHeader>
@@ -929,4 +927,3 @@ const AdminPaymentPlanDetailPage = () => {
 };
 
 export default AdminPaymentPlanDetailPage;
-

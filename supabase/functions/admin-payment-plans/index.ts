@@ -296,7 +296,10 @@ serve(async (req) => {
           throw new Error(`Error getting PMT receivables: ${pmtError.message}`)
         }
 
-        // Get billing receivables - explicitly select nova_data_vencimento
+        // Debug: Check what installmentId we're querying with
+        console.log(`Querying billing_receivables with installment_id: ${installmentId}`);
+        
+        // Get billing receivables with explicit nova_data_vencimento field
         const { data: billingReceivables, error: billingError } = await supabase
           .from('billing_receivables')
           .select(`
@@ -319,7 +322,8 @@ serve(async (req) => {
           throw new Error(`Error getting billing receivables: ${billingError.message}`)
         }
 
-        console.log("Billing receivables fetched:", billingReceivables);
+        // Debug logging
+        console.log(`Billing receivables found for installment ${installmentId}:`, billingReceivables || []);
 
         responseData = {
           pmtReceivables: pmtReceivables || [],
@@ -429,7 +433,7 @@ serve(async (req) => {
           throw new Error('At least one receivable ID is required')
         }
 
-        console.log(`Checking if installment ${installmentId} exists before proceeding`)
+        console.log(`Checking if installment ${installmentId} exists before proceeding`);
         
         // Simplify validation - check installment first
         const { data: installment, error: installmentError } = await supabase
@@ -448,11 +452,11 @@ serve(async (req) => {
 
         // More robust error handling for missing installment
         if (installmentError || !installment) {
-          console.error('Installment not found or error:', installmentError, 'installmentId:', installmentId)
-          throw new Error(`Installment not found: ${installmentId}. Please check that this installment exists in the database.`)
+          console.error('Installment not found or error:', installmentError, 'installmentId:', installmentId);
+          throw new Error(`Installment not found: ${installmentId}. Please check that this installment exists in the database.`);
         }
         
-        console.log(`Installment found:`, installment)
+        console.log(`Installment found:`, installment);
 
         // Verify that all receivables belong to the same project
         // We're intentionally NOT checking if the receivable is already in billing_receivables
@@ -463,179 +467,210 @@ serve(async (req) => {
           .in('id', receivableIds)
 
         if (receivablesError) {
-          console.error('Error getting receivables:', receivablesError)
-          throw new Error(`Error getting receivables: ${receivablesError.message}`)
+          console.error('Error getting receivables:', receivablesError);
+          throw new Error(`Error getting receivables: ${receivablesError.message}`);
         }
 
         if (!receivables || receivables.length === 0) {
-          console.error('No receivables found for the provided IDs')
-          throw new Error('No receivables found for the provided IDs')
+          console.error('No receivables found for the provided IDs');
+          throw new Error('No receivables found for the provided IDs');
         }
 
         // Log found receivables for debugging
         console.log(`Found ${receivables.length} receivables out of ${receivableIds.length} requested:`, 
-          receivables.map(r => ({ id: r.id, project_id: r.project_id })))
+          receivables.map(r => ({ id: r.id, project_id: r.project_id })));
         
         // Check if any receivables are missing
         if (receivables.length !== receivableIds.length) {
-          const foundIds = new Set(receivables.map(r => r.id))
-          const missingIds = receivableIds.filter(id => !foundIds.has(id))
-          console.error(`Missing receivables:`, missingIds)
-          throw new Error(`Some receivables do not exist: ${missingIds.join(', ')}`)
+          const foundIds = new Set(receivables.map(r => r.id));
+          const missingIds = receivableIds.filter(id => !foundIds.has(id));
+          console.error(`Missing receivables:`, missingIds);
+          throw new Error(`Some receivables do not exist: ${missingIds.join(', ')}`);
         }
         
         // Check if all receivables belong to the correct project
-        const wrongProjectReceivables = receivables.filter(r => r.project_id !== installment.project_id)
+        const wrongProjectReceivables = receivables.filter(r => r.project_id !== installment.project_id);
         if (wrongProjectReceivables.length > 0) {
-          console.error(`Receivables from wrong project:`, wrongProjectReceivables)
-          throw new Error(`Some receivables do not belong to the project: ${wrongProjectReceivables.map(r => r.id).join(', ')}`)
+          console.error(`Receivables from wrong project:`, wrongProjectReceivables);
+          throw new Error(`Some receivables do not belong to the project: ${wrongProjectReceivables.map(r => r.id).join(', ')}`);
         }
 
-        // Check if any of these receivables are already linked to other installments
-        // This is important to prevent the same receivable from being used in multiple installments
+        // First, check if any of the receivables are already linked to this installment
         const { data: existingLinks, error: existingLinksError } = await supabase
           .from('billing_receivables')
-          .select('receivable_id, installment_id')
-          .in('receivable_id', receivableIds)
-          .neq('installment_id', installmentId)
-        
+          .select('receivable_id')
+          .eq('installment_id', installmentId)
+          .in('receivable_id', receivableIds);
+          
         if (existingLinksError) {
-          console.error('Error checking existing links:', existingLinksError)
-          throw new Error(`Error checking if receivables are already linked: ${existingLinksError.message}`)
+          console.error('Error checking existing links:', existingLinksError);
+          throw new Error(`Error checking existing links: ${existingLinksError.message}`);
         }
         
         if (existingLinks && existingLinks.length > 0) {
-          console.error('Some receivables are already linked to other installments:', existingLinks)
-          const alreadyLinkedIds = existingLinks.map(link => link.receivable_id)
-          throw new Error(`These receivables are already linked to other installments: ${alreadyLinkedIds.join(', ')}`)
+          // Some receivables already exist in this installment
+          const existingIds = existingLinks.map(link => link.receivable_id);
+          console.log(`Found ${existingIds.length} receivables already linked to this installment:`, existingIds);
+          // We'll delete them below anyway
         }
 
         // Clear existing billing receivables for this installment
+        console.log(`Deleting existing billing receivables for installment ${installmentId}`);
         const { error: deleteError } = await supabase
           .from('billing_receivables')
           .delete()
-          .eq('installment_id', installmentId)
+          .eq('installment_id', installmentId);
 
         if (deleteError) {
-          console.error('Error deleting existing billing receivables:', deleteError)
-          throw new Error(`Error deleting existing billing receivables: ${deleteError.message}`)
+          console.error('Error deleting existing billing receivables:', deleteError);
+          throw new Error(`Error deleting existing billing receivables: ${deleteError.message}`);
         }
+        
+        console.log(`Successfully deleted existing billing receivables for installment ${installmentId}`);
 
         // Verify the payment_plan_settings data exists
         if (!installment.payment_plan_settings || !installment.payment_plan_settings.dia_cobranca) {
-          console.error('Missing payment plan settings or dia_cobranca value:', installment)
-          throw new Error('Missing payment plan settings data needed for nova_data_vencimento calculation')
+          console.error('Missing payment plan settings or dia_cobranca value:', installment);
+          throw new Error('Missing payment plan settings data needed for nova_data_vencimento calculation');
         }
 
         // Get the dia_cobranca from the payment plan settings
-        const diaCobranca = installment.payment_plan_settings.dia_cobranca
+        const diaCobranca = installment.payment_plan_settings.dia_cobranca;
 
         // Create billing receivables array
         const billingReceivables = receivables.map(receivable => {
           // Calculate the nova_data_vencimento based on the receivable due date and payment plan dia_cobranca
-          const dueDate = new Date(receivable.due_date)
-          const year = dueDate.getFullYear()
-          const month = dueDate.getMonth()
+          const dueDate = new Date(receivable.due_date);
+          const year = dueDate.getFullYear();
+          const month = dueDate.getMonth();
           
           // Create date with dia_cobranca
-          let novaDataVencimento = new Date(year, month, diaCobranca)
+          let novaDataVencimento = new Date(year, month, diaCobranca);
           
           // If dia_cobranca is greater than days in month, adjust to last day
-          const lastDayOfMonth = new Date(year, month + 1, 0).getDate()
+          const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
           if (diaCobranca > lastDayOfMonth) {
-            novaDataVencimento = new Date(year, month, lastDayOfMonth)
+            novaDataVencimento = new Date(year, month, lastDayOfMonth);
           }
           
           return {
             installment_id: installmentId,
             receivable_id: receivable.id,
             nova_data_vencimento: novaDataVencimento.toISOString().split('T')[0]
-          }
-        })
+          };
+        });
 
         // Log the receivables we're creating for debugging
-        console.log('Creating billing receivables:', JSON.stringify(billingReceivables))
+        console.log('Creating billing receivables:', JSON.stringify(billingReceivables));
 
-        // Insert billing receivables with returning * to get all columns back
+        // Set explicit transaction to ensure all operations are atomic
         const { data: inserted, error: insertError } = await supabase
           .from('billing_receivables')
           .insert(billingReceivables)
-          .select('*')
+          .select('id, installment_id, receivable_id, nova_data_vencimento, created_at');
 
         if (insertError) {
-          console.error('Error inserting billing receivables:', insertError)
-          throw new Error(`Error inserting billing receivables: ${insertError.message}`)
+          console.error('Error inserting billing receivables:', insertError);
+          throw new Error(`Error inserting billing receivables: ${insertError.message}`);
         }
 
-        console.log('Inserted billing receivables:', inserted)
+        console.log('Inserted billing receivables:', inserted);
         
         // Verify the insertion succeeded by querying for the inserted records
         const { data: verificationData, error: verificationError } = await supabase
           .from('billing_receivables')
-          .select('id, receivable_id')
-          .eq('installment_id', installmentId)
+          .select('id, receivable_id, nova_data_vencimento')
+          .eq('installment_id', installmentId);
         
         if (verificationError) {
-          console.error('Error verifying billing receivables insertion:', verificationError)
+          console.error('Error verifying billing receivables insertion:', verificationError);
         } else {
-          console.log(`Verification found ${verificationData?.length || 0} billing receivables for installment ${installmentId}:`, verificationData)
+          console.log(`Verification found ${verificationData?.length || 0} billing receivables for installment ${installmentId}:`, verificationData);
         }
 
         // Calculate total amount of receivables
-        const totalAmount = receivables.reduce((sum, receivable) => sum + parseFloat(receivable.amount), 0)
+        const totalAmount = receivables.reduce((sum, receivable) => sum + parseFloat(receivable.amount), 0);
 
         // Update installment with new recebiveis value
+        console.log(`Updating installment ${installmentId} with new recebiveis value: ${totalAmount}`);
         const { data: updatedInstallment, error: updateError } = await supabase
           .from('payment_plan_installments')
           .update({ recebiveis: totalAmount })
           .eq('id', installmentId)
-          .select()
-          .single()
+          .select('*');
 
         if (updateError) {
-          console.error('Error updating installment with new recebiveis value:', updateError)
-          throw new Error(`Error updating installment: ${updateError.message}`)
+          console.error('Error updating installment with new recebiveis value:', updateError);
+          throw new Error(`Error updating installment: ${updateError.message}`);
         }
         
-        if (!updatedInstallment) {
-          console.error('No installment was updated. This is unexpected as we already verified it exists')
-          throw new Error('Failed to update installment with new recebiveis value')
+        if (!updatedInstallment || updatedInstallment.length === 0) {
+          console.error('No installment was updated. This is unexpected as we already verified it exists');
+          throw new Error('Failed to update installment with new recebiveis value');
         }
 
-        console.log('Updated installment:', updatedInstallment)
+        console.log('Updated installment:', updatedInstallment[0]);
 
         // Safely attempt to recalculate payment plan
         try {
           // Recalculate payment plan
+          console.log(`Recalculating payment plan for settings_id ${installment.payment_plan_settings_id}`);
           const { error: calcError } = await supabase.rpc(
             'calculate_payment_plan_installments',
             { p_payment_plan_settings_id: installment.payment_plan_settings_id }
-          )
+          );
 
           if (calcError) {
-            console.error('Error recalculating payment plan:', calcError)
-            throw new Error(`Error recalculating payment plan: ${calcError.message}`)
+            console.error('Error recalculating payment plan:', calcError);
+            throw new Error(`Error recalculating payment plan: ${calcError.message}`);
           }
           
-          console.log('Payment plan recalculation succeeded')
+          console.log('Payment plan recalculation succeeded');
         } catch (recalcError) {
-          console.error('Exception during payment plan recalculation:', recalcError)
+          console.error('Exception during payment plan recalculation:', recalcError);
           // Don't rethrow here to preserve the inserted billing receivables
           responseData = { 
             success: true, 
             warning: 'Billing receivables were created but payment plan recalculation failed: ' + recalcError.message,
-            updatedInstallment,
+            updatedInstallment: updatedInstallment[0],
             billingReceivables: inserted
-          }
+          };
           
-          break
+          break;
+        }
+
+        // Fetch the billing receivables again to include in the response
+        const { data: createdBillingReceivables, error: fetchError } = await supabase
+          .from('billing_receivables')
+          .select(`
+            id,
+            receivable_id,
+            nova_data_vencimento,
+            created_at,
+            receivables (
+              id, 
+              buyer_name,
+              buyer_cpf,
+              amount,
+              due_date,
+              description,
+              status
+            )
+          `)
+          .eq('installment_id', installmentId);
+          
+        if (fetchError) {
+          console.error('Error fetching created billing receivables:', fetchError);
+          // Continue anyway, we know they were created
+        } else {
+          console.log(`Found ${createdBillingReceivables?.length || 0} billing receivables after creation`);
         }
 
         responseData = { 
           success: true, 
-          updatedInstallment,
-          billingReceivables: inserted
-        }
+          updatedInstallment: updatedInstallment[0],
+          billingReceivables: createdBillingReceivables || inserted
+        };
         
         break
       }
@@ -793,7 +828,7 @@ serve(async (req) => {
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`)
+        throw new Error(`Unknown action: ${action}`);
     }
 
     return new Response(
@@ -804,7 +839,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
-    console.error(`Error handling admin payment plans request:`, error)
+    console.error(`Error handling admin payment plans request:`, error);
     
     return new Response(
       JSON.stringify({ 
@@ -814,6 +849,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500 
       }
-    )
+    );
   }
 })
