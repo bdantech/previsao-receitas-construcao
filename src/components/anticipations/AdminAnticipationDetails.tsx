@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate } from "react-router-dom";
 
 interface Company {
   name: string;
@@ -84,6 +85,7 @@ type PaymentPlanFormValues = z.infer<typeof paymentPlanSchema>;
 export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> = ({ anticipationId, onClose, onStatusUpdate }) => {
   const { session } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -220,6 +222,57 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+  
+  const handleCreatePaymentPlan = async (values: PaymentPlanFormValues) => {
+    if (!anticipation || !session?.access_token) return;
+    
+    try {
+      setIsCreatingPaymentPlan(true);
+      
+      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          action: 'createPaymentPlan',
+          anticipationRequestId: anticipation.id,
+          diaCobranca: values.diaCobranca,
+          tetoFundoReserva: values.tetoFundoReserva
+        }
+      });
+      
+      if (error) {
+        console.error('Error creating payment plan:', error);
+        toast({
+          title: "Erro ao criar plano de pagamento",
+          description: "Ocorreu um erro ao criar o plano de pagamento.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      toast({
+        title: "Plano de pagamento criado",
+        description: "O plano de pagamento foi criado com sucesso.",
+        variant: "default"
+      });
+      
+      setIsPaymentPlanDialogOpen(false);
+      
+      if (data && data.id) {
+        navigate(`/admin/payment-plans/${data.id}`);
+      }
+    } catch (error) {
+      console.error('Error creating payment plan:', error);
+      toast({
+        title: "Erro ao criar plano de pagamento",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingPaymentPlan(false);
     }
   };
   
