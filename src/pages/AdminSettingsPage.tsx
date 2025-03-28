@@ -1,4 +1,28 @@
 
+import React from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
+import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
+import { format } from "date-fns";
+
+// Helper function to format reference month
+const formatReferenceMonth = (dateString: string) => {
+  try {
+    return format(new Date(dateString), "MMMM yyyy");
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return dateString;
+  }
+};
+
 // Calculator component for compound adjustments
 const IndexCalculator = () => {
   const { getAuthHeader } = useAuth();
@@ -162,3 +186,21 @@ const IndexCalculator = () => {
     </div>
   );
 };
+
+// Main page component
+const AdminSettingsPage = () => {
+  return (
+    <AdminDashboardLayout>
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold">Configurações</h1>
+          <p className="text-muted-foreground mt-2">Gerencie índices e outras configurações do sistema</p>
+        </div>
+        
+        <IndexCalculator />
+      </div>
+    </AdminDashboardLayout>
+  );
+};
+
+export default AdminSettingsPage;
