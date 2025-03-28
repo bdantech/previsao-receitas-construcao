@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -38,15 +37,21 @@ const AdminPaymentPlanDetailPage = () => {
   const [indexId, setIndexId] = useState<string | null>(null);
   const [adjustmentBaseDate, setAdjustmentBaseDate] = useState<string | null>(null);
 
-  // Fetch payment plan details
+  // Fetch payment plan details - using admin-payment-plans instead of company-payment-plans
   const { data: paymentPlan, isLoading, error } = useQuery({
     queryKey: ['paymentPlanDetails', id],
     queryFn: async () => {
+      console.log('Fetching payment plan details with ID:', id);
       const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
         body: { action: 'getPaymentPlanDetails', paymentPlanId: id },
       });
       
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error('Error fetching payment plan details:', error);
+        throw new Error(error.message);
+      }
+      
+      console.log('Received payment plan details:', data);
       return data;
     },
     enabled: !!id,
@@ -70,7 +75,6 @@ const AdminPaymentPlanDetailPage = () => {
     mutationFn: async ({ indexId, adjustmentBaseDate }: { indexId: string | null, adjustmentBaseDate: string | null }) => {
       console.log('Updating payment plan settings:', { indexId, adjustmentBaseDate });
       
-      // Important change: Use admin-payment-plans instead of company-payment-plans
       const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
         body: { 
           action: 'updatePaymentPlanSettings', 
@@ -117,7 +121,7 @@ const AdminPaymentPlanDetailPage = () => {
   // Save the edit index changes
   const handleSaveIndexChanges = () => {
     updatePaymentPlanSettings.mutate({ 
-      indexId, 
+      indexId: indexId === 'none' ? null : indexId, 
       adjustmentBaseDate: adjustmentBaseDate || null 
     });
   };
