@@ -682,27 +682,43 @@ serve(async (req) => {
           throw new Error('Missing required parameters')
         }
 
-        // Get the billing receivable to verify it belongs to the installment
+        console.log(`Removing billing receivable ${billingReceivableId} from installment ${installmentId}`);
+        
+        // Get the billing receivable to verify it belongs to the installment and to get amount
         const { data: billingReceivable, error: brError } = await supabase
           .from('billing_receivables')
-          .select('id, receivable_id')
+          .select(`
+            id, 
+            receivable_id,
+            receivables (
+              amount
+            )
+          `)
           .eq('id', billingReceivableId)
           .eq('installment_id', installmentId)
-          .single()
+          .single();
 
         if (brError) {
+          console.error('Error getting billing receivable:', brError);
           throw new Error(`Error getting billing receivable: ${brError.message}`)
         }
 
-        // Delete the billing receivable
+        // Get the amount of the receivable to be removed
+        const removedAmount = parseFloat(billingReceivable.receivables.amount);
+        console.log(`Removing receivable with amount: ${removedAmount}`);
+
+        // Delete only the specific billing receivable
         const { error: deleteError } = await supabase
           .from('billing_receivables')
           .delete()
-          .eq('id', billingReceivableId)
+          .eq('id', billingReceivableId);
 
         if (deleteError) {
+          console.error('Error removing billing receivable:', deleteError);
           throw new Error(`Error removing billing receivable: ${deleteError.message}`)
         }
+        
+        console.log(`Successfully deleted billing receivable ${billingReceivableId}`);
 
         // Get remaining billing receivables to recalculate total amount
         const { data: remainingReceivables, error: remainingError } = await supabase
@@ -713,9 +729,10 @@ serve(async (req) => {
               amount
             )
           `)
-          .eq('installment_id', installmentId)
+          .eq('installment_id', installmentId);
 
         if (remainingError) {
+          console.error('Error getting remaining receivables:', remainingError);
           throw new Error(`Error getting remaining receivables: ${remainingError.message}`)
         }
 
@@ -723,43 +740,56 @@ serve(async (req) => {
         const totalAmount = (remainingReceivables || []).reduce(
           (sum, item) => sum + parseFloat(item.receivables.amount), 
           0
-        )
+        );
+        
+        console.log(`Calculated new total amount for installment: ${totalAmount}`);
 
         // Get payment plan settings ID for the installment
         const { data: installment, error: installmentError } = await supabase
           .from('payment_plan_installments')
           .select('payment_plan_settings_id')
           .eq('id', installmentId)
-          .single()
+          .single();
 
         if (installmentError) {
+          console.error('Error getting installment:', installmentError);
           throw new Error(`Error getting installment: ${installmentError.message}`)
         }
 
         // Update installment with new recebiveis value
-        const { error: updateError } = await supabase
+        console.log(`Updating installment ${installmentId} with new recebiveis value: ${totalAmount}`);
+        const { data: updatedInstallment, error: updateError } = await supabase
           .from('payment_plan_installments')
           .update({ recebiveis: totalAmount })
           .eq('id', installmentId)
+          .select('*');
 
         if (updateError) {
+          console.error('Error updating installment:', updateError);
           throw new Error(`Error updating installment: ${updateError.message}`)
         }
+        
+        console.log('Successfully updated installment with new recebiveis value');
 
         // Recalculate payment plan
+        console.log(`Recalculating payment plan for settings_id ${installment.payment_plan_settings_id}`);
         const { error: calcError } = await supabase.rpc(
           'calculate_payment_plan_installments',
           { p_payment_plan_settings_id: installment.payment_plan_settings_id }
-        )
+        );
 
         if (calcError) {
+          console.error('Error recalculating payment plan:', calcError);
           throw new Error(`Error recalculating payment plan: ${calcError.message}`)
         }
+        
+        console.log('Payment plan recalculation succeeded');
 
         responseData = { 
           success: true,
           removedReceivableId: billingReceivable.receivable_id,
-          newTotal: totalAmount
+          newTotal: totalAmount,
+          updatedInstallment: updatedInstallment ? updatedInstallment[0] : null
         }
         break
       }
