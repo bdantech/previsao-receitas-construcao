@@ -225,38 +225,60 @@ serve(async (req) => {
           )
         }
 
-        // Convert reference month string to date object (first day of month)
-        const referenceDate = new Date(data.referenceMonth)
-        referenceDate.setDate(1) // Ensure it's the first day of the month
-        
-        console.log('Creating index update:', {
-          index_id: data.indexId,
-          reference_month: referenceDate.toISOString(),
-          monthly_adjustment: data.monthlyAdjustment
-        })
-
-        const { data: newUpdate, error: createUpdateError } = await supabase
-          .from('indexes_update')
-          .insert({
-            index_id: data.indexId,
-            reference_month: referenceDate.toISOString(),
-            monthly_adjustment: data.monthlyAdjustment
-          })
-          .select()
-          .single()
-
-        if (createUpdateError) {
-          console.error('Error creating index update:', createUpdateError)
+        // Validate the reference month
+        if (!data.referenceMonth || data.referenceMonth.trim() === "") {
           return new Response(
-            JSON.stringify({ error: 'Error creating index update' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+            JSON.stringify({ error: 'Reference month is required' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
           )
         }
 
-        return new Response(
-          JSON.stringify({ update: newUpdate }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 }
-        )
+        try {
+          // Parse the reference month string to a Date object (with day set to 1)
+          const [year, month] = data.referenceMonth.split('-').map(Number);
+          
+          if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+            throw new Error("Invalid date format");
+          }
+
+          // Create a date object for the first day of the month
+          const referenceDate = new Date(year, month - 1, 1); // Month is 0-based in JS Date
+          
+          console.log('Creating index update:', {
+            index_id: data.indexId,
+            reference_month: referenceDate.toISOString(),
+            monthly_adjustment: data.monthlyAdjustment
+          });
+
+          const { data: newUpdate, error: createUpdateError } = await supabase
+            .from('indexes_update')
+            .insert({
+              index_id: data.indexId,
+              reference_month: referenceDate.toISOString(),
+              monthly_adjustment: data.monthlyAdjustment
+            })
+            .select()
+            .single();
+
+          if (createUpdateError) {
+            console.error('Error creating index update:', createUpdateError);
+            return new Response(
+              JSON.stringify({ error: 'Error creating index update: ' + createUpdateError.message }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({ update: newUpdate }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 }
+          );
+        } catch (error) {
+          console.error('Error processing date:', error);
+          return new Response(
+            JSON.stringify({ error: 'Invalid date format. Please use YYYY-MM format.' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          );
+        }
 
       case 'updateIndexUpdate':
         // Only admin can update index updates

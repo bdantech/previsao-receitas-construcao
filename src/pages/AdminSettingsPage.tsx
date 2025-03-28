@@ -255,6 +255,19 @@ const indexUpdateSchema = z.object({
   }),
   referenceMonth: z.string({
     required_error: "Informe o mês de referência",
+  }).refine(value => {
+    // Validate the date format (YYYY-MM)
+    if (!value) return false;
+    const pattern = /^\d{4}-\d{2}$/;
+    if (!pattern.test(value)) return false;
+    
+    // Extract year and month
+    const [year, month] = value.split('-').map(Number);
+    
+    // Check if valid date (month between 1-12)
+    return !isNaN(year) && !isNaN(month) && month >= 1 && month <= 12;
+  }, {
+    message: "Formato de data inválido. Utilize o formato AAAA-MM.",
   }),
   monthlyAdjustment: z.coerce.number({
     required_error: "Informe o valor do ajuste",
@@ -278,7 +291,7 @@ const IndexUpdateDialog = ({
     resolver: zodResolver(indexUpdateSchema),
     defaultValues: {
       indexId: initialIndexId || "",
-      referenceMonth: currentUpdate?.reference_month || "",
+      referenceMonth: currentUpdate?.reference_month ? format(new Date(currentUpdate.reference_month), "yyyy-MM") : "",
       monthlyAdjustment: currentUpdate?.monthly_adjustment || 0,
     },
   });
@@ -287,7 +300,7 @@ const IndexUpdateDialog = ({
     if (isOpen) {
       form.reset({
         indexId: initialIndexId || currentUpdate?.index_id || "",
-        referenceMonth: currentUpdate?.reference_month || "",
+        referenceMonth: currentUpdate?.reference_month ? format(new Date(currentUpdate.reference_month), "yyyy-MM") : "",
         monthlyAdjustment: currentUpdate?.monthly_adjustment || 0,
       });
     }
