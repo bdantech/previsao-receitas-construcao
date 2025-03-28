@@ -61,7 +61,7 @@ const IndexesTab = () => {
         description: currentIndex ? "Índice atualizado com sucesso" : "Índice criado com sucesso",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         variant: "destructive",
         description: `Erro: ${error.message}`,
@@ -87,7 +87,7 @@ const IndexesTab = () => {
         description: "Índice excluído com sucesso",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         variant: "destructive",
         description: `Erro: ${error.message}`,
@@ -306,7 +306,7 @@ const IndexUpdatesTab = () => {
         description: currentUpdate ? "Atualização modificada com sucesso" : "Atualização criada com sucesso",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         variant: "destructive",
         description: `Erro: ${error.message}`,
@@ -332,7 +332,7 @@ const IndexUpdatesTab = () => {
         description: "Atualização excluída com sucesso",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         variant: "destructive",
         description: `Erro: ${error.message}`,
