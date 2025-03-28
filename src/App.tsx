@@ -21,6 +21,7 @@ import CompanyPage from "./pages/CompanyPage";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
 import CreateAnticipationForm from "./components/anticipations/CreateAnticipationForm";
 import AnticipationDetails from "./components/anticipations/AnticipationDetails";
+import IntegrationsPage from "./pages/IntegrationsPage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Create a client
