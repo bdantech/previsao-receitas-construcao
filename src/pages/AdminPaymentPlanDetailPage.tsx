@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -168,7 +167,6 @@ const AdminPaymentPlanDetailPage = () => {
       }
       
       if (data.data.payment_plan_installments) {
-        // Sort installments by numero_parcela
         data.data.payment_plan_installments.sort((a, b) => a.numero_parcela - b.numero_parcela);
       }
       
@@ -512,13 +510,12 @@ const AdminPaymentPlanDetailPage = () => {
     try {
       setRemovingBillingReceivable(billingReceivableId);
       
-      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
+      const { data, error } = await supabase.functions.invoke('admin-remove-billing-receivable', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session?.access_token}`
         },
         body: {
-          action: 'removeBillingReceivable',
           installmentId: selectedInstallment.id,
           billingReceivableId
         }
