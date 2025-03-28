@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Building, Users, FileText, ReceiptText, LogOut, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building, Users, FileText, ReceiptText, LogOut, Calendar, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -90,6 +90,11 @@ export const AdminSidebar = () => {
       icon: Calendar,
       label: "Planos de Pagamento",
       href: "/admin/payment-plans"
+    },
+    {
+      icon: Settings,
+      label: "Configurações",
+      href: "/admin/settings"
     }
   ];
 

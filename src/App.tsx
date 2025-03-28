@@ -15,6 +15,7 @@ import AdminReceivablesPage from "./pages/AdminReceivablesPage";
 import AdminAnticipationsPage from "./pages/AdminAnticipationsPage";
 import AdminPaymentPlansPage from "./pages/AdminPaymentPlansPage";
 import AdminPaymentPlanDetailPage from "./pages/AdminPaymentPlanDetailPage";
+import AdminSettingsPage from "./pages/AdminSettingsPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
@@ -59,6 +60,7 @@ function App() {
             <Route path="/admin/anticipations" element={<AdminAnticipationsPage />} />
             <Route path="/admin/payment-plans" element={<AdminPaymentPlansPage />} />
             <Route path="/admin/payment-plans/:paymentPlanId" element={<AdminPaymentPlanDetailPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
             
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
