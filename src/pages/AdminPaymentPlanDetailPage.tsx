@@ -1183,7 +1183,7 @@ const AdminPaymentPlanDetailPage = () => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent className="z-50 pointer-events-auto">
-                            <SelectItem value="">Nenhum</SelectItem>
+                            <SelectItem value="none">Nenhum</SelectItem>
                             {indexes.map((index) => (
                               <SelectItem key={index.id} value={index.id}>
                                 {index.name}
