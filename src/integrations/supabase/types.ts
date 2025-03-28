@@ -389,6 +389,65 @@ export type Database = {
           },
         ]
       }
+      indexes: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      indexes_update: {
+        Row: {
+          created_at: string
+          id: string
+          index_id: string
+          monthly_adjustment: number
+          reference_month: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          index_id: string
+          monthly_adjustment: number
+          reference_month: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          index_id?: string
+          monthly_adjustment?: number
+          reference_month?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "indexes_update_index_id_fkey"
+            columns: ["index_id"]
+            isOneToOne: false
+            referencedRelation: "indexes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_plan_installments: {
         Row: {
           anticipation_request_id: string
