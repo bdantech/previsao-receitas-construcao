@@ -369,41 +369,42 @@ serve(async (req) => {
         throw new Error(`Error fetching anticipation request: ${anticipationError.message}`);
       }
       
-      let saldoDevedor = anticipation.valor_total || 0;
-      console.log(`Starting saldo_devedor: ${saldoDevedor} from anticipation ${anticipationRequestId}`);
+      let saldoDevedorInitial = anticipation.valor_total || 0;
+      console.log(`Starting saldo_devedor: ${saldoDevedorInitial} from anticipation ${anticipationRequestId}`);
       
-      let fundoReserva = 0;
+      // Process installments in order of numero_parcela
+      let previousFundoReserva = 0;
       
       // Now update each installment
       for (const inst of installments) {
         if (inst.pmt === null || typeof inst.pmt !== 'number') continue;
         
+        const saldoDevedor = inst.numero_parcela === 0 
+          ? saldoDevedorInitial - inst.pmt 
+          : Math.max(0, installments[installments.findIndex(i => i.id === inst.id) - 1]?.saldo_devedor - inst.pmt);
+        
         // First installment (number 0) - special handling
         if (inst.numero_parcela === 0) {
-          // Deduct PMT from saldo_devedor
-          saldoDevedor = Math.max(0, saldoDevedor - inst.pmt);
-          
           // Update the installment with new saldo_devedor
           await supabase
             .from('payment_plan_installments')
             .update({ 
-              saldo_devedor,
+              saldo_devedor: saldoDevedor,
               fundo_reserva: 0, // First installment has no fundo_reserva
               devolucao: 0 // First installment has no devolucao
             })
             .eq('id', inst.id);
             
-          console.log(`Updated installment ${inst.numero_parcela} (${inst.id}): saldo_devedor=${saldoDevedor}`);
+          console.log(`Updated installment ${inst.numero_parcela} (${inst.id}): saldo_devedor=${saldoDevedor}, fundo_reserva=0, devolucao=0`);
         }
         // Other installments
         else {
-          // Update saldo_devedor
-          saldoDevedor = Math.max(0, saldoDevedor - inst.pmt);
-          
-          // Add difference between recebiveis and PMT to fundo_reserva
+          // Calculate current installment's contribution to fundo_reserva
           const recebiveis = inst.recebiveis || 0;
-          const contribution = recebiveis - inst.pmt;
-          fundoReserva += contribution;
+          const currentContribution = recebiveis - inst.pmt;
+          
+          // Calculate new fundo_reserva including previous balance
+          let fundoReserva = previousFundoReserva + currentContribution;
           
           // Calculate devolucao if fundo_reserva exceeds teto
           let devolucao = 0;
@@ -416,13 +417,16 @@ serve(async (req) => {
           await supabase
             .from('payment_plan_installments')
             .update({ 
-              saldo_devedor,
-              fundo_reserva,
-              devolucao
+              saldo_devedor: saldoDevedor,
+              fundo_reserva: fundoReserva,
+              devolucao: devolucao
             })
             .eq('id', inst.id);
             
           console.log(`Updated installment ${inst.numero_parcela} (${inst.id}): saldo_devedor=${saldoDevedor}, fundo_reserva=${fundoReserva}, devolucao=${devolucao}`);
+          
+          // Store current fundo_reserva for next iteration
+          previousFundoReserva = fundoReserva;
         }
       }
       

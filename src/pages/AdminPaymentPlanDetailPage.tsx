@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -167,6 +168,7 @@ const AdminPaymentPlanDetailPage = () => {
       }
       
       if (data.data.payment_plan_installments) {
+        // Sort installments by numero_parcela
         data.data.payment_plan_installments.sort((a, b) => a.numero_parcela - b.numero_parcela);
       }
       
@@ -467,7 +469,7 @@ const AdminPaymentPlanDetailPage = () => {
         console.warn("Warning when updating billing receivables:", data.warning);
         toast({
           title: "Atenção",
-          description: "Recebíveis adicionados, mas com alertas: " + data.warning
+          description: data.warning
         });
       } else {
         toast({
