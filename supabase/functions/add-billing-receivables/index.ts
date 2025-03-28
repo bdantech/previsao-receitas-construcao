@@ -383,26 +383,39 @@ serve(async (req) => {
           ? saldoDevedorInitial - inst.pmt 
           : Math.max(0, installments[installments.findIndex(i => i.id === inst.id) - 1]?.saldo_devedor - inst.pmt);
         
-        // First installment (number 0) - special handling
+        // Calculate current installment's contribution to fundo_reserva
+        const recebiveis = inst.recebiveis || 0;
+        const currentContribution = recebiveis - inst.pmt;
+        
+        // First installment (number 0) - should also calculate fundo_reserva
         if (inst.numero_parcela === 0) {
-          // Update the installment with new saldo_devedor
+          // Calculate fundo_reserva for first installment too (corrected)
+          let fundoReserva = currentContribution;
+          
+          // Calculate devolucao if fundo_reserva exceeds teto
+          let devolucao = 0;
+          if (fundoReserva > tetoFundoReserva) {
+            devolucao = fundoReserva - tetoFundoReserva;
+            fundoReserva = tetoFundoReserva;
+          }
+          
+          // Update the installment with new saldo_devedor and fundo_reserva values
           await supabase
             .from('payment_plan_installments')
             .update({ 
               saldo_devedor: saldoDevedor,
-              fundo_reserva: 0, // First installment has no fundo_reserva
-              devolucao: 0 // First installment has no devolucao
+              fundo_reserva: fundoReserva,
+              devolucao: devolucao
             })
             .eq('id', inst.id);
             
-          console.log(`Updated installment ${inst.numero_parcela} (${inst.id}): saldo_devedor=${saldoDevedor}, fundo_reserva=0, devolucao=0`);
+          console.log(`Updated installment ${inst.numero_parcela} (${inst.id}): saldo_devedor=${saldoDevedor}, fundo_reserva=${fundoReserva}, devolucao=${devolucao}`);
+          
+          // Store current fundo_reserva for next iteration
+          previousFundoReserva = fundoReserva;
         }
         // Other installments
         else {
-          // Calculate current installment's contribution to fundo_reserva
-          const recebiveis = inst.recebiveis || 0;
-          const currentContribution = recebiveis - inst.pmt;
-          
           // Calculate new fundo_reserva including previous balance
           let fundoReserva = previousFundoReserva + currentContribution;
           
