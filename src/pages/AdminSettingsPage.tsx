@@ -15,6 +15,13 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
+// Helper function to format reference month
+const formatReferenceMonth = (dateString: string) => {
+  const date = new Date(dateString);
+  // Format as "Month Year" in Portuguese
+  return format(date, "MMMM yyyy");
+};
+
 // Index management tab
 const IndexesTab = () => {
   const [isIndexDialogOpen, setIsIndexDialogOpen] = React.useState(false);
