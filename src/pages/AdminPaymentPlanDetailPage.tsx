@@ -147,7 +147,7 @@ const AdminPaymentPlanDetailPage = () => {
         .filter(receivable => selectedReceivableIds.includes(receivable.id))
         .reduce((sum, receivable) => sum + receivable.amount, 0);
       
-      const installmentAmount = selectedInstallment ? selectedInstallment.recebiveis : 0;
+      const installmentAmount = selectedInstallment ? selectedInstallment.pmt : 0;
       
       setReceivableSummary({
         totalSelected,
@@ -518,7 +518,7 @@ const AdminPaymentPlanDetailPage = () => {
         console.warn("Response missing billing receivables data:", data);
         toast({
           title: "Atenção",
-          description: "Verifique se os recebíveis foram adicionados corretamente."
+          description: "Verifique se os receb��veis foram adicionados corretamente."
         });
       } else {
         console.log(`${billingReceivables.length} billing receivables created successfully`, billingReceivables);
@@ -898,7 +898,7 @@ const AdminPaymentPlanDetailPage = () => {
                             </span>
                           </div>
                           <div>
-                            <span className="font-medium">Valor da Parcela:</span>{" "}
+                            <span className="font-medium">Valor da Parcela (PMT):</span>{" "}
                             <span className="text-blue-600 font-medium">
                               {formatCurrency(receivableSummary.installmentAmount)}
                             </span>
