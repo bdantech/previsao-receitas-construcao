@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
@@ -14,6 +13,7 @@ import { toast } from "@/components/ui/use-toast";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
 
 // Helper function to format reference month
 const formatReferenceMonth = (dateString: string) => {
@@ -24,6 +24,7 @@ const formatReferenceMonth = (dateString: string) => {
 
 // Index management tab
 const IndexesTab = () => {
+  const { getAuthHeader } = useAuth();
   const [isIndexDialogOpen, setIsIndexDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [currentIndex, setCurrentIndex] = React.useState<any>(null);
@@ -34,7 +35,8 @@ const IndexesTab = () => {
     queryKey: ["indexes"],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("indexes-management", {
-        body: { action: "getIndexes" }
+        body: { action: "getIndexes" },
+        headers: getAuthHeader()
       });
       
       if (error) throw new Error(error.message);
@@ -47,7 +49,8 @@ const IndexesTab = () => {
     mutationFn: async (values: { id?: string; name: string; description: string }) => {
       const action = values.id ? "updateIndex" : "createIndex";
       const { data, error } = await supabase.functions.invoke("indexes-management", {
-        body: { action, data: values }
+        body: { action, data: values },
+        headers: getAuthHeader()
       });
       
       if (error) throw new Error(error.message);
@@ -73,7 +76,8 @@ const IndexesTab = () => {
   const deleteIndexMutation = useMutation({
     mutationFn: async (id: string) => {
       const { data, error } = await supabase.functions.invoke("indexes-management", {
-        body: { action: "deleteIndex", data: { id } }
+        body: { action: "deleteIndex", data: { id } },
+        headers: getAuthHeader()
       });
       
       if (error) throw new Error(error.message);
@@ -252,6 +256,7 @@ const IndexesTab = () => {
 
 // Index updates tab
 const IndexUpdatesTab = () => {
+  const { getAuthHeader } = useAuth();
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [currentUpdate, setCurrentUpdate] = React.useState<any>(null);
@@ -263,7 +268,8 @@ const IndexUpdatesTab = () => {
     queryKey: ["indexes"],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("indexes-management", {
-        body: { action: "getIndexes" }
+        body: { action: "getIndexes" },
+        headers: getAuthHeader()
       });
       
       if (error) throw new Error(error.message);
@@ -278,7 +284,8 @@ const IndexUpdatesTab = () => {
       if (!selectedIndexId) return [];
       
       const { data, error } = await supabase.functions.invoke("indexes-management", {
-        body: { action: "getIndexUpdates", data: { indexId: selectedIndexId } }
+        body: { action: "getIndexUpdates", data: { indexId: selectedIndexId } },
+        headers: getAuthHeader()
       });
       
       if (error) throw new Error(error.message);
@@ -292,7 +299,8 @@ const IndexUpdatesTab = () => {
     mutationFn: async (values: { id?: string; indexId: string; referenceMonth: string; monthlyAdjustment: number }) => {
       const action = values.id ? "updateIndexUpdate" : "createIndexUpdate";
       const { data, error } = await supabase.functions.invoke("indexes-management", {
-        body: { action, data: values }
+        body: { action, data: values },
+        headers: getAuthHeader()
       });
       
       if (error) throw new Error(error.message);
@@ -318,7 +326,8 @@ const IndexUpdatesTab = () => {
   const deleteUpdateMutation = useMutation({
     mutationFn: async (id: string) => {
       const { data, error } = await supabase.functions.invoke("indexes-management", {
-        body: { action: "deleteIndexUpdate", data: { id } }
+        body: { action: "deleteIndexUpdate", data: { id } },
+        headers: getAuthHeader()
       });
       
       if (error) throw new Error(error.message);
@@ -540,6 +549,7 @@ const IndexUpdatesTab = () => {
 
 // Calculator component for compound adjustments
 const IndexCalculator = () => {
+  const { getAuthHeader } = useAuth();
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
   const [selectedIndexId, setSelectedIndexId] = React.useState<string | null>(null);
@@ -551,7 +561,8 @@ const IndexCalculator = () => {
     queryKey: ["indexes"],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("indexes-management", {
-        body: { action: "getIndexes" }
+        body: { action: "getIndexes" },
+        headers: getAuthHeader()
       });
       
       if (error) throw new Error(error.message);
@@ -578,7 +589,8 @@ const IndexCalculator = () => {
             startDate,
             endDate
           } 
-        }
+        },
+        headers: getAuthHeader()
       });
       
       if (error) throw new Error(error.message);
