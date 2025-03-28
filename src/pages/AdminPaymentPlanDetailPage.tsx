@@ -152,7 +152,7 @@ const AdminPaymentPlanDetailPage = () => {
       setReceivableSummary({
         totalSelected,
         installmentAmount,
-        difference: installmentAmount - totalSelected
+        difference: totalSelected - installmentAmount
       });
     }
   }, [selectedReceivableIds, eligibleReceivables, selectedInstallment]);
