@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -192,6 +193,8 @@ serve(async (req) => {
             teto_fundo_reserva,
             anticipation_request_id,
             project_id,
+            index_id,
+            adjustment_base_date,
             created_at,
             updated_at,
             anticipation_requests (
@@ -495,12 +498,15 @@ serve(async (req) => {
         
         // Only include fields that are provided
         if (indexId !== undefined) {
-          updateData.index_id = indexId
+          // If "none" is passed, set index_id to null
+          updateData.index_id = indexId === 'none' ? null : indexId;
         }
         
         if (adjustmentBaseDate !== undefined) {
-          updateData.adjustment_base_date = adjustmentBaseDate
+          updateData.adjustment_base_date = adjustmentBaseDate;
         }
+
+        console.log("Updating payment plan settings with data:", updateData);
         
         // Update the payment plan settings
         const { data: updatedPlan, error: updateError } = await supabase
@@ -511,6 +517,7 @@ serve(async (req) => {
           .single()
         
         if (updateError) {
+          console.error("Error updating payment plan settings:", updateError);
           throw new Error(`Error updating payment plan settings: ${updateError.message}`)
         }
         
