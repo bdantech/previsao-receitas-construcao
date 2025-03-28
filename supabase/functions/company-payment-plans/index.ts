@@ -371,11 +371,12 @@ serve(async (req) => {
         const removedAmount = parseFloat(billingReceivable.receivables.amount);
         console.log(`Removing receivable with amount: ${removedAmount}`);
 
-        // Delete ONLY the specific billing receivable
+        // Delete ONLY the specific billing receivable using a precise query with both ID conditions
         const { error: deleteError } = await supabase
           .from('billing_receivables')
           .delete()
-          .eq('id', billingReceivableId);
+          .eq('id', billingReceivableId)
+          .eq('installment_id', installmentId);
 
         if (deleteError) {
           console.error('Error removing billing receivable:', deleteError);

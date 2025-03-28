@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -707,11 +708,12 @@ serve(async (req) => {
         const removedAmount = parseFloat(billingReceivable.receivables.amount);
         console.log(`Removing receivable with amount: ${removedAmount}`);
 
-        // Delete only the specific billing receivable
+        // Delete only the specific billing receivable using both id and installment_id conditions
         const { error: deleteError } = await supabase
           .from('billing_receivables')
           .delete()
-          .eq('id', billingReceivableId);
+          .eq('id', billingReceivableId)
+          .eq('installment_id', installmentId);
 
         if (deleteError) {
           console.error('Error removing billing receivable:', deleteError);
