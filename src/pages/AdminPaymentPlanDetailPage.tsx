@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -167,7 +166,6 @@ const AdminPaymentPlanDetailPage = () => {
         return;
       }
       
-      // Make sure installments are sorted by numero_parcela
       if (data.data.payment_plan_installments) {
         data.data.payment_plan_installments.sort((a, b) => a.numero_parcela - b.numero_parcela);
       }

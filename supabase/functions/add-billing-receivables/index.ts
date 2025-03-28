@@ -193,26 +193,6 @@ serve(async (req) => {
       )
     }
 
-    // Clear existing billing receivables for this installment
-    console.log(`Deleting existing billing receivables for installment ${installmentId}`);
-    const { error: deleteError } = await supabase
-      .from('billing_receivables')
-      .delete()
-      .eq('installment_id', installmentId);
-
-    if (deleteError) {
-      console.error('Error deleting existing billing receivables:', deleteError);
-      return new Response(
-        JSON.stringify({ error: `Error deleting existing billing receivables: ${deleteError.message}` }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500 
-        }
-      )
-    }
-    
-    console.log(`Successfully deleted existing billing receivables for installment ${installmentId}`);
-
     // Get the dia_cobranca from the payment plan settings
     const diaCobranca = installment.payment_plan_settings?.dia_cobranca;
     if (!diaCobranca) {
@@ -229,8 +209,31 @@ serve(async (req) => {
     const novaDataVencimento = installment.data_vencimento;
     console.log(`Using nova_data_vencimento: ${novaDataVencimento} for all receivables`);
 
-    // Create billing receivables array
-    const billingReceivables = receivables.map(receivable => {
+    // MODIFIED: Check if any of the receivables are already linked to this installment
+    const { data: existingLinks, error: existingLinksError } = await supabase
+      .from('billing_receivables')
+      .select('receivable_id')
+      .eq('installment_id', installmentId)
+      .in('receivable_id', receivableIds);
+      
+    if (existingLinksError) {
+      console.error('Error checking existing links:', existingLinksError);
+      // Continue anyway, we'll handle this during insert
+    }
+    
+    // Get a list of receivable IDs that are already linked
+    const existingReceivableIds = new Set(existingLinks?.map(link => link.receivable_id) || []);
+    console.log(`Found ${existingReceivableIds.size} receivables already linked to this installment`);
+    
+    // Filter out receivables that are already linked
+    const newReceivableIds = receivableIds.filter(id => !existingReceivableIds.has(id));
+    console.log(`Adding ${newReceivableIds.length} new receivables to the installment`);
+    
+    // MODIFIED: Only create new billing receivables for those not already linked
+    const newReceivables = receivables.filter(r => newReceivableIds.includes(r.id));
+    
+    // Create billing receivables array for new receivables only
+    const billingReceivables = newReceivables.map(receivable => {
       return {
         installment_id: installmentId,
         receivable_id: receivable.id,
@@ -238,46 +241,63 @@ serve(async (req) => {
       };
     });
 
-    // Log the receivables we're creating for debugging
-    console.log('Creating billing receivables:', JSON.stringify(billingReceivables));
+    // Only insert new billing receivables if there are any
+    let inserted = [];
+    if (billingReceivables.length > 0) {
+      console.log('Creating new billing receivables:', JSON.stringify(billingReceivables));
+      
+      // Insert billing receivables
+      const { data: insertedData, error: insertError } = await supabase
+        .from('billing_receivables')
+        .insert(billingReceivables)
+        .select('id, installment_id, receivable_id, nova_data_vencimento, created_at');
+  
+      if (insertError) {
+        console.error('Error inserting billing receivables:', insertError);
+        return new Response(
+          JSON.stringify({ error: `Error inserting billing receivables: ${insertError.message}` }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        )
+      }
+      
+      inserted = insertedData || [];
+      console.log('Successfully inserted billing receivables:', inserted);
+    } else {
+      console.log('No new billing receivables to insert');
+    }
 
-    // Insert billing receivables
-    const { data: inserted, error: insertError } = await supabase
+    // Calculate total amount of all receivables (existing + new)
+    // Get all billing receivables for this installment to calculate the total
+    const { data: allBillingReceivables, error: allBrError } = await supabase
       .from('billing_receivables')
-      .insert(billingReceivables)
-      .select('id, installment_id, receivable_id, nova_data_vencimento, created_at');
-
-    if (insertError) {
-      console.error('Error inserting billing receivables:', insertError);
+      .select(`
+        receivable_id,
+        receivables (
+          amount
+        )
+      `)
+      .eq('installment_id', installmentId);
+      
+    if (allBrError) {
+      console.error('Error getting all billing receivables:', allBrError);
       return new Response(
-        JSON.stringify({ error: `Error inserting billing receivables: ${insertError.message}` }),
+        JSON.stringify({ error: `Error calculating total amount: ${allBrError.message}` }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500 
         }
       )
     }
-
-    console.log('Successfully inserted billing receivables:', inserted);
     
-    // Verify the insertion succeeded by querying for the inserted records
-    const { data: verificationData, error: verificationError } = await supabase
-      .from('billing_receivables')
-      .select('id, receivable_id, nova_data_vencimento')
-      .eq('installment_id', installmentId);
+    const totalAmount = (allBillingReceivables || []).reduce(
+      (sum, item) => sum + parseFloat(item.receivables.amount), 
+      0
+    );
     
-    if (verificationError) {
-      console.error('Error verifying billing receivables insertion:', verificationError);
-      // Continue anyway since we have the insertion data
-    } else {
-      console.log(`Verification found ${verificationData?.length || 0} billing receivables for installment ${installmentId}`);
-      if (verificationData?.length !== receivableIds.length) {
-        console.warn(`Mismatch in count: expected ${receivableIds.length}, found ${verificationData?.length}`);
-      }
-    }
-
-    // Calculate total amount of receivables
-    const totalAmount = receivables.reduce((sum, receivable) => sum + parseFloat(receivable.amount), 0);
+    console.log(`Total amount of all billing receivables: ${totalAmount}`);
 
     // Update installment with new recebiveis value
     console.log(`Updating installment ${installmentId} with new recebiveis value: ${totalAmount}`);
