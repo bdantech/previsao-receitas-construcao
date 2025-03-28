@@ -1,1258 +1,443 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
-import { Button } from "@/components/ui/button";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle,
-  CardDescription
-} from "@/components/ui/card";
-import { toast } from "@/components/ui/use-toast";
-import { 
+
+import React, { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../integrations/supabase/client';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { Badge } from '../components/ui/badge';
+import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
-  DialogClose
-} from "@/components/ui/dialog";
+  DialogClose,
+} from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
+import { formatCurrency } from '../lib/formatters';
 import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Loader, ArrowLeft, Trash2, Plus, X, Check, Calendar, Edit } from "lucide-react";
-import { format, parse } from "date-fns";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatCPF, formatCurrency } from "@/lib/formatters";
-import { MonthYearPicker } from "@/components/ui/month-year-picker";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { Input } from "@/components/ui/input";
-import { ptBR } from "date-fns/locale";
-
-interface PaymentPlan {
-  id: string;
-  dia_cobranca: number;
-  teto_fundo_reserva: number;
-  anticipation_request_id: string;
-  project_id: string;
-  created_at: string;
-  updated_at: string;
-  index_id?: string;
-  adjustment_base_date?: string;
-  anticipation_requests: {
-    valor_total: number;
-    valor_liquido: number;
-    status: string;
-  };
-  projects: {
-    name: string;
-    cnpj: string;
-  };
-  payment_plan_installments: PaymentPlanInstallment[];
-}
-
-interface PaymentPlanInstallment {
-  id: string;
-  numero_parcela: number;
-  data_vencimento: string;
-  recebiveis: number;
-  pmt: number;
-  saldo_devedor: number;
-  fundo_reserva: number;
-  devolucao: number;
-}
-
-interface Receivable {
-  id: string;
-  buyer_name: string;
-  buyer_cpf: string;
-  amount: number;
-  due_date: string;
-  description: string;
-  status: string;
-}
-
-interface PmtReceivable {
-  id: string;
-  receivable_id: string;
-  receivables: Receivable;
-}
-
-interface BillingReceivable {
-  id: string;
-  receivable_id: string;
-  nova_data_vencimento?: string;
-  receivables: Receivable;
-}
-
-interface ReceivableMap {
-  pmt: PmtReceivable[];
-  billing: BillingReceivable[];
-}
-
-interface ReceivableSummary {
-  totalSelected: number;
-  installmentAmount: number;
-  difference: number;
-}
-
-interface Index {
-  id: string;
-  name: string;
-}
-
-interface AdjustmentFormValues {
-  indexId: string;
-  adjustmentBaseDate: string;
-}
+} from "../components/ui/select";
+import { ptBR } from 'date-fns/locale';
 
 const AdminPaymentPlanDetailPage = () => {
-  const { paymentPlanId } = useParams();
-  const { session, userRole } = useAuth();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [paymentPlan, setPaymentPlan] = useState<PaymentPlan | null>(null);
-  const [selectedInstallment, setSelectedInstallment] = useState<PaymentPlanInstallment | null>(null);
-  const [receivableMap, setReceivableMap] = useState<ReceivableMap>({
-    pmt: [],
-    billing: []
-  });
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [isReceivablesDialogOpen, setIsReceivablesDialogOpen] = useState(false);
-  const [isAddBillingReceivablesOpen, setIsAddBillingReceivablesOpen] = useState(false);
-  const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
-  const [deletingPlan, setDeletingPlan] = useState(false);
-  const [eligibleReceivables, setEligibleReceivables] = useState<Receivable[]>([]);
-  const [selectedReceivableIds, setSelectedReceivableIds] = useState<string[]>([]);
-  const [loadingEligibleReceivables, setLoadingEligibleReceivables] = useState(false);
-  const [updatingBillingReceivables, setUpdatingBillingReceivables] = useState(false);
-  const [removingBillingReceivable, setRemovingBillingReceivable] = useState<string | null>(null);
-  const [receivableSummary, setReceivableSummary] = useState<ReceivableSummary>({
-    totalSelected: 0,
-    installmentAmount: 0,
-    difference: 0
-  });
-  const [indexes, setIndexes] = useState<Index[]>([]);
-  const [updatingAdjustment, setUpdatingAdjustment] = useState(false);
-  
-  const form = useForm<AdjustmentFormValues>({
-    defaultValues: {
-      indexId: '',
-      adjustmentBaseDate: ''
-    }
-  });
+  const queryClient = useQueryClient();
+  const [selectedInstallment, setSelectedInstallment] = useState(null);
+  const [showBillingDialog, setShowBillingDialog] = useState(false);
+  const [showEditIndexDialog, setShowEditIndexDialog] = useState(false);
+  const [indexId, setIndexId] = useState<string | null>(null);
+  const [adjustmentBaseDate, setAdjustmentBaseDate] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (session && userRole === 'admin' && paymentPlanId) {
-      fetchPaymentPlanDetails();
-      fetchIndexes();
-    }
-  }, [session, userRole, paymentPlanId]);
-
-  useEffect(() => {
-    if (paymentPlan) {
-      form.reset({
-        indexId: paymentPlan.index_id || '',
-        adjustmentBaseDate: paymentPlan.adjustment_base_date || ''
+  // Fetch payment plan details
+  const { data: paymentPlan, isLoading, error } = useQuery({
+    queryKey: ['paymentPlanDetails', id],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
+        body: { action: 'getPaymentPlanDetails', paymentPlanId: id },
       });
-    }
-  }, [paymentPlan, form]);
-
-  useEffect(() => {
-    if (eligibleReceivables.length > 0 && selectedInstallment) {
-      const totalSelected = eligibleReceivables
-        .filter(receivable => selectedReceivableIds.includes(receivable.id))
-        .reduce((sum, receivable) => sum + receivable.amount, 0);
       
-      const installmentAmount = selectedInstallment ? selectedInstallment.pmt : 0;
-      
-      setReceivableSummary({
-        totalSelected,
-        installmentAmount,
-        difference: totalSelected - installmentAmount
-      });
-    }
-  }, [selectedReceivableIds, eligibleReceivables, selectedInstallment]);
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    enabled: !!id,
+  });
 
-  const fetchIndexes = async () => {
-    if (!session) return;
-    
-    try {
+  // Fetch indexes for the select dropdown
+  const { data: indexes } = useQuery({
+    queryKey: ['indexes'],
+    queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('indexes-management', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: {
-          action: 'getIndexesForSelect'
-        }
+        body: { action: 'getIndexesForSelect' },
       });
       
-      if (error) {
-        console.error("Error fetching indexes:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Não foi possível carregar os índices."
-        });
-        return;
-      }
-      
-      if (data?.indexes) {
-        setIndexes(data.indexes);
-      }
-    } catch (error) {
-      console.error("Exception fetching indexes:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Erro ao carregar índices."
-      });
-    }
-  };
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
 
-  const fetchPaymentPlanDetails = async () => {
-    if (!session || !paymentPlanId) return;
-    
-    try {
-      setLoading(true);
+  // Mutation for updating payment plan settings
+  const updatePaymentPlanSettings = useMutation({
+    mutationFn: async ({ indexId, adjustmentBaseDate }: { indexId: string | null, adjustmentBaseDate: string | null }) => {
+      console.log('Updating payment plan settings:', { indexId, adjustmentBaseDate });
       
+      // Important change: Use admin-payment-plans instead of company-payment-plans
       const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
+        body: { 
+          action: 'updatePaymentPlanSettings', 
+          paymentPlanId: id,
+          indexId,
+          adjustmentBaseDate 
         },
-        body: {
-          action: 'getPaymentPlanDetails',
-          paymentPlanId
-        }
       });
       
       if (error) {
-        console.error("Error fetching payment plan details:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Não foi possível carregar os detalhes do plano de pagamento."
-        });
-        return;
+        console.error('Error updating payment plan settings:', error);
+        throw new Error(`Error updating payment plan settings: ${error.message}`);
       }
       
-      if (!data?.data) {
-        console.error("No payment plan data returned:", data);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Plano de pagamento não encontrado."
-        });
-        return;
-      }
-      
-      if (data.data.payment_plan_installments) {
-        data.data.payment_plan_installments.sort((a, b) => a.numero_parcela - b.numero_parcela);
-      }
-      
-      setPaymentPlan(data.data);
-      
-      if (!data.data.payment_plan_installments || data.data.payment_plan_installments.length === 0) {
-        console.warn("Payment plan has no installments:", data.data);
-        toast({
-          variant: "warning",
-          title: "Atenção",
-          description: "Este plano de pagamento não possui parcelas."
-        });
-        return;
-      }
-      
-      console.log("Payment plan loaded with installments:", data.data.payment_plan_installments);
-      
-      const firstInstallment = data.data.payment_plan_installments[0];
-      setSelectedInstallment(firstInstallment);
-      
-      await fetchInstallmentReceivables(firstInstallment.id);
-    } catch (error) {
-      console.error("Exception fetching payment plan details:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Erro ao carregar detalhes do plano de pagamento."
-      });
-    } finally {
-      setLoading(false);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Configurações de reajuste atualizadas com sucesso');
+      queryClient.invalidateQueries({ queryKey: ['paymentPlanDetails', id] });
+      setShowEditIndexDialog(false);
+    },
+    onError: (error) => {
+      console.error('Error updating payment plan settings:', error);
+      toast.error(`Erro ao atualizar configurações: ${error.message}`);
     }
-  };
+  });
 
-  const fetchInstallmentReceivables = async (installmentId: string) => {
-    if (!session || !installmentId) {
-      console.error("Missing session or installment ID for fetchInstallmentReceivables");
-      return;
-    }
-    
-    try {
-      console.log(`Fetching receivables for installment: ${installmentId}`);
-      
-      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: {
-          action: 'getInstallmentReceivables',
-          installmentId
-        }
-      });
-      
-      if (error) {
-        console.error("Error fetching installment receivables:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: `Erro ao carregar recebíveis: ${error.message}`
-        });
-        return;
-      }
-      
-      if (!data?.data) {
-        console.warn("No receivables data returned:", data);
-        toast({
-          variant: "warning", 
-          title: "Atenção",
-          description: "Nenhum dado de recebíveis retornado pelo servidor."
-        });
-        setReceivableMap({
-          pmt: [],
-          billing: []
-        });
-        return;
-      }
-      
-      console.log("Receivables loaded:", data.data);
-      
-      setReceivableMap({
-        pmt: data.data.pmtReceivables || [],
-        billing: data.data.billingReceivables || []
-      });
-    } catch (error) {
-      console.error("Exception fetching installment receivables:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: `Erro ao carregar recebíveis: ${error.message || 'Erro desconhecido'}`
-      });
-    }
-  };
-
-  const fetchEligibleBillingReceivables = async () => {
-    if (!paymentPlanId || !selectedInstallment) return;
-    
-    try {
-      setLoadingEligibleReceivables(true);
-      
-      console.log(`Verifying installment: ${selectedInstallment.id}`);
-      
-      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('admin-payment-plans', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`
-        },
-        body: {
-          action: 'getInstallmentReceivables',
-          installmentId: selectedInstallment.id
-        }
-      });
-      
-      if (verifyError) {
-        console.error("Error verifying installment:", verifyError);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: `A parcela selecionada não pode ser verificada: ${verifyError.message}`
-        });
-        return;
-      }
-      
-      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`
-        },
-        body: {
-          action: 'getEligibleBillingReceivables',
-          paymentPlanId,
-          installmentId: selectedInstallment.id
-        }
-      });
-      
-      if (error) {
-        console.error("Error fetching eligible receivables:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: `Não foi possível carregar os recebíveis elegíveis: ${error.message}`
-        });
-        return;
-      }
-      
-      if (!data || !data.data) {
-        console.warn("No eligible receivables data returned:", data);
-        toast({
-          variant: "warning",
-          title: "Atenção",
-          description: "Nenhum recebível elegível encontrado para esta parcela."
-        });
-        setEligibleReceivables([]);
-        return;
-      }
-      
-      console.log("Eligible receivables loaded:", data.data);
-      setEligibleReceivables(data.data || []);
-      setSelectedReceivableIds([]);
-    } catch (error) {
-      console.error("Exception in fetchEligibleBillingReceivables:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: `Erro ao carregar recebíveis elegíveis: ${error.message || 'Erro desconhecido'}`
-      });
-    } finally {
-      setLoadingEligibleReceivables(false);
-    }
-  };
-
-  const handleDeletePaymentPlan = async () => {
-    if (!paymentPlanId) return;
-    
-    try {
-      setDeletingPlan(true);
-      
-      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`
-        },
-        body: {
-          action: 'deletePaymentPlan',
-          paymentPlanId
-        }
-      });
-      
-      if (error) {
-        console.error("Error deleting payment plan:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Não foi possível excluir o plano de pagamento."
-        });
-        return;
-      }
-      
-      toast({
-        title: "Sucesso",
-        description: "Plano de pagamento excluído com sucesso."
-      });
-      
-      navigate('/admin/payment-plans');
-    } catch (error) {
-      console.error("Error deleting payment plan:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Não foi possível excluir o plano de pagamento."
-      });
-    } finally {
-      setDeletingPlan(false);
-      setIsDeleteConfirmOpen(false);
-    }
-  };
-
-  const handleViewReceivables = async (installment: PaymentPlanInstallment) => {
+  // Open the receivables dialog for an installment
+  const handleViewReceivables = (installment) => {
     setSelectedInstallment(installment);
-    await fetchInstallmentReceivables(installment.id);
-    setIsReceivablesDialogOpen(true);
+    setShowBillingDialog(true);
   };
 
-  const handleAddBillingReceivables = async () => {
-    if (!selectedInstallment) return;
-    
-    await fetchEligibleBillingReceivables();
-    setIsAddBillingReceivablesOpen(true);
+  // Open the edit index dialog
+  const handleOpenEditIndexDialog = () => {
+    // Set current values if they exist
+    if (paymentPlan) {
+      setIndexId(paymentPlan.index_id || 'none');
+      setAdjustmentBaseDate(paymentPlan.adjustment_base_date || '');
+    }
+    setShowEditIndexDialog(true);
   };
 
-  const handleToggleReceivableSelection = (receivableId: string) => {
-    setSelectedReceivableIds(prevSelected => {
-      if (prevSelected.includes(receivableId)) {
-        return prevSelected.filter(id => id !== receivableId);
-      } else {
-        return [...prevSelected, receivableId];
-      }
+  // Save the edit index changes
+  const handleSaveIndexChanges = () => {
+    updatePaymentPlanSettings.mutate({ 
+      indexId, 
+      adjustmentBaseDate: adjustmentBaseDate || null 
     });
   };
 
-  const handleSelectAllReceivables = () => {
-    if (selectedReceivableIds.length === eligibleReceivables.length) {
-      setSelectedReceivableIds([]);
-    } else {
-      setSelectedReceivableIds(eligibleReceivables.map(receivable => receivable.id));
-    }
-  };
+  if (isLoading) {
+    return <div className="p-4">Carregando...</div>;
+  }
 
-  const handleSaveBillingReceivables = async () => {
-    if (!selectedInstallment) {
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Nenhuma parcela selecionada. Por favor, selecione uma parcela primeiro."
-      });
-      return;
-    }
+  if (error) {
+    return <div className="p-4 text-red-500">Erro: {error.message}</div>;
+  }
 
-    if (selectedReceivableIds.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Nenhum recebível selecionado. Por favor, selecione pelo menos um recebível."
-      });
-      return;
-    }
-    
-    try {
-      setUpdatingBillingReceivables(true);
-      
-      console.log(`Sending add-billing-receivables request for installment: ${selectedInstallment.id} with receivables: ${selectedReceivableIds.length}`);
-      
-      const { data, error } = await supabase.functions.invoke('add-billing-receivables', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`
-        },
-        body: {
-          installmentId: selectedInstallment.id,
-          receivableIds: selectedReceivableIds
-        }
-      });
-      
-      if (error) {
-        console.error("Error updating billing receivables:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: `Não foi possível adicionar os recebíveis de cobrança: ${error.message}`
-        });
-        return;
-      }
-      
-      if (!data) {
-        console.error("No response data received");
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Resposta vazia do servidor. Verifique os logs para mais detalhes."
-        });
-        return;
-      }
-      
-      console.log("Response from add-billing-receivables:", data);
-      
-      if (data.warning) {
-        console.warn("Warning when updating billing receivables:", data.warning);
-        toast({
-          title: "Atenção",
-          description: data.warning
-        });
-      } else {
-        toast({
-          title: "Sucesso",
-          description: "Recebíveis de cobrança adicionados com sucesso."
-        });
-      }
-      
-      const billingReceivables = data.billingReceivables;
-      
-      if (!billingReceivables || !Array.isArray(billingReceivables)) {
-        console.warn("Response missing billing receivables data:", data);
-        toast({
-          title: "Atenção",
-          description: "Verifique se os receb��veis foram adicionados corretamente."
-        });
-      } else {
-        console.log(`${billingReceivables.length} billing receivables created successfully`, billingReceivables);
-      }
-      
-      setIsAddBillingReceivablesOpen(false);
-      
-      await fetchInstallmentReceivables(selectedInstallment.id);
-      await fetchPaymentPlanDetails();
-    } catch (error) {
-      console.error("Exception updating billing receivables:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: `Não foi possível adicionar os recebíveis de cobrança: ${error.message || 'Erro desconhecido'}`
-      });
-    } finally {
-      setUpdatingBillingReceivables(false);
-    }
-  };
-
-  const handleRemoveBillingReceivable = async (billingReceivableId: string) => {
-    if (!selectedInstallment) return;
-    
-    try {
-      setRemovingBillingReceivable(billingReceivableId);
-      
-      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`
-        },
-        body: {
-          action: 'removeBillingReceivable',
-          installmentId: selectedInstallment.id,
-          billingReceivableId
-        }
-      });
-      
-      if (error) {
-        console.error("Error removing billing receivable:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Não foi possível remover o recebível de cobrança."
-        });
-        return;
-      }
-      
-      toast({
-        title: "Sucesso",
-        description: "Recebível de cobrança removido com sucesso."
-      });
-      
-      await fetchInstallmentReceivables(selectedInstallment.id);
-      await fetchPaymentPlanDetails();
-    } catch (error) {
-      console.error("Error removing billing receivable:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Não foi possível remover o recebível de cobrança."
-      });
-    } finally {
-      setRemovingBillingReceivable(null);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd/MM/yyyy');
-  };
-
-  const getIndexName = (indexId: string) => {
-    const index = indexes.find(idx => idx.id === indexId);
-    return index ? index.name : 'Não definido';
-  };
-
-  const handleAdjustmentSave = async (data: AdjustmentFormValues) => {
-    if (!paymentPlanId) return;
-    
-    try {
-      setUpdatingAdjustment(true);
-      
-      const { data: response, error } = await supabase.functions.invoke('company-payment-plans', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`
-        },
-        body: {
-          action: 'updatePaymentPlanSettings',
-          paymentPlanId,
-          indexId: data.indexId || null,
-          adjustmentBaseDate: data.adjustmentBaseDate || null
-        }
-      });
-      
-      if (error) {
-        console.error("Error updating payment plan settings:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Não foi possível atualizar as configurações de reajuste."
-        });
-        return;
-      }
-      
-      toast({
-        title: "Sucesso",
-        description: "Configurações de reajuste atualizadas com sucesso."
-      });
-      
-      await fetchPaymentPlanDetails();
-      setIsAdjustmentDialogOpen(false);
-    } catch (error) {
-      console.error("Error updating payment plan settings:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Erro ao atualizar configurações de reajuste."
-      });
-    } finally {
-      setUpdatingAdjustment(false);
-    }
-  };
+  if (!paymentPlan) {
+    return <div className="p-4">Plano de pagamento não encontrado</div>;
+  }
 
   return (
-    <AdminDashboardLayout>
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
+    <div className="p-4 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Detalhes do Plano de Pagamento</h1>
+        <div className="space-x-2">
           <Button 
             variant="outline" 
-            size="icon" 
+            onClick={handleOpenEditIndexDialog}
+          >
+            Configurar Reajuste
+          </Button>
+          <Button 
+            variant="outline" 
             onClick={() => navigate('/admin/payment-plans')}
           >
-            <ArrowLeft className="h-4 w-4" />
+            Voltar
           </Button>
-          <h2 className="text-xl font-semibold">Detalhes do Plano de Pagamento</h2>
         </div>
-        
-        <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
-          <AlertDialogTrigger asChild>
-            <Button 
-              variant="destructive"
-              size="sm"
-              className="flex items-center gap-1"
-            >
-              <Trash2 className="h-4 w-4" />
-              Excluir Plano
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Excluir Plano de Pagamento</AlertDialogTitle>
-              <AlertDialogDescription>
-                Tem certeza que deseja excluir este plano de pagamento? Esta ação não pode ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={handleDeletePaymentPlan}
-                disabled={deletingPlan}
-              >
-                {deletingPlan ? (
-                  <>
-                    <Loader className="mr-2 h-4 w-4 animate-spin" />
-                    Excluindo...
-                  </>
-                ) : (
-                  'Excluir'
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center my-10">
-          <Loader className="h-8 w-8 animate-spin text-gray-500" />
-        </div>
-      ) : paymentPlan ? (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle>Informações do Plano</CardTitle>
-                  <CardDescription>
-                    Detalhes gerais do plano de pagamento
-                  </CardDescription>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="flex items-center gap-1"
-                  onClick={() => setIsAdjustmentDialogOpen(true)}
-                >
-                  <Edit className="h-4 w-4" />
-                  Configurar Reajuste
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Projeto</h4>
-                  <p className="mt-1 text-lg">{paymentPlan.projects.name}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Dia de Cobrança</h4>
-                  <p className="mt-1 text-lg">Dia {paymentPlan.dia_cobranca}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Teto do Fundo de Reserva</h4>
-                  <p className="mt-1 text-lg">{formatCurrency(paymentPlan.teto_fundo_reserva)}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Valor da Antecipação</h4>
-                  <p className="mt-1 text-lg">{formatCurrency(paymentPlan.anticipation_requests.valor_total)}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Status da Antecipação</h4>
-                  <p className="mt-1 text-lg">{paymentPlan.anticipation_requests.status}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Criado em</h4>
-                  <p className="mt-1 text-lg">{formatDate(paymentPlan.created_at)}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Índice para Reajuste</h4>
-                  <p className="mt-1 text-lg">
-                    {paymentPlan.index_id ? getIndexName(paymentPlan.index_id) : 'Não definido'}
-                  </p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">Data Base para Reajuste</h4>
-                  <p className="mt-1 text-lg">
-                    {paymentPlan.adjustment_base_date 
-                      ? formatDate(paymentPlan.adjustment_base_date) 
-                      : 'Não definida'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Informações do Plano</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">Empresa / Projeto</p>
+              <p className="font-medium">{paymentPlan.projects?.name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">CNPJ</p>
+              <p className="font-medium">{paymentPlan.projects?.cnpj}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Status da Antecipação</p>
+              <Badge>{paymentPlan.anticipation_requests?.status}</Badge>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Dia de Cobrança</p>
+              <p className="font-medium">{paymentPlan.dia_cobranca}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Teto Fundo Reserva</p>
+              <p className="font-medium">{formatCurrency(paymentPlan.teto_fundo_reserva)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Valor Total da Antecipação</p>
+              <p className="font-medium">{formatCurrency(paymentPlan.anticipation_requests?.valor_total)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Valor Líquido da Antecipação</p>
+              <p className="font-medium">{formatCurrency(paymentPlan.anticipation_requests?.valor_liquido)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Índice de Reajuste</p>
+              <p className="font-medium">
+                {indexes?.find(i => i.id === paymentPlan.index_id)?.name || 'Nenhum'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Data Base para Reajuste</p>
+              <p className="font-medium">
+                {paymentPlan.adjustment_base_date 
+                  ? format(new Date(paymentPlan.adjustment_base_date), 'dd/MM/yyyy')
+                  : 'Não definida'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Parcelas</CardTitle>
-              <CardDescription>
-                Lista de parcelas do plano de pagamento
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Parcela</TableHead>
-                      <TableHead>Vencimento</TableHead>
-                      <TableHead>Recebíveis</TableHead>
-                      <TableHead>PMT</TableHead>
-                      <TableHead>Saldo Devedor</TableHead>
-                      <TableHead>Fundo de Reserva</TableHead>
-                      <TableHead>Devolução</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paymentPlan.payment_plan_installments.map((installment) => (
-                      <TableRow key={installment.id}>
-                        <TableCell className="font-medium">{installment.numero_parcela}</TableCell>
-                        <TableCell>{formatDate(installment.data_vencimento)}</TableCell>
-                        <TableCell>{formatCurrency(installment.recebiveis)}</TableCell>
-                        <TableCell>{formatCurrency(installment.pmt)}</TableCell>
-                        <TableCell>{formatCurrency(installment.saldo_devedor)}</TableCell>
-                        <TableCell>{formatCurrency(installment.fundo_reserva)}</TableCell>
-                        <TableCell>{formatCurrency(installment.devolucao)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewReceivables(installment)}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            Ver Recebíveis
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Dialog open={isReceivablesDialogOpen} onOpenChange={setIsReceivablesDialogOpen}>
-            <DialogContent className="max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>
-                  Recebíveis da Parcela {selectedInstallment?.numero_parcela} - {selectedInstallment ? formatDate(selectedInstallment.data_vencimento) : ''}
-                </DialogTitle>
-                <DialogDescription>
-                  Detalhes dos recebíveis vinculados a esta parcela
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="mt-4 space-y-6">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm font-medium">Recebíveis de PMT ({receivableMap.pmt.length})</h4>
-                  </div>
-                  
-                  {receivableMap.pmt.length > 0 ? (
-                    <div className="overflow-x-auto border rounded-md">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Comprador</TableHead>
-                            <TableHead>CPF</TableHead>
-                            <TableHead>Valor</TableHead>
-                            <TableHead>Vencimento</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {receivableMap.pmt.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell>{item.receivables.buyer_name}</TableCell>
-                              <TableCell>{formatCPF(item.receivables.buyer_cpf)}</TableCell>
-                              <TableCell>{formatCurrency(item.receivables.amount)}</TableCell>
-                              <TableCell>{formatDate(item.receivables.due_date)}</TableCell>
-                              <TableCell>{item.receivables.status}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">Nenhum recebível de PMT encontrado.</p>
-                  )}
-                </div>
-                
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm font-medium">Recebíveis de Cobrança ({receivableMap.billing.length})</h4>
+      <Card>
+        <CardHeader>
+          <CardTitle>Parcelas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">Nº</TableHead>
+                <TableHead>Vencimento</TableHead>
+                <TableHead className="text-right">Recebíveis</TableHead>
+                <TableHead className="text-right">PMT</TableHead>
+                <TableHead className="text-right">Saldo Devedor</TableHead>
+                <TableHead className="text-right">Fundo Reserva</TableHead>
+                <TableHead className="text-right">Devolução</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paymentPlan.payment_plan_installments?.map((installment) => (
+                <TableRow key={installment.id}>
+                  <TableCell>{installment.numero_parcela}</TableCell>
+                  <TableCell>{format(new Date(installment.data_vencimento), 'dd/MM/yyyy')}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(installment.recebiveis)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(installment.pmt)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(installment.saldo_devedor)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(installment.fundo_reserva)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(installment.devolucao)}</TableCell>
+                  <TableCell className="text-right">
                     <Button 
                       variant="outline" 
-                      size="sm"
-                      className="flex items-center gap-1"
-                      onClick={handleAddBillingReceivables}
+                      size="sm" 
+                      onClick={() => handleViewReceivables(installment)}
                     >
-                      <Plus className="h-4 w-4" />
-                      Adicionar Recebíveis de Cobrança
+                      Ver Recebíveis
                     </Button>
-                  </div>
-                  
-                  {receivableMap.billing.length > 0 ? (
-                    <div className="overflow-x-auto border rounded-md">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Comprador</TableHead>
-                            <TableHead>CPF</TableHead>
-                            <TableHead>Valor</TableHead>
-                            <TableHead>Vencimento Original</TableHead>
-                            <TableHead>Nova Data Vencimento</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {receivableMap.billing.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell>{item.receivables.buyer_name}</TableCell>
-                              <TableCell>{formatCPF(item.receivables.buyer_cpf)}</TableCell>
-                              <TableCell>{formatCurrency(item.receivables.amount)}</TableCell>
-                              <TableCell>{formatDate(item.receivables.due_date)}</TableCell>
-                              <TableCell>
-                                {item.nova_data_vencimento 
-                                  ? formatDate(item.nova_data_vencimento) 
-                                  : "Não definida"}
-                              </TableCell>
-                              <TableCell>{item.receivables.status}</TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-red-600 hover:text-red-900"
-                                  disabled={!!removingBillingReceivable}
-                                  onClick={() => handleRemoveBillingReceivable(item.id)}
-                                >
-                                  {removingBillingReceivable === item.id ? (
-                                    <Loader className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <X className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">Nenhum recebível de cobrança encontrado.</p>
-                  )}
-                </div>
-              </div>
-              
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline">Fechar</Button>
-                </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-          <Dialog open={isAddBillingReceivablesOpen} onOpenChange={setIsAddBillingReceivablesOpen}>
-            <DialogContent className="max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>
-                  Adicionar Recebíveis de Cobrança
-                </DialogTitle>
-                <DialogDescription>
-                  Selecione os recebíveis que deseja vincular à parcela {selectedInstallment?.numero_parcela}
-                </DialogDescription>
-              </DialogHeader>
-              
-              {loadingEligibleReceivables ? (
-                <div className="flex justify-center my-6">
-                  <Loader className="h-8 w-8 animate-spin text-gray-500" />
-                </div>
-              ) : (
-                <>
-                  {eligibleReceivables.length > 0 ? (
-                    <>
-                      <div className="flex justify-between items-center mb-3">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={handleSelectAllReceivables}
-                          className="flex items-center gap-1"
-                        >
-                          <Check className="h-4 w-4" />
-                          {selectedReceivableIds.length === eligibleReceivables.length 
-                            ? "Desmarcar Todos" 
-                            : "Selecionar Todos"}
-                        </Button>
-                        
-                        <div className="flex gap-4 text-sm">
-                          <div>
-                            <span className="font-medium">Total Selecionado:</span>{" "}
-                            <span className={receivableSummary.totalSelected > 0 ? "text-green-600 font-medium" : "text-gray-500"}>
-                              {formatCurrency(receivableSummary.totalSelected)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="font-medium">Valor da Parcela (PMT):</span>{" "}
-                            <span className="text-blue-600 font-medium">
-                              {formatCurrency(receivableSummary.installmentAmount)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="font-medium">Diferença:</span>{" "}
-                            <span className={
-                              receivableSummary.difference === 0 
-                                ? "text-green-600 font-medium" 
-                                : receivableSummary.difference < 0 
-                                  ? "text-red-600 font-medium" 
-                                  : "text-yellow-600 font-medium"
-                            }>
-                              {formatCurrency(receivableSummary.difference)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="overflow-y-auto max-h-96 border rounded-md">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-12">Selecionar</TableHead>
-                              <TableHead>Comprador</TableHead>
-                              <TableHead>CPF</TableHead>
-                              <TableHead>Valor</TableHead>
-                              <TableHead>Vencimento</TableHead>
-                              <TableHead>Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {eligibleReceivables.map((receivable) => (
-                              <TableRow key={receivable.id} className="cursor-pointer hover:bg-gray-100">
-                                <TableCell className="text-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedReceivableIds.includes(receivable.id)}
-                                    onChange={() => handleToggleReceivableSelection(receivable.id)}
-                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                  />
-                                </TableCell>
-                                <TableCell>{receivable.buyer_name}</TableCell>
-                                <TableCell>{formatCPF(receivable.buyer_cpf)}</TableCell>
-                                <TableCell>{formatCurrency(receivable.amount)}</TableCell>
-                                <TableCell>{formatDate(receivable.due_date)}</TableCell>
-                                <TableCell>{receivable.status}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                      
-                      <div className="mt-2 text-sm text-gray-500">
-                        {selectedReceivableIds.length} recebíveis selecionados
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center py-6">
-                      <p className="text-gray-500">Não foram encontrados recebíveis elegíveis para vincular a esta parcela.</p>
-                    </div>
-                  )}
-                </>
-              )}
-              
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsAddBillingReceivablesOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  disabled={selectedReceivableIds.length === 0 || updatingBillingReceivables}
-                  onClick={handleSaveBillingReceivables}
-                >
-                  {updatingBillingReceivables ? (
-                    <>
-                      <Loader className="mr-2 h-4 w-4 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    'Adicionar Recebíveis'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+      {/* Billing Receivables Dialog */}
+      {selectedInstallment && (
+        <ReceivablesDialog 
+          installmentId={selectedInstallment.id}
+          installmentNumber={selectedInstallment.numero_parcela}
+          dueDate={selectedInstallment.data_vencimento}
+          open={showBillingDialog}
+          onOpenChange={setShowBillingDialog}
+        />
+      )}
 
-          <Dialog open={isAdjustmentDialogOpen} onOpenChange={setIsAdjustmentDialogOpen}>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Configurar Reajuste</DialogTitle>
-                <DialogDescription>
-                  Configure as opções de reajuste para este plano de pagamento.
-                </DialogDescription>
-              </DialogHeader>
-              
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleAdjustmentSave)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="indexId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Índice para Reajuste</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione um índice" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="z-50 pointer-events-auto">
-                            <SelectItem value="none">Nenhum</SelectItem>
-                            {indexes.map((index) => (
-                              <SelectItem key={index.id} value={index.id}>
-                                {index.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="adjustmentBaseDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Data Base para Reajuste</FormLabel>
-                        <FormControl>
-                          <div className="flex gap-2 items-center">
-                            <Input
-                              type="date"
-                              value={field.value ? field.value : ""}
-                              onChange={(e) => field.onChange(e.target.value)}
-                              className="w-full"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <DialogFooter>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setIsAdjustmentDialogOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button 
-                      type="submit" 
-                      disabled={updatingAdjustment}
-                    >
-                      {updatingAdjustment ? (
-                        <>
-                          <Loader className="mr-2 h-4 w-4 animate-spin" />
-                          Salvando...
-                        </>
-                      ) : 'Salvar'}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      ) : (
-        <div className="flex justify-center my-10">
-          <div className="text-center">
-            <p className="text-gray-500 mb-4">Plano de pagamento não encontrado.</p>
-            <Button onClick={() => navigate('/admin/payment-plans')}>
-              Voltar para a lista
+      {/* Edit Index Dialog */}
+      <Dialog open={showEditIndexDialog} onOpenChange={setShowEditIndexDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configurar Reajuste</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Índice de Reajuste</label>
+              <Select value={indexId || 'none'} onValueChange={setIndexId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um índice" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {indexes?.map(index => (
+                    <SelectItem key={index.id} value={index.id}>{index.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data Base para Reajuste</label>
+              <Input 
+                type="date" 
+                value={adjustmentBaseDate || ''} 
+                onChange={(e) => setAdjustmentBaseDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button 
+              onClick={handleSaveIndexChanges}
+              disabled={updatePaymentPlanSettings.isPending}
+            >
+              {updatePaymentPlanSettings.isPending ? 'Salvando...' : 'Salvar'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+// Receivables Dialog Component
+const ReceivablesDialog = ({ installmentId, installmentNumber, dueDate, open, onOpenChange }) => {
+  // Fetch receivables for this installment
+  const { data: receivables, isLoading, error } = useQuery({
+    queryKey: ['installmentReceivables', installmentId],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
+        body: { action: 'getInstallmentReceivables', installmentId },
+      });
+      
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    enabled: !!installmentId && open,
+  });
+
+  if (isLoading) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Recebíveis da Parcela {installmentNumber}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">Carregando...</div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (error) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Recebíveis da Parcela {installmentNumber}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-red-500">Erro: {error.message}</div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Format the installment due date
+  const formattedDueDate = dueDate ? format(new Date(dueDate), 'dd MMMM yyyy', { locale: ptBR }) : '';
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Recebíveis da Parcela {installmentNumber} - Vencimento: {formattedDueDate}</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6 py-4">
+          {/* PMT Receivables */}
+          <div>
+            <h3 className="text-lg font-medium mb-2">Recebíveis PMT</h3>
+            {receivables?.pmtReceivables && receivables.pmtReceivables.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Comprador</TableHead>
+                    <TableHead>CPF</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {receivables.pmtReceivables.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{item.receivables.buyer_name}</TableCell>
+                      <TableCell>{item.receivables.buyer_cpf}</TableCell>
+                      <TableCell>{format(new Date(item.receivables.due_date), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.receivables.amount)}</TableCell>
+                      <TableCell>
+                        <Badge>{item.receivables.status}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-gray-500">Nenhum recebível PMT encontrado.</p>
+            )}
+          </div>
+
+          {/* Billing Receivables */}
+          <div>
+            <h3 className="text-lg font-medium mb-2">Recebíveis de Faturamento</h3>
+            {receivables?.billingReceivables && receivables.billingReceivables.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Comprador</TableHead>
+                    <TableHead>CPF</TableHead>
+                    <TableHead>Vencimento Original</TableHead>
+                    <TableHead>Nova Data Vencimento</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {receivables.billingReceivables.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{item.receivables.buyer_name}</TableCell>
+                      <TableCell>{item.receivables.buyer_cpf}</TableCell>
+                      <TableCell>{format(new Date(item.receivables.due_date), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell>
+                        {item.nova_data_vencimento 
+                          ? format(new Date(item.nova_data_vencimento), 'dd/MM/yyyy')
+                          : format(new Date(item.receivables.due_date), 'dd/MM/yyyy')}
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.receivables.amount)}</TableCell>
+                      <TableCell>
+                        <Badge>{item.receivables.status}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-gray-500">Nenhum recebível de faturamento encontrado.</p>
+            )}
           </div>
         </div>
-      )}
-    </AdminDashboardLayout>
+      </DialogContent>
+    </Dialog>
   );
 };
 
