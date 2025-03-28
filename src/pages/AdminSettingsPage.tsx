@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -260,6 +261,8 @@ const indexUpdateSchema = z.object({
   }).min(0, "O valor deve ser maior ou igual a 0"),
 });
 
+type IndexUpdateFormValues = z.infer<typeof indexUpdateSchema>;
+
 // Index Update Dialog Component
 const IndexUpdateDialog = ({ 
   isOpen, 
@@ -271,7 +274,7 @@ const IndexUpdateDialog = ({
   const queryClient = useQueryClient();
   const { getAuthHeader } = useAuth();
 
-  const form = useForm({
+  const form = useForm<IndexUpdateFormValues>({
     resolver: zodResolver(indexUpdateSchema),
     defaultValues: {
       indexId: initialIndexId || "",
@@ -291,7 +294,7 @@ const IndexUpdateDialog = ({
   }, [isOpen, initialIndexId, currentUpdate, form]);
 
   const createMutation = useMutation({
-    mutationFn: async (values) => {
+    mutationFn: async (values: IndexUpdateFormValues) => {
       const { data, error } = await supabase.functions.invoke("indexes-management", {
         body: { 
           action: "createIndexUpdate",
@@ -325,7 +328,7 @@ const IndexUpdateDialog = ({
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (values) => {
+    mutationFn: async (values: IndexUpdateFormValues) => {
       const { data, error } = await supabase.functions.invoke("indexes-management", {
         body: { 
           action: "updateIndexUpdate",
@@ -357,7 +360,7 @@ const IndexUpdateDialog = ({
     },
   });
 
-  const onSubmit = (values) => {
+  const onSubmit = (values: IndexUpdateFormValues) => {
     if (currentUpdate) {
       updateMutation.mutate(values);
     } else {

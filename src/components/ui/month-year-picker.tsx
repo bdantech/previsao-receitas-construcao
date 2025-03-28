@@ -24,6 +24,7 @@ interface MonthYearPickerProps {
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 export function MonthYearPicker({
@@ -31,6 +32,7 @@ export function MonthYearPicker({
   onChange,
   className,
   placeholder = "Selecione um mês/ano",
+  disabled = false,
 }: MonthYearPickerProps) {
   // Parse the initial value or use current date
   const initialDate = value 
@@ -82,6 +84,7 @@ export function MonthYearPicker({
             !value && "text-muted-foreground",
             className
           )}
+          disabled={disabled}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {value ? (
@@ -99,6 +102,7 @@ export function MonthYearPicker({
               <Select
                 value={date.getMonth().toString()}
                 onValueChange={handleMonthChange}
+                disabled={disabled}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Mês" />
@@ -119,6 +123,7 @@ export function MonthYearPicker({
               <Select
                 value={date.getFullYear().toString()}
                 onValueChange={handleYearChange}
+                disabled={disabled}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Ano" />
