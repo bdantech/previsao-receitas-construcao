@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -690,7 +691,13 @@ const AdminPaymentPlanDetailPage = () => {
     try {
       setUpdatingAdjustment(true);
       
-      const { data: response, error } = await supabase.functions.invoke('company-payment-plans', {
+      console.log("Updating payment plan settings with:", {
+        paymentPlanId,
+        indexId: data.indexId === 'none' ? null : data.indexId,
+        adjustmentBaseDate: data.adjustmentBaseDate || null
+      });
+      
+      const { data: response, error } = await supabase.functions.invoke('admin-payment-plans', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session?.access_token}`
@@ -698,7 +705,7 @@ const AdminPaymentPlanDetailPage = () => {
         body: {
           action: 'updatePaymentPlanSettings',
           paymentPlanId,
-          indexId: data.indexId || null,
+          indexId: data.indexId === 'none' ? null : data.indexId,
           adjustmentBaseDate: data.adjustmentBaseDate || null
         }
       });

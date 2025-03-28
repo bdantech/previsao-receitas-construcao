@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -856,6 +855,39 @@ serve(async (req) => {
         }
 
         responseData = { success: true }
+        break
+      }
+
+      case 'updatePaymentPlanSettings': {
+        const { paymentPlanId, indexId, adjustmentBaseDate } = data
+        
+        if (!paymentPlanId) {
+          throw new Error('Missing required payment plan ID')
+        }
+        
+        console.log(`Updating payment plan settings for ID: ${paymentPlanId}`, { 
+          indexId: indexId || 'null', 
+          adjustmentBaseDate: adjustmentBaseDate || 'null' 
+        })
+
+        // Update payment plan settings
+        const { data: updatedSettings, error: updateError } = await supabase
+          .from('payment_plan_settings')
+          .update({
+            index_id: indexId,
+            adjustment_base_date: adjustmentBaseDate
+          })
+          .eq('id', paymentPlanId)
+          .select('*')
+          .single()
+
+        if (updateError) {
+          console.error("Error updating payment plan settings:", updateError)
+          throw new Error(`Error updating payment plan settings: ${updateError.message}`)
+        }
+
+        console.log("Successfully updated payment plan settings:", updatedSettings)
+        responseData = updatedSettings
         break
       }
 
