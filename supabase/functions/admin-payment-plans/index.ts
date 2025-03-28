@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -220,12 +221,10 @@ serve(async (req) => {
 
       case 'getPaymentPlanDetails': {
         const { paymentPlanId } = data
-      
+        
         if (!paymentPlanId) {
           throw new Error('Missing payment plan ID')
         }
-
-        console.log(`Fetching payment plan details for ID: ${paymentPlanId}`);
 
         // Get payment plan details with installments
         const { data: paymentPlan, error: ppError } = await supabase
@@ -236,8 +235,6 @@ serve(async (req) => {
             teto_fundo_reserva,
             anticipation_request_id,
             project_id,
-            index_id,
-            adjustment_base_date,
             created_at,
             updated_at,
             anticipation_requests (
@@ -264,11 +261,9 @@ serve(async (req) => {
           .single()
 
         if (ppError) {
-          console.error(`Error getting payment plan details: ${ppError.message}`, ppError);
           throw new Error(`Error getting payment plan details: ${ppError.message}`)
         }
 
-        console.log(`Successfully retrieved payment plan: ${paymentPlan ? 'yes' : 'no'}`);
         responseData = paymentPlan
         break
       }
@@ -861,38 +856,6 @@ serve(async (req) => {
         }
 
         responseData = { success: true }
-        break
-      }
-
-      case 'updatePaymentPlanSettings': {
-        const { paymentPlanId, indexId, adjustmentBaseDate } = data
-      
-        if (!paymentPlanId) {
-          throw new Error('Missing payment plan ID')
-        }
-
-        console.log(`Updating payment plan settings for ID: ${paymentPlanId}`, {
-          indexId,
-          adjustmentBaseDate
-        });
-
-        // Update payment plan settings
-        const { data: updatedSettings, error: updateError } = await supabase
-          .from('payment_plan_settings')
-          .update({ 
-            index_id: indexId === 'none' ? null : indexId,
-            adjustment_base_date: adjustmentBaseDate
-          })
-          .eq('id', paymentPlanId)
-          .select('*')
-
-        if (updateError) {
-          console.error(`Error updating payment plan settings: ${updateError.message}`, updateError);
-          throw new Error(`Error updating payment plan settings: ${updateError.message}`)
-        }
-
-        console.log(`Successfully updated payment plan settings`);
-        responseData = updatedSettings
         break
       }
 
