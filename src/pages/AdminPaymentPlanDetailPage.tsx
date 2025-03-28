@@ -186,6 +186,11 @@ const AdminPaymentPlanDetailPage = () => {
 
   useEffect(() => {
     if (paymentPlan) {
+      console.log("Setting form values from payment plan:", {
+        indexId: paymentPlan.index_id || '',
+        adjustmentBaseDate: paymentPlan.adjustment_base_date || ''
+      });
+      
       form.reset({
         indexId: paymentPlan.index_id || '',
         adjustmentBaseDate: paymentPlan.adjustment_base_date || ''
@@ -234,6 +239,7 @@ const AdminPaymentPlanDetailPage = () => {
       }
       
       if (data?.indexes) {
+        console.log("Indexes loaded:", data.indexes);
         setIndexes(data.indexes);
       }
     } catch (error) {
@@ -251,6 +257,8 @@ const AdminPaymentPlanDetailPage = () => {
     
     try {
       setLoading(true);
+      
+      console.log(`Fetching payment plan details for ID: ${paymentPlanId}`);
       
       const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
         method: 'POST',
@@ -282,6 +290,8 @@ const AdminPaymentPlanDetailPage = () => {
         });
         return;
       }
+      
+      console.log("Payment plan details loaded:", data.data);
       
       if (data.data.payment_plan_installments) {
         data.data.payment_plan_installments.sort((a, b) => a.numero_parcela - b.numero_parcela);
