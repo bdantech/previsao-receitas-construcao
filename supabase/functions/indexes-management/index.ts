@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -241,8 +240,14 @@ serve(async (req) => {
             throw new Error("Invalid date format");
           }
 
-          // Create a date object for the first day of the month
-          const referenceDate = new Date(year, month - 1, 1); // Month is 0-based in JS Date
+          // Create a valid date object for the first day of the month
+          // Using UTC to avoid timezone issues
+          const referenceDate = new Date(Date.UTC(year, month - 1, 1));
+          
+          // Validate that the date is valid before proceeding
+          if (isNaN(referenceDate.getTime())) {
+            throw new Error("Invalid date created");
+          }
           
           console.log('Creating index update:', {
             index_id: data.indexId,

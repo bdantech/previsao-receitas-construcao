@@ -94,7 +94,7 @@ export function MonthYearPicker({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0 z-50 pointer-events-auto" align="start">
         <div className="p-4 flex flex-col space-y-4">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
@@ -107,7 +107,7 @@ export function MonthYearPicker({
                 <SelectTrigger>
                   <SelectValue placeholder="Mês" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-50 pointer-events-auto">
                   {months.map((month) => (
                     <SelectItem key={month} value={month.toString()}>
                       {format(new Date(2000, month, 1), "MMMM", { 
@@ -128,7 +128,7 @@ export function MonthYearPicker({
                 <SelectTrigger>
                   <SelectValue placeholder="Ano" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-50 pointer-events-auto">
                   {years.map((year) => (
                     <SelectItem key={year} value={year.toString()}>
                       {year}

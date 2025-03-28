@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -21,7 +20,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
-// Helper function to format reference month
 const formatReferenceMonth = (dateString: string) => {
   try {
     return format(new Date(dateString), "MMMM yyyy");
@@ -31,7 +29,6 @@ const formatReferenceMonth = (dateString: string) => {
   }
 };
 
-// Indices List Component
 const IndicesList = () => {
   const { getAuthHeader } = useAuth();
   const { data: indexes, isLoading } = useQuery({
@@ -85,7 +82,6 @@ const IndicesList = () => {
   );
 };
 
-// Calculator component for compound adjustments
 const IndexCalculator = () => {
   const { getAuthHeader } = useAuth();
   const [startDate, setStartDate] = React.useState("");
@@ -248,7 +244,6 @@ const IndexCalculator = () => {
   );
 };
 
-// Index Update Form Schema
 const indexUpdateSchema = z.object({
   indexId: z.string({
     required_error: "Selecione um índice",
@@ -256,15 +251,12 @@ const indexUpdateSchema = z.object({
   referenceMonth: z.string({
     required_error: "Informe o mês de referência",
   }).refine(value => {
-    // Validate the date format (YYYY-MM)
     if (!value) return false;
     const pattern = /^\d{4}-\d{2}$/;
     if (!pattern.test(value)) return false;
     
-    // Extract year and month
     const [year, month] = value.split('-').map(Number);
     
-    // Check if valid date (month between 1-12)
     return !isNaN(year) && !isNaN(month) && month >= 1 && month <= 12;
   }, {
     message: "Formato de data inválido. Utilize o formato AAAA-MM.",
@@ -276,7 +268,6 @@ const indexUpdateSchema = z.object({
 
 type IndexUpdateFormValues = z.infer<typeof indexUpdateSchema>;
 
-// Index Update Dialog Component
 const IndexUpdateDialog = ({ 
   isOpen, 
   onClose, 
@@ -385,7 +376,7 @@ const IndexUpdateDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] z-50">
         <DialogHeader>
           <DialogTitle>{currentUpdate ? "Editar Atualização" : "Nova Atualização"}</DialogTitle>
         </DialogHeader>
@@ -407,7 +398,7 @@ const IndexUpdateDialog = ({
                         <SelectValue placeholder="Selecione um índice" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="z-50 pointer-events-auto">
                       {allIndexes.map((index) => (
                         <SelectItem key={index.id} value={index.id}>
                           {index.name}
@@ -469,7 +460,6 @@ const IndexUpdateDialog = ({
   );
 };
 
-// Atualizações component
 const UpdatesManagement = () => {
   const { getAuthHeader } = useAuth();
   const queryClient = useQueryClient();
@@ -671,7 +661,6 @@ const UpdatesManagement = () => {
   );
 };
 
-// Main page component
 const AdminSettingsPage = () => {
   return (
     <AdminDashboardLayout>
