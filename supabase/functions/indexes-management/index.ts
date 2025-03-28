@@ -345,6 +345,28 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         )
 
+      // ===== Payment Plan Index Operations =====
+      case 'getIndexesForSelect':
+        // Both admin and company users can read indexes for select dropdowns
+        console.log('Getting indexes for select dropdown')
+        const { data: indexesForSelect, error: indexesSelectError } = await supabase
+          .from('indexes')
+          .select('id, name')
+          .order('name')
+
+        if (indexesSelectError) {
+          console.error('Error fetching indexes for select:', indexesSelectError)
+          return new Response(
+            JSON.stringify({ error: 'Error fetching indexes for select' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+          )
+        }
+
+        return new Response(
+          JSON.stringify({ indexes: indexesForSelect }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        )
+
       // ===== Calculation =====
       case 'calculateCompoundAdjustment':
         // Both admin and company users can calculate compound adjustments

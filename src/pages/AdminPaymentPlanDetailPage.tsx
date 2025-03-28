@@ -32,8 +32,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Loader, ArrowLeft, Trash2, Plus, X, Check } from "lucide-react";
-import { format } from "date-fns";
+import { Loader, ArrowLeft, Trash2, Plus, X, Check, Calendar, Edit } from "lucide-react";
+import { format, parse } from "date-fns";
 import {
   Table,
   TableBody,
@@ -43,6 +43,25 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCPF, formatCurrency } from "@/lib/formatters";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { Input } from "@/components/ui/input";
+import { ptBR } from "date-fns/locale";
 
 interface PaymentPlan {
   id: string;
@@ -52,6 +71,8 @@ interface PaymentPlan {
   project_id: string;
   created_at: string;
   updated_at: string;
+  index_id?: string;
+  adjustment_base_date?: string;
   anticipation_requests: {
     valor_total: number;
     valor_liquido: number;
@@ -109,6 +130,16 @@ interface ReceivableSummary {
   difference: number;
 }
 
+interface Index {
+  id: string;
+  name: string;
+}
+
+interface AdjustmentFormValues {
+  indexId: string;
+  adjustmentBaseDate: string;
+}
+
 const AdminPaymentPlanDetailPage = () => {
   const { paymentPlanId } = useParams();
   const { session, userRole } = useAuth();
@@ -123,6 +154,7 @@ const AdminPaymentPlanDetailPage = () => {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isReceivablesDialogOpen, setIsReceivablesDialogOpen] = useState(false);
   const [isAddBillingReceivablesOpen, setIsAddBillingReceivablesOpen] = useState(false);
+  const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
   const [deletingPlan, setDeletingPlan] = useState(false);
   const [eligibleReceivables, setEligibleReceivables] = useState<Receivable[]>([]);
   const [selectedReceivableIds, setSelectedReceivableIds] = useState<string[]>([]);
@@ -134,12 +166,31 @@ const AdminPaymentPlanDetailPage = () => {
     installmentAmount: 0,
     difference: 0
   });
+  const [indexes, setIndexes] = useState<Index[]>([]);
+  const [updatingAdjustment, setUpdatingAdjustment] = useState(false);
+  
+  const form = useForm<AdjustmentFormValues>({
+    defaultValues: {
+      indexId: '',
+      adjustmentBaseDate: ''
+    }
+  });
 
   useEffect(() => {
     if (session && userRole === 'admin' && paymentPlanId) {
       fetchPaymentPlanDetails();
+      fetchIndexes();
     }
   }, [session, userRole, paymentPlanId]);
+
+  useEffect(() => {
+    if (paymentPlan) {
+      form.reset({
+        indexId: paymentPlan.index_id || '',
+        adjustmentBaseDate: paymentPlan.adjustment_base_date || ''
+      });
+    }
+  }, [paymentPlan, form]);
 
   useEffect(() => {
     if (eligibleReceivables.length > 0 && selectedInstallment) {
@@ -156,6 +207,43 @@ const AdminPaymentPlanDetailPage = () => {
       });
     }
   }, [selectedReceivableIds, eligibleReceivables, selectedInstallment]);
+
+  const fetchIndexes = async () => {
+    if (!session) return;
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('indexes-management', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          action: 'getIndexesForSelect'
+        }
+      });
+      
+      if (error) {
+        console.error("Error fetching indexes:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível carregar os índices."
+        });
+        return;
+      }
+      
+      if (data?.indexes) {
+        setIndexes(data.indexes);
+      }
+    } catch (error) {
+      console.error("Exception fetching indexes:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao carregar índices."
+      });
+    }
+  };
 
   const fetchPaymentPlanDetails = async () => {
     if (!session || !paymentPlanId) return;
@@ -591,6 +679,59 @@ const AdminPaymentPlanDetailPage = () => {
     return format(new Date(dateString), 'dd/MM/yyyy');
   };
 
+  const getIndexName = (indexId: string) => {
+    const index = indexes.find(idx => idx.id === indexId);
+    return index ? index.name : 'Não definido';
+  };
+
+  const handleAdjustmentSave = async (data: AdjustmentFormValues) => {
+    if (!paymentPlanId) return;
+    
+    try {
+      setUpdatingAdjustment(true);
+      
+      const { data: response, error } = await supabase.functions.invoke('company-payment-plans', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: {
+          action: 'updatePaymentPlanSettings',
+          paymentPlanId,
+          indexId: data.indexId || null,
+          adjustmentBaseDate: data.adjustmentBaseDate || null
+        }
+      });
+      
+      if (error) {
+        console.error("Error updating payment plan settings:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível atualizar as configurações de reajuste."
+        });
+        return;
+      }
+      
+      toast({
+        title: "Sucesso",
+        description: "Configurações de reajuste atualizadas com sucesso."
+      });
+      
+      await fetchPaymentPlanDetails();
+      setIsAdjustmentDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating payment plan settings:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao atualizar configurações de reajuste."
+      });
+    } finally {
+      setUpdatingAdjustment(false);
+    }
+  };
+
   return (
     <AdminDashboardLayout>
       <div className="flex justify-between items-center mb-6">
@@ -651,10 +792,23 @@ const AdminPaymentPlanDetailPage = () => {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Informações do Plano</CardTitle>
-              <CardDescription>
-                Detalhes gerais do plano de pagamento
-              </CardDescription>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>Informações do Plano</CardTitle>
+                  <CardDescription>
+                    Detalhes gerais do plano de pagamento
+                  </CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="flex items-center gap-1"
+                  onClick={() => setIsAdjustmentDialogOpen(true)}
+                >
+                  <Edit className="h-4 w-4" />
+                  Configurar Reajuste
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -681,6 +835,20 @@ const AdminPaymentPlanDetailPage = () => {
                 <div>
                   <h4 className="text-sm font-medium text-gray-500">Criado em</h4>
                   <p className="mt-1 text-lg">{formatDate(paymentPlan.created_at)}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500">Índice para Reajuste</h4>
+                  <p className="mt-1 text-lg">
+                    {paymentPlan.index_id ? getIndexName(paymentPlan.index_id) : 'Não definido'}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500">Data Base para Reajuste</h4>
+                  <p className="mt-1 text-lg">
+                    {paymentPlan.adjustment_base_date 
+                      ? formatDate(paymentPlan.adjustment_base_date) 
+                      : 'Não definida'}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -985,6 +1153,92 @@ const AdminPaymentPlanDetailPage = () => {
                   )}
                 </Button>
               </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isAdjustmentDialogOpen} onOpenChange={setIsAdjustmentDialogOpen}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Configurar Reajuste</DialogTitle>
+                <DialogDescription>
+                  Configure as opções de reajuste para este plano de pagamento.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleAdjustmentSave)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="indexId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Índice para Reajuste</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione um índice" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="z-50 pointer-events-auto">
+                            <SelectItem value="">Nenhum</SelectItem>
+                            {indexes.map((index) => (
+                              <SelectItem key={index.id} value={index.id}>
+                                {index.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="adjustmentBaseDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data Base para Reajuste</FormLabel>
+                        <FormControl>
+                          <div className="flex gap-2 items-center">
+                            <Input
+                              type="date"
+                              value={field.value ? field.value : ""}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              className="w-full"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <DialogFooter>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsAdjustmentDialogOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={updatingAdjustment}
+                    >
+                      {updatingAdjustment ? (
+                        <>
+                          <Loader className="mr-2 h-4 w-4 animate-spin" />
+                          Salvando...
+                        </>
+                      ) : 'Salvar'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
             </DialogContent>
           </Dialog>
         </div>

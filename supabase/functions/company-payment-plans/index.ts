@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -456,6 +455,66 @@ serve(async (req) => {
           newTotal: totalAmount,
           updatedInstallment: updatedInstallment ? updatedInstallment[0] : null
         }
+        break
+      }
+      
+      case 'updatePaymentPlanSettings': {
+        const { paymentPlanId, indexId, adjustmentBaseDate } = data
+        
+        if (!paymentPlanId) {
+          throw new Error('Missing payment plan ID')
+        }
+        
+        // First verify this payment plan belongs to the company
+        const { data: planCheck, error: planCheckError } = await supabase
+          .from('payment_plan_settings')
+          .select(`
+            projects!inner (
+              company_id
+            )
+          `)
+          .eq('id', paymentPlanId)
+          .single()
+        
+        if (planCheckError) {
+          throw new Error(`Error checking payment plan: ${planCheckError.message}`)
+        }
+        
+        if (planCheck.projects.company_id !== companyId) {
+          return new Response(
+            JSON.stringify({ error: 'Unauthorized to access this payment plan' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 403 
+            }
+          )
+        }
+        
+        // Update payment plan settings
+        let updateData = {}
+        
+        // Only include fields that are provided
+        if (indexId !== undefined) {
+          updateData.index_id = indexId
+        }
+        
+        if (adjustmentBaseDate !== undefined) {
+          updateData.adjustment_base_date = adjustmentBaseDate
+        }
+        
+        // Update the payment plan settings
+        const { data: updatedPlan, error: updateError } = await supabase
+          .from('payment_plan_settings')
+          .update(updateData)
+          .eq('id', paymentPlanId)
+          .select('*')
+          .single()
+        
+        if (updateError) {
+          throw new Error(`Error updating payment plan settings: ${updateError.message}`)
+        }
+        
+        responseData = updatedPlan
         break
       }
       

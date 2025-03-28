@@ -520,28 +520,34 @@ export type Database = {
       }
       payment_plan_settings: {
         Row: {
+          adjustment_base_date: string | null
           anticipation_request_id: string
           created_at: string
           dia_cobranca: number
           id: string
+          index_id: string | null
           project_id: string
           teto_fundo_reserva: number
           updated_at: string
         }
         Insert: {
+          adjustment_base_date?: string | null
           anticipation_request_id: string
           created_at?: string
           dia_cobranca: number
           id?: string
+          index_id?: string | null
           project_id: string
           teto_fundo_reserva: number
           updated_at?: string
         }
         Update: {
+          adjustment_base_date?: string | null
           anticipation_request_id?: string
           created_at?: string
           dia_cobranca?: number
           id?: string
+          index_id?: string | null
           project_id?: string
           teto_fundo_reserva?: number
           updated_at?: string
@@ -552,6 +558,13 @@ export type Database = {
             columns: ["anticipation_request_id"]
             isOneToOne: false
             referencedRelation: "anticipation_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_plan_settings_index_id_fkey"
+            columns: ["index_id"]
+            isOneToOne: false
+            referencedRelation: "indexes"
             referencedColumns: ["id"]
           },
           {
