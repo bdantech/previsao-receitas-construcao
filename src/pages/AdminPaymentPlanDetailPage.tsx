@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,7 +32,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Loader, ArrowLeft, Trash2, Plus, X } from "lucide-react";
+import { Loader, ArrowLeft, Trash2, Plus, X, Check } from "lucide-react";
 import { format } from "date-fns";
 import {
   Table,
@@ -43,6 +42,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatCPF, formatCurrency } from "@/lib/formatters";
 
 interface PaymentPlan {
   id: string;
@@ -103,6 +103,12 @@ interface ReceivableMap {
   billing: BillingReceivable[];
 }
 
+interface ReceivableSummary {
+  totalSelected: number;
+  installmentAmount: number;
+  difference: number;
+}
+
 const AdminPaymentPlanDetailPage = () => {
   const { paymentPlanId } = useParams();
   const { session, userRole } = useAuth();
@@ -123,12 +129,33 @@ const AdminPaymentPlanDetailPage = () => {
   const [loadingEligibleReceivables, setLoadingEligibleReceivables] = useState(false);
   const [updatingBillingReceivables, setUpdatingBillingReceivables] = useState(false);
   const [removingBillingReceivable, setRemovingBillingReceivable] = useState<string | null>(null);
+  const [receivableSummary, setReceivableSummary] = useState<ReceivableSummary>({
+    totalSelected: 0,
+    installmentAmount: 0,
+    difference: 0
+  });
 
   useEffect(() => {
     if (session && userRole === 'admin' && paymentPlanId) {
       fetchPaymentPlanDetails();
     }
   }, [session, userRole, paymentPlanId]);
+
+  useEffect(() => {
+    if (eligibleReceivables.length > 0 && selectedInstallment) {
+      const totalSelected = eligibleReceivables
+        .filter(receivable => selectedReceivableIds.includes(receivable.id))
+        .reduce((sum, receivable) => sum + receivable.amount, 0);
+      
+      const installmentAmount = selectedInstallment ? selectedInstallment.recebiveis : 0;
+      
+      setReceivableSummary({
+        totalSelected,
+        installmentAmount,
+        difference: installmentAmount - totalSelected
+      });
+    }
+  }, [selectedReceivableIds, eligibleReceivables, selectedInstallment]);
 
   const fetchPaymentPlanDetails = async () => {
     if (!session || !paymentPlanId) return;
@@ -168,7 +195,6 @@ const AdminPaymentPlanDetailPage = () => {
       }
       
       if (data.data.payment_plan_installments) {
-        // Sort installments by numero_parcela
         data.data.payment_plan_installments.sort((a, b) => a.numero_parcela - b.numero_parcela);
       }
       
@@ -408,6 +434,14 @@ const AdminPaymentPlanDetailPage = () => {
     });
   };
 
+  const handleSelectAllReceivables = () => {
+    if (selectedReceivableIds.length === eligibleReceivables.length) {
+      setSelectedReceivableIds([]);
+    } else {
+      setSelectedReceivableIds(eligibleReceivables.map(receivable => receivable.id));
+    }
+  };
+
   const handleSaveBillingReceivables = async () => {
     if (!selectedInstallment) {
       toast({
@@ -551,13 +585,6 @@ const AdminPaymentPlanDetailPage = () => {
     } finally {
       setRemovingBillingReceivable(null);
     }
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
   };
 
   const formatDate = (dateString: string) => {
@@ -742,7 +769,7 @@ const AdminPaymentPlanDetailPage = () => {
                           {receivableMap.pmt.map((item) => (
                             <TableRow key={item.id}>
                               <TableCell>{item.receivables.buyer_name}</TableCell>
-                              <TableCell>{item.receivables.buyer_cpf}</TableCell>
+                              <TableCell>{formatCPF(item.receivables.buyer_cpf)}</TableCell>
                               <TableCell>{formatCurrency(item.receivables.amount)}</TableCell>
                               <TableCell>{formatDate(item.receivables.due_date)}</TableCell>
                               <TableCell>{item.receivables.status}</TableCell>
@@ -788,7 +815,7 @@ const AdminPaymentPlanDetailPage = () => {
                           {receivableMap.billing.map((item) => (
                             <TableRow key={item.id}>
                               <TableCell>{item.receivables.buyer_name}</TableCell>
-                              <TableCell>{item.receivables.buyer_cpf}</TableCell>
+                              <TableCell>{formatCPF(item.receivables.buyer_cpf)}</TableCell>
                               <TableCell>{formatCurrency(item.receivables.amount)}</TableCell>
                               <TableCell>{formatDate(item.receivables.due_date)}</TableCell>
                               <TableCell>
@@ -849,48 +876,91 @@ const AdminPaymentPlanDetailPage = () => {
               ) : (
                 <>
                   {eligibleReceivables.length > 0 ? (
-                    <div className="overflow-y-auto max-h-96 border rounded-md">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-12">Selecionar</TableHead>
-                            <TableHead>Comprador</TableHead>
-                            <TableHead>CPF</TableHead>
-                            <TableHead>Valor</TableHead>
-                            <TableHead>Vencimento</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {eligibleReceivables.map((receivable) => (
-                            <TableRow key={receivable.id} className="cursor-pointer hover:bg-gray-100">
-                              <TableCell className="text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedReceivableIds.includes(receivable.id)}
-                                  onChange={() => handleToggleReceivableSelection(receivable.id)}
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                              </TableCell>
-                              <TableCell>{receivable.buyer_name}</TableCell>
-                              <TableCell>{receivable.buyer_cpf}</TableCell>
-                              <TableCell>{formatCurrency(receivable.amount)}</TableCell>
-                              <TableCell>{formatDate(receivable.due_date)}</TableCell>
-                              <TableCell>{receivable.status}</TableCell>
+                    <>
+                      <div className="flex justify-between items-center mb-3">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={handleSelectAllReceivables}
+                          className="flex items-center gap-1"
+                        >
+                          <Check className="h-4 w-4" />
+                          {selectedReceivableIds.length === eligibleReceivables.length 
+                            ? "Desmarcar Todos" 
+                            : "Selecionar Todos"}
+                        </Button>
+                        
+                        <div className="flex gap-4 text-sm">
+                          <div>
+                            <span className="font-medium">Total Selecionado:</span>{" "}
+                            <span className={receivableSummary.totalSelected > 0 ? "text-green-600 font-medium" : "text-gray-500"}>
+                              {formatCurrency(receivableSummary.totalSelected)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Valor da Parcela:</span>{" "}
+                            <span className="text-blue-600 font-medium">
+                              {formatCurrency(receivableSummary.installmentAmount)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Diferença:</span>{" "}
+                            <span className={
+                              receivableSummary.difference === 0 
+                                ? "text-green-600 font-medium" 
+                                : receivableSummary.difference < 0 
+                                  ? "text-red-600 font-medium" 
+                                  : "text-yellow-600 font-medium"
+                            }>
+                              {formatCurrency(receivableSummary.difference)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="overflow-y-auto max-h-96 border rounded-md">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-12">Selecionar</TableHead>
+                              <TableHead>Comprador</TableHead>
+                              <TableHead>CPF</TableHead>
+                              <TableHead>Valor</TableHead>
+                              <TableHead>Vencimento</TableHead>
+                              <TableHead>Status</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          </TableHeader>
+                          <TableBody>
+                            {eligibleReceivables.map((receivable) => (
+                              <TableRow key={receivable.id} className="cursor-pointer hover:bg-gray-100">
+                                <TableCell className="text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedReceivableIds.includes(receivable.id)}
+                                    onChange={() => handleToggleReceivableSelection(receivable.id)}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                </TableCell>
+                                <TableCell>{receivable.buyer_name}</TableCell>
+                                <TableCell>{formatCPF(receivable.buyer_cpf)}</TableCell>
+                                <TableCell>{formatCurrency(receivable.amount)}</TableCell>
+                                <TableCell>{formatDate(receivable.due_date)}</TableCell>
+                                <TableCell>{receivable.status}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      
+                      <div className="mt-2 text-sm text-gray-500">
+                        {selectedReceivableIds.length} recebíveis selecionados
+                      </div>
+                    </>
                   ) : (
                     <div className="text-center py-6">
                       <p className="text-gray-500">Não foram encontrados recebíveis elegíveis para vincular a esta parcela.</p>
                     </div>
                   )}
-                  
-                  <div className="mt-2 text-sm text-gray-500">
-                    {selectedReceivableIds.length} recebíveis selecionados
-                  </div>
                 </>
               )}
               
