@@ -22,7 +22,6 @@ import ProjectDashboardPage from "./pages/ProjectDashboardPage";
 import CreateAnticipationForm from "./components/anticipations/CreateAnticipationForm";
 import AnticipationDetails from "./components/anticipations/AnticipationDetails";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import IntegrationsPage from "./pages/IntegrationsPage";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -36,39 +35,41 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/admin/auth" element={<AdminAuth />} />
-            
-            {/* Protected routes */}
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/project-dashboard/:projectId" element={<ProjectDashboardPage />} />
-            <Route path="/project-dashboard/:projectId/create-anticipation" element={<CreateAnticipationForm />} />
-            <Route path="/project-dashboard/:projectId/anticipation/:anticipationId" element={<AnticipationDetails />} />
-            <Route path="/company" element={<CompanyPage />} />
-            <Route path="/integrations" element={<IntegrationsPage />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
-            <Route path="/admin/buyers" element={<AdminBuyersPage />} />
-            <Route path="/admin/receivables" element={<AdminReceivablesPage />} />
-            <Route path="/admin/anticipations" element={<AdminAnticipationsPage />} />
-            <Route path="/admin/payment-plans" element={<AdminPaymentPlansPage />} />
-            <Route path="/admin/payment-plans/:paymentPlanId" element={<AdminPaymentPlanDetailPage />} />
-            <Route path="/admin/settings" element={<AdminSettingsPage />} />
-            
-            {/* 404 */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/admin/auth" element={<AdminAuth />} />
+              
+              {/* Protected routes */}
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/project-dashboard/:projectId" element={<ProjectDashboardPage />} />
+              <Route path="/project-dashboard/:projectId/create-anticipation" element={<CreateAnticipationForm />} />
+              <Route path="/project-dashboard/:projectId/anticipation/:anticipationId" element={<AnticipationDetails />} />
+              <Route path="/company" element={<CompanyPage />} />
+              <Route path="/integrations" element={<IntegrationsPage />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
+              <Route path="/admin/buyers" element={<AdminBuyersPage />} />
+              <Route path="/admin/receivables" element={<AdminReceivablesPage />} />
+              <Route path="/admin/anticipations" element={<AdminAnticipationsPage />} />
+              <Route path="/admin/payment-plans" element={<AdminPaymentPlansPage />} />
+              <Route path="/admin/payment-plans/:paymentPlanId" element={<AdminPaymentPlanDetailPage />} />
+              <Route path="/admin/settings" element={<AdminSettingsPage />} />
+              
+              {/* 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+          </AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </React.StrictMode>
   );
 }
 
