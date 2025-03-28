@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileText, RefreshCw } from "lucide-react";
 
 // Helper function to format reference month
 const formatReferenceMonth = (dateString: string) => {
@@ -21,6 +23,60 @@ const formatReferenceMonth = (dateString: string) => {
     console.error("Error formatting date:", error);
     return dateString;
   }
+};
+
+// Indices List Component
+const IndicesList = () => {
+  const { getAuthHeader } = useAuth();
+  const { data: indexes, isLoading } = useQuery({
+    queryKey: ["indexes"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("indexes-management", {
+        body: { action: "getIndexes" },
+        headers: getAuthHeader()
+      });
+      
+      if (error) throw new Error(error.message);
+      return data.indexes;
+    }
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Índices</h2>
+      </div>
+
+      <Card>
+        <CardContent className="p-6">
+          {isLoading ? (
+            <div className="py-4 text-center">Carregando índices...</div>
+          ) : indexes && indexes.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Tipo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {indexes.map((index: any) => (
+                  <TableRow key={index.id}>
+                    <TableCell className="font-medium">{index.name}</TableCell>
+                    <TableCell>{index.description || "-"}</TableCell>
+                    <TableCell>{index.type}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="py-4 text-center">Nenhum índice encontrado.</div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 };
 
 // Calculator component for compound adjustments
@@ -187,6 +243,29 @@ const IndexCalculator = () => {
   );
 };
 
+// Atualizações component
+const UpdatesManagement = () => {
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Atualizações</h2>
+      </div>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center py-6">
+            <p className="text-muted-foreground mb-4">Esta funcionalidade está em desenvolvimento.</p>
+            <Button variant="outline">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Verificar atualizações
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 // Main page component
 const AdminSettingsPage = () => {
   return (
@@ -197,7 +276,34 @@ const AdminSettingsPage = () => {
           <p className="text-muted-foreground mt-2">Gerencie índices e outras configurações do sistema</p>
         </div>
         
-        <IndexCalculator />
+        <Tabs defaultValue="calculator" className="space-y-6">
+          <TabsList className="grid grid-cols-3 w-full max-w-md">
+            <TabsTrigger value="calculator" className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              <span>Calculadora</span>
+            </TabsTrigger>
+            <TabsTrigger value="indexes" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span>Índices</span>
+            </TabsTrigger>
+            <TabsTrigger value="updates" className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              <span>Atualizações</span>
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="calculator">
+            <IndexCalculator />
+          </TabsContent>
+          
+          <TabsContent value="indexes">
+            <IndicesList />
+          </TabsContent>
+          
+          <TabsContent value="updates">
+            <UpdatesManagement />
+          </TabsContent>
+        </Tabs>
       </div>
     </AdminDashboardLayout>
   );
