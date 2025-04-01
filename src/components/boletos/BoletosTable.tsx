@@ -164,12 +164,12 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
         </div>
         <div className="min-w-[180px]">
           <label className="text-sm font-medium mb-1 block">Status de Emissão</label>
-          <Select value={filters.statusEmissao || ''} onValueChange={handleStatusEmissaoChange}>
+          <Select value={filters.statusEmissao || 'all'} onValueChange={handleStatusEmissaoChange}>
             <SelectTrigger>
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="Criado">Criado</SelectItem>
               <SelectItem value="Emitido">Emitido</SelectItem>
               <SelectItem value="Cancelado">Cancelado</SelectItem>
@@ -178,12 +178,12 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
         </div>
         <div className="min-w-[180px]">
           <label className="text-sm font-medium mb-1 block">Status de Pagamento</label>
-          <Select value={filters.statusPagamento || ''} onValueChange={handleStatusPagamentoChange}>
+          <Select value={filters.statusPagamento || 'all'} onValueChange={handleStatusPagamentoChange}>
             <SelectTrigger>
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="N/A">N/A</SelectItem>
               <SelectItem value="Pago">Pago</SelectItem>
               <SelectItem value="Em Aberto">Em Aberto</SelectItem>

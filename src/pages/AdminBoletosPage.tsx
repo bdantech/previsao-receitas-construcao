@@ -56,15 +56,27 @@ const AdminBoletosPage: React.FC = () => {
           .split('T')[0];
       }
 
+      // Prepare filters
+      const filterData = {
+        ...filters,
+        fromDate,
+        toDate,
+      };
+      
+      // Remove "all" values from filters before sending to API
+      if (filterData.statusEmissao === 'all') {
+        delete filterData.statusEmissao;
+      }
+      
+      if (filterData.statusPagamento === 'all') {
+        delete filterData.statusPagamento;
+      }
+
       const { data, error } = await supabase.functions.invoke("admin-boletos", {
         body: {
           action: "getBoletos",
           data: {
-            filters: {
-              ...filters,
-              fromDate,
-              toDate,
-            },
+            filters: filterData,
           },
         },
       });
