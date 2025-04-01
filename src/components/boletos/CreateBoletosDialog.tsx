@@ -72,6 +72,7 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
   const fetchAvailableBillingReceivables = async () => {
     setIsFetching(true);
     try {
+      console.log("Fetching available billing receivables...");
       const { data, error } = await supabase.functions.invoke("admin-boletos", {
         body: {
           action: "getAvailableBillingReceivables",
@@ -89,6 +90,8 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
         setBillingReceivables([]);
         return;
       }
+
+      console.log("Billing receivables response:", data);
 
       // Ensure we're setting an array even if the API returns a different format
       if (data && Array.isArray(data.billingReceivables)) {

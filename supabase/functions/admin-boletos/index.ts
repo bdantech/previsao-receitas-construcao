@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -249,63 +250,89 @@ async function handleGetBoletos(serviceClient, filters, corsHeaders) {
 }
 
 async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) {
-  // This query gets billing receivables that don't have associated boletos yet
+  console.log('Getting available billing receivables');
+  // Fix the query to simplify it and make it more reliable
   try {
-    const { data: availableReceivables, error } = await serviceClient.rpc(
-      'execute_sql',
-      {
-        query_text: `
-          SELECT 
-            br.id,
-            br.receivable_id,
-            br.installment_id,
-            br.nova_data_vencimento,
-            r.amount,
-            r.buyer_name,
-            r.buyer_cpf,
-            r.project_id,
-            p.name AS project_name,
-            p.cnpj AS project_cnpj,
-            p.company_id,
-            c.name AS company_name,
-            ppi.numero_parcela,
-            ppi.payment_plan_settings_id,
-            pps.index_id,
-            pps.adjustment_base_date,
-            i.name AS index_name
-          FROM 
-            billing_receivables br
-            JOIN receivables r ON br.receivable_id = r.id
-            JOIN projects p ON r.project_id = p.id
-            JOIN companies c ON p.company_id = c.id
-            JOIN payment_plan_installments ppi ON br.installment_id = ppi.id
-            JOIN payment_plan_settings pps ON ppi.payment_plan_settings_id = pps.id
-            LEFT JOIN indexes i ON pps.index_id = i.id
-          WHERE 
-            NOT EXISTS (
-              SELECT 1 FROM boletos b WHERE b.billing_receivable_id = br.id
+    // Using a simpler direct query for billing receivables without boletos
+    const { data, error } = await serviceClient
+      .from('billing_receivables')
+      .select(`
+        id,
+        nova_data_vencimento,
+        receivable_id,
+        installment_id,
+        receivables (
+          id,
+          amount,
+          buyer_name,
+          buyer_cpf,
+          due_date,
+          project_id
+        ),
+        payment_installments:installment_id (
+          id,
+          numero_parcela,
+          payment_plan_settings (
+            index_id,
+            adjustment_base_date,
+            project_id,
+            projects (
+              id,
+              name,
+              cnpj,
+              company_id,
+              companies (
+                id,
+                name
+              )
             )
-          ORDER BY 
-            br.nova_data_vencimento ASC
-        `,
-        params: {}
-      }
-    )
+          )
+        )
+      `)
+      .filter('id', 'not.in', `(
+        select billing_receivable_id from boletos where billing_receivable_id is not null
+      )`)
+      .order('nova_data_vencimento', { ascending: true })
+      .limit(100);
 
     if (error) {
-      console.error('Error fetching available billing receivables:', error)
-      throw error
+      console.error('Error fetching available billing receivables:', error);
+      throw error;
     }
 
-    // Ensure we're returning an array
-    const resultArray = Array.isArray(availableReceivables) ? availableReceivables : [];
+    // Transform the data into the expected format
+    const transformedData = (data || []).map(br => {
+      // Extract project and company info
+      const projectId = br.receivables?.project_id || br.payment_installments?.payment_plan_settings?.project_id;
+      const projectName = br.payment_installments?.payment_plan_settings?.projects?.name || 'Unknown Project';
+      const projectCnpj = br.payment_installments?.payment_plan_settings?.projects?.cnpj || '';
+      const companyId = br.payment_installments?.payment_plan_settings?.projects?.company_id || '';
+      const companyName = br.payment_installments?.payment_plan_settings?.projects?.companies?.name || 'Unknown Company';
+      
+      return {
+        id: br.id,
+        nova_data_vencimento: br.nova_data_vencimento,
+        amount: br.receivables?.amount || 0,
+        buyer_name: br.receivables?.buyer_name || '',
+        buyer_cpf: br.receivables?.buyer_cpf || '',
+        project_id: projectId,
+        project_name: projectName,
+        project_cnpj: projectCnpj,
+        company_id: companyId,
+        company_name: companyName,
+        numero_parcela: br.payment_installments?.numero_parcela || 0,
+        index_id: br.payment_installments?.payment_plan_settings?.index_id || null,
+        adjustment_base_date: br.payment_installments?.payment_plan_settings?.adjustment_base_date || null
+      };
+    });
     
-    console.log(`Found ${resultArray.length} available billing receivables`);
+    const resultCount = transformedData.length;
+    console.log(`Found ${resultCount} available billing receivables`);
 
     return new Response(
       JSON.stringify({ 
-        billingReceivables: resultArray,
-        count: resultArray.length
+        billingReceivables: transformedData,
+        count: resultCount
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
