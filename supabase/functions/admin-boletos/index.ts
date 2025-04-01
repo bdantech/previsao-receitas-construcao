@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -251,10 +250,25 @@ async function handleGetBoletos(serviceClient, filters, corsHeaders) {
 
 async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) {
   console.log('Getting available billing receivables');
-  // Fix the query to simplify it and make it more reliable
+  
   try {
-    // Using a simpler direct query for billing receivables without boletos
-    const { data, error } = await serviceClient
+    // First, get all the billing_receivable_ids that already have boletos
+    const { data: existingBoletoReceipts, error: existingError } = await serviceClient
+      .from('boletos')
+      .select('billing_receivable_id')
+      .not('billing_receivable_id', 'is', null);
+    
+    if (existingError) {
+      console.error('Error fetching existing boleto receipts:', existingError);
+      throw existingError;
+    }
+    
+    // Extract the IDs to an array
+    const existingIds = existingBoletoReceipts.map(b => b.billing_receivable_id);
+    console.log(`Found ${existingIds.length} existing boleto receipts to exclude`);
+    
+    // Now get all billing receivables that don't have boletos yet
+    let query = serviceClient
       .from('billing_receivables')
       .select(`
         id,
@@ -289,16 +303,21 @@ async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) 
           )
         )
       `)
-      .filter('id', 'not.in', `(
-        select billing_receivable_id from boletos where billing_receivable_id is not null
-      )`)
-      .order('nova_data_vencimento', { ascending: true })
-      .limit(100);
+      .order('nova_data_vencimento', { ascending: true });
+    
+    // If we have existing boletos, exclude their billing_receivable_ids
+    if (existingIds.length > 0) {
+      query = query.not('id', 'in', `(${existingIds.join(',')})`);
+    }
+    
+    const { data, error } = await query.limit(100);
 
     if (error) {
       console.error('Error fetching available billing receivables:', error);
       throw error;
     }
+
+    console.log(`Successfully fetched ${data?.length || 0} available billing receivables`);
 
     // Transform the data into the expected format
     const transformedData = (data || []).map(br => {
@@ -322,12 +341,37 @@ async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) 
         company_name: companyName,
         numero_parcela: br.payment_installments?.numero_parcela || 0,
         index_id: br.payment_installments?.payment_plan_settings?.index_id || null,
+        index_name: null, // This will be added in a subsequent query if needed
         adjustment_base_date: br.payment_installments?.payment_plan_settings?.adjustment_base_date || null
       };
     });
     
+    // Get index names for the ones that have index_id
+    const indexIds = transformedData
+      .filter(item => item.index_id)
+      .map(item => item.index_id);
+      
+    if (indexIds.length > 0) {
+      const { data: indexesData, error: indexesError } = await serviceClient
+        .from('indexes')
+        .select('id, name')
+        .in('id', indexIds);
+        
+      if (!indexesError && indexesData) {
+        // Add index names to the transformed data
+        transformedData.forEach(item => {
+          if (item.index_id) {
+            const index = indexesData.find(idx => idx.id === item.index_id);
+            if (index) {
+              item.index_name = index.name;
+            }
+          }
+        });
+      }
+    }
+    
     const resultCount = transformedData.length;
-    console.log(`Found ${resultCount} available billing receivables`);
+    console.log(`Returning ${resultCount} available billing receivables`);
 
     return new Response(
       JSON.stringify({ 
@@ -338,7 +382,7 @@ async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
       }
-    )
+    );
   } catch (error) {
     console.error('Error in handleGetAvailableBillingReceivables:', error);
     return new Response(

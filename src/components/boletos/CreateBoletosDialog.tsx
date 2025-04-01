@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -61,7 +61,7 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
   const { getAuthHeader } = useAuth();
 
   // Fetch available billing receivables when dialog opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (open) {
       fetchAvailableBillingReceivables();
     } else {
@@ -71,6 +71,7 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
 
   const fetchAvailableBillingReceivables = async () => {
     setIsFetching(true);
+    setBillingReceivables([]);
     try {
       console.log("Fetching available billing receivables...");
       const { data, error } = await supabase.functions.invoke("admin-boletos", {
