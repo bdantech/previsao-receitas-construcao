@@ -23,6 +23,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 type BillingReceivable = {
   id: string;
@@ -57,6 +58,7 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
   const [billingReceivables, setBillingReceivables] = useState<BillingReceivable[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { toast } = useToast();
+  const { getAuthHeader } = useAuth();
 
   // Fetch available billing receivables when dialog opens
   React.useEffect(() => {
@@ -74,6 +76,7 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
         body: {
           action: "getAvailableBillingReceivables",
         },
+        headers: getAuthHeader(),
       });
 
       if (error) {
@@ -134,6 +137,7 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
             billingReceivableIds: selectedIds,
           },
         },
+        headers: getAuthHeader(),
       });
 
       if (error) {

@@ -8,6 +8,7 @@ import { Plus, Search, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CreateBoletosDialog } from "@/components/boletos/CreateBoletosDialog";
 import { EditBoletoDialog } from "@/components/boletos/EditBoletoDialog";
+import { useAuth } from "@/hooks/useAuth";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,7 @@ const AdminBoletosPage: React.FC = () => {
   const [boletoToDelete, setBoletoToDelete] = useState<string | null>(null);
   const [filters, setFilters] = useState<BoletosFilters>({});
   const { toast } = useToast();
+  const { getAuthHeader } = useAuth();
 
   // Fetch boletos on load and when filters change
   useEffect(() => {
@@ -79,6 +81,7 @@ const AdminBoletosPage: React.FC = () => {
             filters: filterData,
           },
         },
+        headers: getAuthHeader(),
       });
 
       if (error) {
@@ -129,6 +132,7 @@ const AdminBoletosPage: React.FC = () => {
             boletoId: boletoToDelete,
           },
         },
+        headers: getAuthHeader(),
       });
 
       if (error) {
