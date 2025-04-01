@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -251,62 +250,82 @@ async function handleGetBoletos(serviceClient, filters, corsHeaders) {
 
 async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) {
   // This query gets billing receivables that don't have associated boletos yet
-  const { data: availableReceivables, error } = await serviceClient.rpc(
-    'execute_sql',
-    {
-      query_text: `
-        SELECT 
-          br.id,
-          br.receivable_id,
-          br.installment_id,
-          br.nova_data_vencimento,
-          r.amount,
-          r.buyer_name,
-          r.buyer_cpf,
-          r.project_id,
-          p.name AS project_name,
-          p.cnpj AS project_cnpj,
-          p.company_id,
-          c.name AS company_name,
-          ppi.numero_parcela,
-          ppi.payment_plan_settings_id,
-          pps.index_id,
-          pps.adjustment_base_date,
-          i.name AS index_name
-        FROM 
-          billing_receivables br
-          JOIN receivables r ON br.receivable_id = r.id
-          JOIN projects p ON r.project_id = p.id
-          JOIN companies c ON p.company_id = c.id
-          JOIN payment_plan_installments ppi ON br.installment_id = ppi.id
-          JOIN payment_plan_settings pps ON ppi.payment_plan_settings_id = pps.id
-          LEFT JOIN indexes i ON pps.index_id = i.id
-        WHERE 
-          NOT EXISTS (
-            SELECT 1 FROM boletos b WHERE b.billing_receivable_id = br.id
-          )
-        ORDER BY 
-          br.nova_data_vencimento ASC
-      `,
-      params: {}
-    }
-  )
+  try {
+    const { data: availableReceivables, error } = await serviceClient.rpc(
+      'execute_sql',
+      {
+        query_text: `
+          SELECT 
+            br.id,
+            br.receivable_id,
+            br.installment_id,
+            br.nova_data_vencimento,
+            r.amount,
+            r.buyer_name,
+            r.buyer_cpf,
+            r.project_id,
+            p.name AS project_name,
+            p.cnpj AS project_cnpj,
+            p.company_id,
+            c.name AS company_name,
+            ppi.numero_parcela,
+            ppi.payment_plan_settings_id,
+            pps.index_id,
+            pps.adjustment_base_date,
+            i.name AS index_name
+          FROM 
+            billing_receivables br
+            JOIN receivables r ON br.receivable_id = r.id
+            JOIN projects p ON r.project_id = p.id
+            JOIN companies c ON p.company_id = c.id
+            JOIN payment_plan_installments ppi ON br.installment_id = ppi.id
+            JOIN payment_plan_settings pps ON ppi.payment_plan_settings_id = pps.id
+            LEFT JOIN indexes i ON pps.index_id = i.id
+          WHERE 
+            NOT EXISTS (
+              SELECT 1 FROM boletos b WHERE b.billing_receivable_id = br.id
+            )
+          ORDER BY 
+            br.nova_data_vencimento ASC
+        `,
+        params: {}
+      }
+    )
 
-  if (error) {
-    console.error('Error fetching available billing receivables:', error)
-    throw error
+    if (error) {
+      console.error('Error fetching available billing receivables:', error)
+      throw error
+    }
+
+    // Ensure we're returning an array
+    const resultArray = Array.isArray(availableReceivables) ? availableReceivables : [];
+    
+    console.log(`Found ${resultArray.length} available billing receivables`);
+
+    return new Response(
+      JSON.stringify({ 
+        billingReceivables: resultArray,
+        count: resultArray.length
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
+    )
+  } catch (error) {
+    console.error('Error in handleGetAvailableBillingReceivables:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message,
+        billingReceivables: [],
+        count: 0
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
+    );
   }
-
-  return new Response(
-    JSON.stringify({ 
-      billingReceivables: availableReceivables || [],
-      count: (availableReceivables || []).length
-    }),
-    { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200 
-    }
-  )
 }
 
 async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHeaders) {
@@ -383,7 +402,10 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
         continue
       }
 
-      const brInfo = billingReceivableData[0]
+      const brInfo = Array.isArray(billingReceivableData) && billingReceivableData.length > 0 
+        ? billingReceivableData[0] 
+        : null;
+        
       if (!brInfo) {
         console.error(`Billing receivable ${brId} not found`)
         errors.push({

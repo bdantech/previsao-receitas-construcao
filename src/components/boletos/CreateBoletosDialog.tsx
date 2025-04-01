@@ -86,10 +86,17 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
           title: "Erro",
           description: "Não foi possível carregar os recebíveis disponíveis.",
         });
+        setBillingReceivables([]);
         return;
       }
 
-      setBillingReceivables(data.billingReceivables || []);
+      // Ensure we're setting an array even if the API returns a different format
+      if (data && Array.isArray(data.billingReceivables)) {
+        setBillingReceivables(data.billingReceivables);
+      } else {
+        console.warn("Received non-array billingReceivables data:", data);
+        setBillingReceivables([]);
+      }
     } catch (error) {
       console.error("Error:", error);
       toast({
@@ -97,6 +104,7 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
         title: "Erro",
         description: "Erro ao carregar os recebíveis disponíveis.",
       });
+      setBillingReceivables([]);
     } finally {
       setIsFetching(false);
     }
