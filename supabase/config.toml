@@ -17,3 +17,9 @@ verify_jwt = true
 
 [functions.indexes-management]
 verify_jwt = true
+
+[functions.admin-boletos]
+verify_jwt = true
+
+[functions.company-boletos]
+verify_jwt = true

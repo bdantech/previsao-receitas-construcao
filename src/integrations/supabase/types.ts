@@ -150,6 +150,104 @@ export type Database = {
           },
         ]
       }
+      boletos: {
+        Row: {
+          arquivo_boleto_name: string | null
+          arquivo_boleto_path: string | null
+          billing_receivable_id: string
+          company_id: string
+          created_at: string
+          data_emissao: string
+          data_vencimento: string
+          id: string
+          index_id: string | null
+          linha_digitavel: string | null
+          nosso_numero: string | null
+          payer_tax_id: string
+          percentual_atualizacao: number | null
+          project_id: string
+          project_tax_id: string
+          status_emissao: Database["public"]["Enums"]["boleto_issuance_status"]
+          status_pagamento: Database["public"]["Enums"]["boleto_payment_status"]
+          updated_at: string
+          valor_boleto: number
+          valor_face: number
+        }
+        Insert: {
+          arquivo_boleto_name?: string | null
+          arquivo_boleto_path?: string | null
+          billing_receivable_id: string
+          company_id: string
+          created_at?: string
+          data_emissao?: string
+          data_vencimento: string
+          id?: string
+          index_id?: string | null
+          linha_digitavel?: string | null
+          nosso_numero?: string | null
+          payer_tax_id: string
+          percentual_atualizacao?: number | null
+          project_id: string
+          project_tax_id: string
+          status_emissao?: Database["public"]["Enums"]["boleto_issuance_status"]
+          status_pagamento?: Database["public"]["Enums"]["boleto_payment_status"]
+          updated_at?: string
+          valor_boleto: number
+          valor_face: number
+        }
+        Update: {
+          arquivo_boleto_name?: string | null
+          arquivo_boleto_path?: string | null
+          billing_receivable_id?: string
+          company_id?: string
+          created_at?: string
+          data_emissao?: string
+          data_vencimento?: string
+          id?: string
+          index_id?: string | null
+          linha_digitavel?: string | null
+          nosso_numero?: string | null
+          payer_tax_id?: string
+          percentual_atualizacao?: number | null
+          project_id?: string
+          project_tax_id?: string
+          status_emissao?: Database["public"]["Enums"]["boleto_issuance_status"]
+          status_pagamento?: Database["public"]["Enums"]["boleto_payment_status"]
+          updated_at?: string
+          valor_boleto?: number
+          valor_face?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "boletos_billing_receivable_id_fkey"
+            columns: ["billing_receivable_id"]
+            isOneToOne: false
+            referencedRelation: "billing_receivables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "boletos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "boletos_index_id_fkey"
+            columns: ["index_id"]
+            isOneToOne: false
+            referencedRelation: "indexes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "boletos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           cnpj: string
@@ -827,10 +925,24 @@ export type Database = {
         }
         Returns: boolean
       }
+      billing_receivable_has_boleto: {
+        Args: {
+          p_billing_receivable_id: string
+        }
+        Returns: boolean
+      }
       calculate_anticipation_valor_liquido: {
         Args: {
           p_receivable_ids: string[]
           p_company_id: string
+        }
+        Returns: number
+      }
+      calculate_index_adjustment: {
+        Args: {
+          p_index_id: string
+          p_start_date: string
+          p_end_date: string
         }
         Returns: number
       }
@@ -894,6 +1006,8 @@ export type Database = {
     }
     Enums: {
       anticipation_status: "Solicitada" | "Aprovada" | "Reprovada" | "Concluída"
+      boleto_issuance_status: "Criado" | "Emitido" | "Cancelado"
+      boleto_payment_status: "N/A" | "Pago" | "Em Aberto" | "Em Atraso"
       buyer_status: "aprovado" | "reprovado" | "a_analisar"
       contract_status: "aprovado" | "reprovado" | "a_enviar" | "a_analisar"
       credit_analysis_status: "aprovado" | "reprovado" | "a_analisar"
