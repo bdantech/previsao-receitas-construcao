@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -433,51 +434,48 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
         continue
       }
 
-      // Get all required data for creating the boleto
-      const { data: billingReceivableData, error: brError } = await serviceClient.rpc(
-        'execute_sql',
-        {
-          query_text: `
-            SELECT 
-              br.id,
-              br.nova_data_vencimento,
-              r.amount AS valor_face,
-              r.buyer_cpf AS payer_tax_id,
-              r.project_id,
-              p.cnpj AS project_tax_id,
-              p.company_id,
-              ppi.payment_plan_settings_id,
-              pps.index_id,
-              pps.adjustment_base_date
-            FROM 
-              billing_receivables br
-              JOIN receivables r ON br.receivable_id = r.id
-              JOIN projects p ON r.project_id = p.id
-              JOIN payment_plan_installments ppi ON br.installment_id = ppi.id
-              JOIN payment_plan_settings pps ON ppi.payment_plan_settings_id = pps.id
-            WHERE 
-              br.id = $1
-          `,
-          params: { 
-            $1: brId 
-          }
-        }
-      )
+      // Get the billing receivable data directly
+      const { data: billingReceivableData, error: brQueryError } = await serviceClient
+        .from('billing_receivables')
+        .select(`
+          id,
+          nova_data_vencimento,
+          receivable_id,
+          installment_id,
+          receivables:receivable_id (
+            id,
+            amount,
+            buyer_cpf,
+            project_id
+          ),
+          payment_installments:installment_id (
+            id,
+            numero_parcela,
+            payment_plan_settings (
+              index_id,
+              adjustment_base_date,
+              project_id,
+              projects:project_id (
+                id,
+                cnpj,
+                company_id
+              )
+            )
+          )
+        `)
+        .eq('id', brId)
+        .single();
 
-      if (brError) {
-        console.error(`Error fetching data for billing receivable ${brId}:`, brError)
+      if (brQueryError) {
+        console.error(`Error fetching billing receivable ${brId}:`, brQueryError)
         errors.push({
           billingReceivableId: brId,
-          error: brError.message
+          error: brQueryError.message
         })
         continue
       }
 
-      const brInfo = Array.isArray(billingReceivableData) && billingReceivableData.length > 0 
-        ? billingReceivableData[0] 
-        : null;
-        
-      if (!brInfo) {
+      if (!billingReceivableData) {
         console.error(`Billing receivable ${brId} not found`)
         errors.push({
           billingReceivableId: brId,
@@ -486,19 +484,54 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
         continue
       }
 
+      console.log(`Processing billing receivable: ${JSON.stringify(billingReceivableData, null, 2)}`)
+
+      // Extract the necessary data
+      const {
+        nova_data_vencimento,
+        receivables,
+        payment_installments
+      } = billingReceivableData;
+
+      if (!receivables) {
+        console.error(`Receivable data not found for billing receivable ${brId}`)
+        errors.push({
+          billingReceivableId: brId,
+          error: 'Receivable data not found'
+        })
+        continue
+      }
+
+      if (!payment_installments?.payment_plan_settings?.projects) {
+        console.error(`Project data not found for billing receivable ${brId}`)
+        errors.push({
+          billingReceivableId: brId,
+          error: 'Project data not found'
+        })
+        continue
+      }
+
+      const valorFace = receivables.amount;
+      const payerTaxId = receivables.buyer_cpf;
+      const projectId = receivables.project_id;
+      const projectTaxId = payment_installments.payment_plan_settings.projects.cnpj;
+      const companyId = payment_installments.payment_plan_settings.projects.company_id;
+      const indexId = payment_installments.payment_plan_settings.index_id;
+      const adjustmentBaseDate = payment_installments.payment_plan_settings.adjustment_base_date;
+
       // Calculate adjustment percentage if index is set
       let percentualAtualizacao = null
-      let valorBoleto = brInfo.valor_face
+      let valorBoleto = valorFace
 
-      if (brInfo.index_id && brInfo.adjustment_base_date) {
+      if (indexId && adjustmentBaseDate) {
         const currentDate = new Date().toISOString().split('T')[0] // Today in YYYY-MM-DD format
         
         // Get adjustment percentage from the database function
         const { data: adjustmentResult, error: adjustmentError } = await serviceClient.rpc(
           'calculate_index_adjustment',
           {
-            p_index_id: brInfo.index_id,
-            p_start_date: brInfo.adjustment_base_date,
+            p_index_id: indexId,
+            p_start_date: adjustmentBaseDate,
             p_end_date: currentDate
           }
         )
@@ -510,7 +543,7 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
           
           // Calculate valor_boleto with adjustment
           if (percentualAtualizacao !== null) {
-            valorBoleto = parseFloat(brInfo.valor_face) * (1 + (percentualAtualizacao / 100))
+            valorBoleto = parseFloat(valorFace) * (1 + (percentualAtualizacao / 100))
             valorBoleto = Math.round(valorBoleto * 100) / 100 // Round to 2 decimal places
           }
         }
@@ -521,18 +554,18 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
         .from('boletos')
         .insert({
           billing_receivable_id: brId,
-          valor_face: brInfo.valor_face,
-          index_id: brInfo.index_id || null,
+          valor_face: valorFace,
+          index_id: indexId || null,
           percentual_atualizacao: percentualAtualizacao,
           valor_boleto: valorBoleto,
-          data_vencimento: brInfo.nova_data_vencimento,
+          data_vencimento: nova_data_vencimento,
           data_emissao: new Date().toISOString(),
           status_emissao: 'Criado',
           status_pagamento: 'N/A',
-          payer_tax_id: brInfo.payer_tax_id,
-          project_tax_id: brInfo.project_tax_id,
-          project_id: brInfo.project_id,
-          company_id: brInfo.company_id
+          payer_tax_id: payerTaxId,
+          project_tax_id: projectTaxId,
+          project_id: projectId,
+          company_id: companyId
         })
         .select()
         .single()
