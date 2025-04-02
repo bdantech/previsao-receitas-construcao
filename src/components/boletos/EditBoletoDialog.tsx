@@ -33,6 +33,7 @@ import { format } from "date-fns";
 import { Boleto } from "./BoletosTable";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const formSchema = z.object({
   status_emissao: z.enum(["Criado", "Emitido", "Cancelado"]),
@@ -58,6 +59,7 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { getAuthHeader } = useAuth();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -86,6 +88,7 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
 
     setIsLoading(true);
     try {
+      // Add auth headers to the request
       const { data, error } = await supabase.functions.invoke("admin-boletos", {
         body: {
           action: "updateBoleto",
@@ -94,6 +97,7 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
             updateData: values,
           },
         },
+        headers: getAuthHeader(), // Add authentication headers
       });
 
       if (error) {
