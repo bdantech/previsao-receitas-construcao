@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
@@ -13,6 +13,8 @@ import {
   ArrowRightLeft, 
   LogOut 
 } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SidebarItemProps {
   icon: React.ElementType;
@@ -49,9 +51,27 @@ const SidebarItem = ({
 export const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   
   const toggleSidebar = () => {
     setIsCollapsed(prev => !prev);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        description: "Logout realizado com sucesso",
+      });
+      navigate('/auth');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        variant: "destructive",
+        description: "Erro ao realizar logout",
+      });
+    }
   };
 
   const sidebarItems = [
@@ -126,7 +146,7 @@ export const Sidebar = () => {
             "w-full justify-start gap-3 px-3 py-2",
             "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           )}
-          onClick={signOut}
+          onClick={handleSignOut}
         >
           <LogOut className="h-5 w-5" />
           {!isCollapsed && <span>Sair</span>}
