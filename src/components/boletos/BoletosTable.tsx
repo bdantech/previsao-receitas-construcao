@@ -153,6 +153,9 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
     });
   };
 
+  // Determine if we're in the project dashboard context
+  const isProjectContext = Boolean(filters.projectId);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-4 pb-4">
@@ -199,8 +202,8 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Empresa</TableHead>
-              <TableHead>Projeto</TableHead>
+              {!isProjectContext && <TableHead>Empresa</TableHead>}
+              {!isProjectContext && <TableHead>Projeto</TableHead>}
               <TableHead>Pagador</TableHead>
               <TableHead>Valor do Boleto</TableHead>
               <TableHead>Data de Vencimento</TableHead>
@@ -212,21 +215,21 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-4">
+                <TableCell colSpan={isProjectContext ? 6 : 8} className="text-center py-4">
                   Carregando boletos...
                 </TableCell>
               </TableRow>
             ) : boletos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-4">
+                <TableCell colSpan={isProjectContext ? 6 : 8} className="text-center py-4">
                   Nenhum boleto encontrado.
                 </TableCell>
               </TableRow>
             ) : (
               boletos.map((boleto) => (
                 <TableRow key={boleto.id}>
-                  <TableCell>{boleto.companies?.name || 'N/A'}</TableCell>
-                  <TableCell>{boleto.projects?.name || 'N/A'}</TableCell>
+                  {!isProjectContext && <TableCell>{boleto.companies?.name || 'N/A'}</TableCell>}
+                  {!isProjectContext && <TableCell>{boleto.projects?.name || 'N/A'}</TableCell>}
                   <TableCell>
                     {boleto.billing_receivables?.receivables?.buyer_name || 'N/A'}
                     <div className="text-xs text-gray-500">{boleto.payer_tax_id}</div>

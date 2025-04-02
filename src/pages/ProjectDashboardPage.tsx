@@ -799,18 +799,18 @@ const ProjectDashboardPage = () => {
                 <CardTitle>Boletos</CardTitle>
               </CardHeader>
               <CardContent>
-                {boletos.length > 0 ? (
+                {isLoadingBoletos ? (
+                  <div className="flex justify-center py-8">
+                    <Loader className="h-6 w-6 animate-spin text-gray-500" />
+                  </div>
+                ) : (
                   <BoletosTable
                     boletos={boletos}
                     isLoading={isLoadingBoletos}
                     onUpdate={handleEditBoleto}
                     onFilterChange={handleBoletoFilterChange}
-                    filters={boletoFilters}
+                    filters={{...boletoFilters, projectId}}
                   />
-                ) : (
-                  <p className="text-center text-gray-500 py-8">
-                    {isLoadingBoletos ? "Carregando boletos..." : "Nenhum boleto cadastrado para este projeto ainda."}
-                  </p>
                 )}
               </CardContent>
             </Card>

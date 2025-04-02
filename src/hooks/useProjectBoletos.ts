@@ -64,6 +64,8 @@ export const useProjectBoletos = (projectId: string) => {
         delete filterData.statusPagamento;
       }
 
+      console.log("Fetching boletos with filters:", filterData);
+
       const { data, error } = await supabase.functions.invoke("company-boletos", {
         body: {
           action: "getBoletos",
@@ -84,6 +86,7 @@ export const useProjectBoletos = (projectId: string) => {
         return;
       }
 
+      console.log("Boletos response:", data);
       setBoletos(data.boletos || []);
     } catch (error) {
       console.error("Error:", error);
