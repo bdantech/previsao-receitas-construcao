@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader, UsersRound, Receipt, ArrowDownToLine, FileSpreadsheet, PencilIcon, Plus, Upload } from "lucide-react";
+import { Loader, UsersRound, Receipt, ArrowDownToLine, FileSpreadsheet, PencilIcon, Plus, Upload, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
@@ -23,6 +23,8 @@ import { Switch } from "@/components/ui/switch";
 import { BoletosTable } from "@/components/boletos/BoletosTable";
 import { EditBoletoDialog } from "@/components/boletos/EditBoletoDialog";
 import { useProjectBoletos } from "@/hooks/useProjectBoletos";
+import PaymentPlansTable from "@/components/payment-plans/PaymentPlansTable";
+import { useProjectPaymentPlans } from "@/hooks/useProjectPaymentPlans";
 
 interface Project {
   id: string;
@@ -124,6 +126,13 @@ const ProjectDashboardPage = () => {
     useProjectBoletos(projectId || "");
   const [selectedBoleto, setSelectedBoleto] = useState<any>(null);
   const [editBoletoDialogOpen, setEditBoletoDialogOpen] = useState(false);
+  
+  const { 
+    paymentPlans, 
+    selectedPlan, 
+    isLoading: isLoadingPaymentPlans, 
+    fetchPlanDetails 
+  } = useProjectPaymentPlans(projectId || "");
 
   useEffect(() => {
     const fetchProjectDetails = async () => {
@@ -667,6 +676,10 @@ const ProjectDashboardPage = () => {
               <FileSpreadsheet className="h-4 w-4" />
               Boletos
             </TabsTrigger>
+            <TabsTrigger value="plano-pagamento" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Plano de Pagamento
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="compradores" className="mt-6">
@@ -810,6 +823,28 @@ const ProjectDashboardPage = () => {
                     onUpdate={handleEditBoleto}
                     onFilterChange={handleBoletoFilterChange}
                     filters={{...boletoFilters, projectId}}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="plano-pagamento" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Plano de Pagamento</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingPaymentPlans ? (
+                  <div className="flex justify-center py-8">
+                    <Loader className="h-6 w-6 animate-spin text-gray-500" />
+                  </div>
+                ) : (
+                  <PaymentPlansTable
+                    paymentPlans={paymentPlans}
+                    selectedPlan={selectedPlan}
+                    isLoading={isLoadingPaymentPlans}
+                    onSelectPlan={fetchPlanDetails}
                   />
                 )}
               </CardContent>
