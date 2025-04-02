@@ -81,9 +81,10 @@ type BoletosTableProps = {
   boletos: Boleto[];
   isLoading: boolean;
   onUpdate: (boleto: Boleto) => void;
-  onDelete: (id: string) => void;
+  onDelete?: (id: string) => void;
   onFilterChange: (filters: BoletosFilters) => void;
   filters: BoletosFilters;
+  isAdmin?: boolean;
 };
 
 export type BoletosFilters = {
@@ -129,6 +130,7 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
   onDelete,
   onFilterChange,
   filters,
+  isAdmin = false,
 }) => {
   const handleMonthYearChange = (value: string) => {
     onFilterChange({
@@ -274,15 +276,17 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
                           <FileDown className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => onDelete(boleto.id)}
-                        title="Excluir Boleto"
-                        className="text-red-500 hover:text-red-600"
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && onDelete && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => onDelete(boleto.id)}
+                          title="Excluir Boleto"
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

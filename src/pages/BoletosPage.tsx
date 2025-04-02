@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { BoletosTable, Boleto, BoletosFilters } from "@/components/boletos/BoletosTable";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { EditBoletoDialog } from "@/components/boletos/EditBoletoDialog";
 import { useAuth } from "@/hooks/useAuth";
