@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -82,6 +82,8 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
         nosso_numero: boleto.nosso_numero || "",
         linha_digitavel: boleto.linha_digitavel || "",
       });
+      // Reset file state when boleto changes
+      setFile(null);
     }
   }, [boleto, form]);
 
@@ -91,24 +93,68 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
     }
   };
 
+  // Function to download the existing boleto file
+  const handleDownloadFile = async () => {
+    if (!boleto || !boleto.arquivo_boleto_path) return;
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .download(boleto.arquivo_boleto_path);
+      
+      if (error) {
+        console.error("Error downloading file:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: `Erro ao baixar o arquivo: ${error.message}`,
+        });
+        return;
+      }
+      
+      // Create a download link and trigger the download
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = boleto.arquivo_boleto_name || 'boleto.pdf';
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Error in download function:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao baixar o arquivo do boleto.",
+      });
+    }
+  };
+
   const uploadBoletoFile = async (boletoId: string, file: File) => {
     setUploadingFile(true);
     try {
-      // Upload file to Supabase Storage
-      const filePath = `boletos/${boletoId}/${file.name}`;
+      // Create a unique file path with timestamp to avoid conflicts
+      const timestamp = Date.now();
+      const fileExt = file.name.split('.').pop();
+      const filePath = `boletos/${boletoId}/${timestamp}_${file.name}`;
+      
+      console.log("Uploading file to path:", filePath);
       
       // Upload the file to the documents bucket
       const { data: storageData, error: storageError } = await supabase.storage
         .from('documents')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: true
         });
       
       if (storageError) {
         console.error("Error uploading file:", storageError);
         throw new Error(`Error uploading file: ${storageError.message}`);
       }
+      
+      console.log("File uploaded successfully:", storageData);
       
       // Update boleto record with file path and name
       const { data, error } = await supabase.functions.invoke("admin-boletos", {
@@ -341,7 +387,7 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
               <div className="space-y-2">
                 <FormLabel>Arquivo do Boleto</FormLabel>
                 <div className="border border-input rounded-md p-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-2">
                     <Input 
                       type="file" 
                       id="boleto-file" 
@@ -349,9 +395,25 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
                       accept=".pdf,.png,.jpg,.jpeg"
                       className="flex-1" 
                     />
+                    
                     {boleto.arquivo_boleto_name && (
-                      <div className="text-sm text-muted-foreground">
-                        Arquivo atual: {boleto.arquivo_boleto_name}
+                      <div className="flex items-center justify-between text-sm text-muted-foreground p-2 bg-muted rounded-md">
+                        <span>Arquivo atual: {boleto.arquivo_boleto_name}</span>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={handleDownloadFile}
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Baixar
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {file && (
+                      <div className="text-sm text-muted-foreground p-2 bg-muted rounded-md">
+                        Novo arquivo: {file.name}
                       </div>
                     )}
                   </div>
