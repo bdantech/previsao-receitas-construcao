@@ -22,6 +22,7 @@ import AnticipationsList from "@/components/anticipations/AnticipationsList";
 import { Switch } from "@/components/ui/switch";
 import { BoletosTable } from "@/components/boletos/BoletosTable";
 import { EditBoletoDialog } from "@/components/boletos/EditBoletoDialog";
+import { ViewBoletoDialog } from "@/components/boletos/ViewBoletoDialog";
 import { useProjectBoletos } from "@/hooks/useProjectBoletos";
 import PaymentPlansTable from "@/components/payment-plans/PaymentPlansTable";
 import { useProjectPaymentPlans } from "@/hooks/useProjectPaymentPlans";
@@ -924,15 +925,26 @@ const ProjectDashboardPage = () => {
       />
 
       {selectedBoleto && (
-        <EditBoletoDialog
-          boleto={selectedBoleto}
-          open={editBoletoDialogOpen}
-          onClose={() => {
-            setEditBoletoDialogOpen(false);
-            setSelectedBoleto(null);
-          }}
-          onSuccess={refreshBoletos}
-        />
+        session?.user?.app_metadata?.role === 'admin' ? (
+          <EditBoletoDialog
+            boleto={selectedBoleto}
+            open={editBoletoDialogOpen}
+            onClose={() => {
+              setEditBoletoDialogOpen(false);
+              setSelectedBoleto(null);
+            }}
+            onSuccess={refreshBoletos}
+          />
+        ) : (
+          <ViewBoletoDialog
+            boleto={selectedBoleto}
+            open={editBoletoDialogOpen}
+            onClose={() => {
+              setEditBoletoDialogOpen(false);
+              setSelectedBoleto(null);
+            }}
+          />
+        )
       )}
     </DashboardLayout>
   );

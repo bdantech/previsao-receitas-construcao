@@ -261,14 +261,25 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => onUpdate(boleto)}
-                        title="Editar Boleto"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      {isAdmin ? (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => onUpdate(boleto)}
+                          title="Editar Boleto"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => onUpdate(boleto)} 
+                          title="Ver Detalhes"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
                       {boleto.arquivo_boleto_path && (
                         <Button
                           variant="outline"
