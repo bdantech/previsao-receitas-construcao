@@ -20,6 +20,9 @@ import { ReceivableDialog } from "@/components/receivables/ReceivableDialog";
 import { ReceivableBulkImportDialog } from "@/components/receivables/ReceivableBulkImportDialog";
 import AnticipationsList from "@/components/anticipations/AnticipationsList";
 import { Switch } from "@/components/ui/switch";
+import { BoletosTable } from "@/components/boletos/BoletosTable";
+import { EditBoletoDialog } from "@/components/boletos/EditBoletoDialog";
+import { useProjectBoletos } from "@/hooks/useProjectBoletos";
 
 interface Project {
   id: string;
@@ -117,6 +120,11 @@ const ProjectDashboardPage = () => {
     totalInvoices: 0
   });
 
+  const { boletos, isLoading: isLoadingBoletos, filters: boletoFilters, handleFilterChange: handleBoletoFilterChange, refreshBoletos } = 
+    useProjectBoletos(projectId || "");
+  const [selectedBoleto, setSelectedBoleto] = useState<any>(null);
+  const [editBoletoDialogOpen, setEditBoletoDialogOpen] = useState(false);
+
   useEffect(() => {
     const fetchProjectDetails = async () => {
       if (!projectId || !session?.access_token) return;
@@ -168,14 +176,14 @@ const ProjectDashboardPage = () => {
 
   useEffect(() => {
     updateDashboardSummary();
-  }, [projectBuyers, receivables, anticipations]);
+  }, [projectBuyers, receivables, anticipations, boletos]);
 
   const updateDashboardSummary = () => {
     setDashboardSummary({
       totalBuyers: projectBuyers.length,
       totalReceivablesAmount: receivables.reduce((sum, r) => sum + Number(r.amount), 0),
       totalAnticipationsAmount: anticipations.reduce((sum, a) => sum + Number(a.valor_total), 0),
-      totalInvoices: 0
+      totalInvoices: boletos.length
     });
   };
 
@@ -487,6 +495,11 @@ const ProjectDashboardPage = () => {
     }
   };
 
+  const handleEditBoleto = (boleto: any) => {
+    setSelectedBoleto(boleto);
+    setEditBoletoDialogOpen(true);
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -786,9 +799,19 @@ const ProjectDashboardPage = () => {
                 <CardTitle>Boletos</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-center text-gray-500 py-8">
-                  Nenhum boleto cadastrado para este projeto ainda.
-                </p>
+                {boletos.length > 0 ? (
+                  <BoletosTable
+                    boletos={boletos}
+                    isLoading={isLoadingBoletos}
+                    onUpdate={handleEditBoleto}
+                    onFilterChange={handleBoletoFilterChange}
+                    filters={boletoFilters}
+                  />
+                ) : (
+                  <p className="text-center text-gray-500 py-8">
+                    {isLoadingBoletos ? "Carregando boletos..." : "Nenhum boleto cadastrado para este projeto ainda."}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -864,6 +887,18 @@ const ProjectDashboardPage = () => {
         projectId={projectId || ""}
         onReceivablesImported={handleReceivableCreated}
       />
+
+      {selectedBoleto && (
+        <EditBoletoDialog
+          boleto={selectedBoleto}
+          open={editBoletoDialogOpen}
+          onClose={() => {
+            setEditBoletoDialogOpen(false);
+            setSelectedBoleto(null);
+          }}
+          onSuccess={refreshBoletos}
+        />
+      )}
     </DashboardLayout>
   );
 };
