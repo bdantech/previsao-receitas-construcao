@@ -98,29 +98,32 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
     if (!boleto || !boleto.arquivo_boleto_path) return;
     
     try {
-      const { data, error } = await supabase.storage
-        .from('documents')
-        .download(boleto.arquivo_boleto_path);
+      // Use document-management function to get a signed URL
+      const { data, error } = await supabase.functions.invoke("document-management", {
+        body: {
+          action: "downloadFile",
+          filePath: boleto.arquivo_boleto_path
+        },
+        headers: await getAuthHeader()
+      });
       
       if (error) {
-        console.error("Error downloading file:", error);
+        console.error("Error getting download URL:", error);
         toast({
           variant: "destructive",
           title: "Erro",
-          description: `Erro ao baixar o arquivo: ${error.message}`,
+          description: `Erro ao preparar o download: ${error.message}`,
         });
         return;
       }
       
-      // Create a download link and trigger the download
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = boleto.arquivo_boleto_name || 'boleto.pdf';
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      if (!data || !data.url) {
+        throw new Error("Failed to get download URL");
+      }
+      
+      // Open the URL in a new tab or trigger download
+      window.open(data.url, '_blank');
+      
     } catch (error) {
       console.error("Error in download function:", error);
       toast({
@@ -134,46 +137,53 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
   const uploadBoletoFile = async (boletoId: string, file: File) => {
     setUploadingFile(true);
     try {
-      // Create a unique file path with timestamp to avoid conflicts
-      const timestamp = Date.now();
-      const fileExt = file.name.split('.').pop();
-      const filePath = `boletos/${boletoId}/${timestamp}_${file.name}`;
+      // Create a unique file path for the boleto
+      const resourceType = "boletos";
+      const resourceId = boletoId;
       
-      console.log("Uploading file to path:", filePath);
+      console.log("Preparing to upload file for boleto:", boletoId);
       
-      // Upload the file to the documents bucket
-      const { data: storageData, error: storageError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
+      // Use document-management edge function to upload the file
+      const { data, error } = await supabase.functions.invoke("document-management", {
+        body: {
+          action: "uploadFile",
+          file: await convertFileToBase64(file),
+          fileName: file.name,
+          resourceType: resourceType,
+          resourceId: resourceId
+        },
+        headers: await getAuthHeader()
+      });
       
-      if (storageError) {
-        console.error("Error uploading file:", storageError);
-        throw new Error(`Error uploading file: ${storageError.message}`);
+      if (error) {
+        console.error("Error invoking document-management function:", error);
+        throw new Error(`Error uploading file: ${error.message}`);
       }
       
-      console.log("File uploaded successfully:", storageData);
+      if (!data || !data.filePath) {
+        throw new Error("No file path returned from upload");
+      }
+      
+      console.log("File uploaded successfully, path:", data.filePath);
       
       // Update boleto record with file path and name
-      const { data, error } = await supabase.functions.invoke("admin-boletos", {
+      const { data: updateData, error: updateError } = await supabase.functions.invoke("admin-boletos", {
         body: {
           action: "updateBoleto",
           data: {
             boletoId,
             updateData: {
-              arquivo_boleto_path: filePath,
-              arquivo_boleto_name: file.name
+              arquivo_boleto_path: data.filePath,
+              arquivo_boleto_name: data.fileName
             },
           },
         },
-        headers: getAuthHeader(),
+        headers: await getAuthHeader(),
       });
 
-      if (error) {
-        console.error("Error updating boleto with file info:", error);
-        throw new Error(`Error updating boleto: ${error.message}`);
+      if (updateError) {
+        console.error("Error updating boleto with file info:", updateError);
+        throw new Error(`Error updating boleto: ${updateError.message}`);
       }
       
       toast({
@@ -181,7 +191,7 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
         description: "O arquivo do boleto foi enviado e associado ao registro.",
       });
       
-      return data;
+      return updateData;
     } catch (error) {
       console.error("Error in uploadBoletoFile:", error);
       toast({
@@ -193,6 +203,16 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
     } finally {
       setUploadingFile(false);
     }
+  };
+  
+  // Helper function to convert File to base64
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
   };
 
   const onSubmit = async (values: FormValues) => {
@@ -209,7 +229,7 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
             updateData: values,
           },
         },
-        headers: getAuthHeader(), // Add authentication headers
+        headers: await getAuthHeader(), // Add authentication headers
       });
 
       if (error) {
