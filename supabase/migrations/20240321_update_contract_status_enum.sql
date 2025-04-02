@@ -1,3 +1,4 @@
+
 -- Update contract_status enum to include 'a_analisar'
 ALTER TYPE contract_status ADD VALUE IF NOT EXISTS 'a_analisar';
 
