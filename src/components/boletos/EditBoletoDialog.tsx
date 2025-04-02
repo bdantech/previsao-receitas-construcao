@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -58,6 +58,8 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
   onSuccess,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
   const { toast } = useToast();
   const { getAuthHeader } = useAuth();
 
@@ -82,6 +84,70 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
       });
     }
   }, [boleto, form]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const uploadBoletoFile = async (boletoId: string, file: File) => {
+    setUploadingFile(true);
+    try {
+      // Upload file to Supabase Storage
+      const filePath = `boletos/${boletoId}/${file.name}`;
+      
+      // Upload the file to the documents bucket
+      const { data: storageData, error: storageError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (storageError) {
+        console.error("Error uploading file:", storageError);
+        throw new Error(`Error uploading file: ${storageError.message}`);
+      }
+      
+      // Update boleto record with file path and name
+      const { data, error } = await supabase.functions.invoke("admin-boletos", {
+        body: {
+          action: "updateBoleto",
+          data: {
+            boletoId,
+            updateData: {
+              arquivo_boleto_path: filePath,
+              arquivo_boleto_name: file.name
+            },
+          },
+        },
+        headers: getAuthHeader(),
+      });
+
+      if (error) {
+        console.error("Error updating boleto with file info:", error);
+        throw new Error(`Error updating boleto: ${error.message}`);
+      }
+      
+      toast({
+        title: "Arquivo enviado com sucesso",
+        description: "O arquivo do boleto foi enviado e associado ao registro.",
+      });
+      
+      return data;
+    } catch (error) {
+      console.error("Error in uploadBoletoFile:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao enviar o arquivo do boleto.",
+      });
+      throw error;
+    } finally {
+      setUploadingFile(false);
+    }
+  };
 
   const onSubmit = async (values: FormValues) => {
     if (!boleto) return;
@@ -108,6 +174,11 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
           description: "Não foi possível atualizar o boleto.",
         });
         return;
+      }
+
+      // If there's a file to upload, do it after updating the boleto
+      if (file) {
+        await uploadBoletoFile(boleto.id, file);
       }
 
       toast({
@@ -266,17 +337,40 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
                   </FormItem>
                 )}
               />
+
+              <div className="space-y-2">
+                <FormLabel>Arquivo do Boleto</FormLabel>
+                <div className="border border-input rounded-md p-2">
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      type="file" 
+                      id="boleto-file" 
+                      onChange={handleFileChange}
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      className="flex-1" 
+                    />
+                    {boleto.arquivo_boleto_name && (
+                      <div className="text-sm text-muted-foreground">
+                        Arquivo atual: {boleto.arquivo_boleto_name}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Faça upload do arquivo do boleto (PDF ou imagem)
+                </p>
+              </div>
             </div>
 
             <DialogFooter className="pt-4">
-              <Button variant="outline" onClick={onClose} disabled={isLoading}>
+              <Button variant="outline" onClick={onClose} disabled={isLoading || uploadingFile}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? (
+              <Button type="submit" disabled={isLoading || uploadingFile}>
+                {(isLoading || uploadingFile) ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Salvando...
+                    {uploadingFile ? "Enviando arquivo..." : "Salvando..."}
                   </>
                 ) : (
                   "Salvar"
