@@ -1,17 +1,17 @@
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import { CompanyDocuments } from "@/components/company/CompanyDocuments";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/components/ui/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import { AdminCompanyProjects } from "@/components/dashboard/AdminCompanyProjects";
-import { useAuth } from "@/hooks/useAuth";
 import { CompanyStatusBadge } from "@/components/company/CompanyStatusBadge";
-import { formatCNPJ } from "@/lib/formatters";
 import { AdminCompanyCredit } from "@/components/credit/AdminCompanyCredit";
+import { AdminCompanyProjects } from "@/components/dashboard/AdminCompanyProjects";
+import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCNPJ } from "@/lib/formatters";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 
 const AdminCompanyDetail = () => {
   const { companyId } = useParams();

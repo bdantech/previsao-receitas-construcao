@@ -1,5 +1,5 @@
-import { supabase } from "./client";
 import { Session } from "@supabase/supabase-js";
+import { supabase } from "./client";
 
 export type DocumentType = {
   id: string;
