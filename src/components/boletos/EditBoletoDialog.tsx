@@ -59,6 +59,7 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const { toast } = useToast();
   const { getAuthHeader } = useAuth();
@@ -97,6 +98,7 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
   const handleDownloadFile = async () => {
     if (!boleto || !boleto.arquivo_boleto_path) return;
     
+    setDownloading(true);
     try {
       // Use document-management function to get a signed URL
       const { data, error } = await supabase.functions.invoke("document-management", {
@@ -121,8 +123,15 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
         throw new Error("Failed to get download URL");
       }
       
-      // Open the URL in a new tab or trigger download
-      window.open(data.url, '_blank');
+      console.log("Download URL received:", data.url);
+      
+      // Create a temporary link and trigger download instead of opening in new tab
+      const link = document.createElement('a');
+      link.href = data.url;
+      link.download = boleto.arquivo_boleto_name || 'boleto.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       
     } catch (error) {
       console.error("Error in download function:", error);
@@ -131,6 +140,8 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
         title: "Erro",
         description: "Erro ao baixar o arquivo do boleto.",
       });
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -424,9 +435,14 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
                           variant="ghost" 
                           size="sm"
                           onClick={handleDownloadFile}
+                          disabled={downloading}
                         >
-                          <Download className="h-4 w-4 mr-1" />
-                          Baixar
+                          {downloading ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4 mr-1" />
+                          )}
+                          {downloading ? "Baixando..." : "Baixar"}
                         </Button>
                       </div>
                     )}
@@ -445,10 +461,10 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
             </div>
 
             <DialogFooter className="pt-4">
-              <Button variant="outline" onClick={onClose} disabled={isLoading || uploadingFile}>
+              <Button variant="outline" onClick={onClose} disabled={isLoading || uploadingFile || downloading}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isLoading || uploadingFile}>
+              <Button type="submit" disabled={isLoading || uploadingFile || downloading}>
                 {(isLoading || uploadingFile) ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

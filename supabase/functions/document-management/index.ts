@@ -345,138 +345,41 @@ serve(async (req) => {
       console.log('Processing downloadFile request for path:', requestBody.filePath);
       
       try {
-        let downloadUrl;
+        // Create a signed URL with an expiration of 60 minutes (3600 seconds)
+        const { data, error } = await adminSupabase
+          .storage
+          .from('documents')
+          .createSignedUrl(requestBody.filePath, 3600, {
+            download: true,  // Explicitly mark for download
+          });
         
-        // Check if we should use direct access with key
-        if (requestBody.useAccessKey && requestBody.keyId && requestBody.accessKey) {
-          console.log('Using access key for storage access');
+        if (error) {
+          console.error('Error creating signed URL:', error);
           
-          // Create a direct URL with access key authentication
-          const bucketName = 'documents';
-          const objectPath = requestBody.filePath;
-          
-          // First verify the file exists
-          try {
-            // List the directory contents to check if the file exists
-            const { data: fileList, error: listError } = await adminSupabase
-              .storage
-              .from(bucketName)
-              .list(objectPath.split('/').slice(0, -1).join('/'));
-            
-            if (listError) {
-              console.error('Error listing directory contents:', listError);
-            } else {
-              const fileName = objectPath.split('/').pop();
-              const fileExists = fileList?.some(file => file.name === fileName);
-              
-              if (!fileExists) {
-                console.error('File not found in storage:', objectPath);
-                return new Response(
-                  JSON.stringify({ error: 'File not found', details: 'The requested file does not exist' }),
-                  { 
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    status: 404 
-                  }
-                );
+          // If file not found, return a clear error
+          if (error.message.includes('not found') || error.message.includes('does not exist')) {
+            return new Response(
+              JSON.stringify({ error: 'File not found', details: 'The requested file does not exist' }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 404 
               }
-              
-              console.log('File verified, exists in storage');
-            }
-          } catch (verifyError) {
-            console.error('Error verifying file existence:', verifyError);
-            // Continue anyway as the list operation might not be permitted
+            );
           }
           
-          // Build a URL with the access key that will have full access to the storage
-          const directUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${objectPath}`;
-          
-          // Try to fetch the object directly with the access keys
-          const verificationHeaders = {
-            'apikey': requestBody.keyId,
-            'Authorization': `Bearer ${requestBody.accessKey}`
-          };
-          
-          try {
-            const verifyResponse = await fetch(directUrl, { 
-              headers: verificationHeaders,
-              method: 'HEAD'
-            });
-            
-            if (!verifyResponse.ok) {
-              console.error('File verification failed with status:', verifyResponse.status);
-              
-              // If file not found (404), return a clear error
-              if (verifyResponse.status === 404) {
-                return new Response(
-                  JSON.stringify({ error: 'File not found', details: 'The requested file does not exist' }),
-                  { 
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                    status: 404 
-                  }
-                );
-              }
-              
-              throw new Error(`File not accessible: ${verifyResponse.statusText}`);
-            }
-            
-            console.log('File verified, exists and is accessible');
-            
-            // If the file exists, return a direct download URL with the access key
-            const downloadParams = new URLSearchParams();
-            downloadParams.append('download', 'true');
-            
-            downloadUrl = `${directUrl}?${downloadParams.toString()}`;
-            console.log('Using direct access URL for download:', downloadUrl);
-          } catch (verifyError) {
-            console.error('Error verifying file:', verifyError);
-            // Fall back to signed URL if direct access fails
-          }
+          throw error;
         }
         
-        // If direct access failed or wasn't requested, use a signed URL
-        if (!downloadUrl) {
-          console.log('Falling back to signed URL generation');
-          
-          // Create a signed URL with an expiration of 60 minutes (3600 seconds)
-          const { data, error } = await adminSupabase
-            .storage
-            .from('documents')
-            .createSignedUrl(requestBody.filePath, 3600, {
-              download: true,  // Explicitly mark for download
-              transform: {
-                quality: 100  // Just to add a parameter and make sure the URL is properly formed
-              }
-            });
-          
-          if (error) {
-            console.error('Error creating signed URL:', error);
-            
-            // If file not found, return a clear error
-            if (error.message.includes('not found') || error.message.includes('does not exist')) {
-              return new Response(
-                JSON.stringify({ error: 'File not found', details: 'The requested file does not exist' }),
-                { 
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                  status: 404 
-                }
-              );
-            }
-            
-            throw error;
-          }
-          
-          if (!data || !data.signedUrl) {
-            throw new Error('Failed to generate signed URL');
-          }
-          
-          console.log('Successfully created signed URL with token');
-          downloadUrl = data.signedUrl;
+        if (!data || !data.signedUrl) {
+          throw new Error('Failed to generate signed URL');
         }
+        
+        console.log('Successfully created signed URL for download:', data.signedUrl);
         
         return new Response(
           JSON.stringify({ 
             success: true, 
-            url: downloadUrl
+            url: data.signedUrl
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -520,35 +423,12 @@ serve(async (req) => {
 
         console.log('Uploading file to path:', filePath);
 
-        // Make sure the bucket exists before uploading
-        const { data: buckets, error: bucketsError } = await adminSupabase
-          .storage
-          .listBuckets();
-          
-        if (bucketsError) {
-          console.error('Error listing buckets:', bucketsError);
-          throw new Error(`Failed to check storage buckets: ${bucketsError.message}`);
-        }
-        
-        const documentsBucketExists = buckets?.some(bucket => bucket.name === 'documents');
-        if (!documentsBucketExists) {
-          console.log('Creating documents bucket as it does not exist');
-          const { error: createBucketError } = await adminSupabase
-            .storage
-            .createBucket('documents', { public: true });
-            
-          if (createBucketError) {
-            console.error('Error creating documents bucket:', createBucketError);
-            throw new Error(`Failed to create documents bucket: ${createBucketError.message}`);
-          }
-        }
-
         // Upload file to storage using admin client
         const { data: uploadData, error: uploadError } = await adminSupabase
           .storage
           .from('documents')
           .upload(filePath, bytes, {
-            contentType: 'application/pdf',
+            contentType: 'application/octet-stream',
             upsert: true
           });
 
@@ -568,114 +448,6 @@ serve(async (req) => {
         if (urlError) {
           console.error('Error creating signed URL:', urlError);
           // Continue anyway as it's not critical
-        }
-        
-        // Verify the file exists in the bucket
-        const { data: verifyData, error: verifyError } = await adminSupabase
-          .storage
-          .from('documents')
-          .list(filePath.split('/').slice(0, -1).join('/'));
-          
-        if (verifyError) {
-          console.error('Error verifying file upload:', verifyError);
-        } else {
-          const fileExists = verifyData?.some(file => 
-            file.name === filePath.split('/').pop()
-          );
-          
-          if (!fileExists) {
-            console.error('File was not found after upload:', filePath);
-          } else {
-            console.log('File successfully verified in storage:', filePath);
-          }
-        }
-        
-        // If document ID is provided, update the document record with new status
-        if (requestBody.documentId) {
-          console.log('Updating document record with ID:', requestBody.documentId);
-          
-          const now = new Date().toISOString();
-          
-          // Create update object with all required fields
-          const documentUpdate = {
-            file_path: filePath,
-            file_name: fileNameClean,
-            status: 'sent',
-            submitted_at: now,
-            updated_at: now,
-            submitted_by: requestBody.userId || user.id, // Use provided userId or default to current user
-            file_size: bytes.length, // Add file size information
-            mime_type: 'application/pdf' // Add mime type information
-          };
-          
-          console.log('Updating document with data:', documentUpdate);
-          
-          const { data: updateData, error: updateError } = await adminSupabase
-            .from('documents')
-            .update(documentUpdate)
-            .eq('id', requestBody.documentId)
-            .select();
-            
-          if (updateError) {
-            console.error('Error updating document record:', updateError);
-            // Get more details about the specific error
-            const { data: docInfo, error: docInfoError } = await adminSupabase
-              .from('documents')
-              .select('*')
-              .eq('id', requestBody.documentId)
-              .single();
-            
-            if (docInfoError) {
-              console.error('Error checking document:', docInfoError);
-            } else {
-              console.log('Current document state:', docInfo);
-            }
-            
-            // Don't throw here, still return success for the file upload
-            console.log('File was uploaded but document record was not updated');
-          } else {
-            console.log('Document record updated successfully:', updateData);
-          }
-        }
-        
-        // If buyerId is provided, update the project_buyer record
-        if (requestBody.buyerId && requestBody.resourceType === 'projects') {
-          console.log('Updating project_buyer record with ID:', requestBody.buyerId);
-          console.log('Setting file path:', filePath);
-          console.log('Setting file name:', fileNameClean);
-          
-          const { data: updateData, error: updateError } = await adminSupabase
-            .from('project_buyers')
-            .update({
-              contract_file_path: filePath,
-              contract_file_name: fileNameClean,
-              contract_status: 'a_analisar'
-            })
-            .eq('id', requestBody.buyerId)
-            .select();
-            
-          if (updateError) {
-            console.error('Error updating project_buyer:', updateError);
-            // Don't throw here, still return success for the file upload
-            console.log('File was uploaded but project_buyer record was not updated');
-          } else {
-            console.log('Project buyer record updated successfully:', updateData);
-          }
-        }
-
-        // Set the file to be publicly accessible
-        const { error: updatePublicError } = await adminSupabase
-          .storage
-          .from('documents')
-          .update(filePath, bytes, {
-            contentType: 'application/pdf',
-            upsert: true,
-            cacheControl: '3600',
-            allowedMimeTypes: ['application/pdf']
-          });
-          
-        if (updatePublicError) {
-          console.error('Error setting file to public:', updatePublicError);
         }
 
         return new Response(
