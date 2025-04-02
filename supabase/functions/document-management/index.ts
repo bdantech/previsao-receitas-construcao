@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.0';
 import { cors } from '../_shared/cors.ts';
@@ -182,26 +183,40 @@ serve(async (req) => {
           throw documentError;
         }
       } else if (buyerId && resourceType === 'projects') {
-        // Updating a buyer's contract
-        const { data: buyerData, error: buyerError } = await serviceClient
-          .from('project_buyers')
-          .update({
-            contract_file_path: storagePath,
-            contract_file_name: fileName,
-            contract_status: 'a_analisar'  // Explicitly set to 'a_analisar' (Em Análise)
-          })
-          .eq('id', buyerId)
-          .select()
-          .single();
-        
-        if (buyerError) {
-          console.error('Error updating buyer contract:', buyerError);
-          throw buyerError;
+        console.log('Updating buyer contract with buyerId:', buyerId);
+        try {
+          // Use the serviceClient (with admin privileges) to update contract status
+          const { data: buyerData, error: buyerError } = await serviceClient
+            .from('project_buyers')
+            .update({
+              contract_file_path: storagePath,
+              contract_file_name: fileName,
+              contract_status: 'a_analisar'  // Explicitly set to 'a_analisar' (Em Análise)
+            })
+            .eq('id', buyerId)
+            .select()
+            .single();
+          
+          if (buyerError) {
+            console.error('Error updating buyer contract:', buyerError);
+            throw buyerError;
+          }
+          
+          console.log('Buyer contract updated successfully:', buyerData);
+        } catch (updateError) {
+          console.error('Error in update operation:', updateError);
+          throw updateError;
         }
       }
 
       return new Response(
-        JSON.stringify({ message: 'File uploaded successfully', path: storagePath }),
+        JSON.stringify({ 
+          success: true,
+          message: 'File uploaded successfully', 
+          path: storagePath,
+          fileName: fileName,
+          signedUrl: `${supabaseUrl}/storage/v1/object/sign/documents/${storagePath}`
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }

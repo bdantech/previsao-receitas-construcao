@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -447,6 +448,7 @@ const ProjectDashboardPage = () => {
       
       console.log('File uploaded successfully:', uploadResponse.data);
       
+      // Refresh the buyers list to see the updated status
       await fetchProjectBuyers();
       
       toast({
