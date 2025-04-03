@@ -1,36 +1,27 @@
-
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 // CORS configuration
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-serve(async (req) => {
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
+serve(async (req)=>{
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, {
+      headers: corsHeaders
+    });
   }
-
   try {
     // Get environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing environment variables')
+      throw new Error('Missing environment variables');
     }
-
     // Initialize Supabase client with Service Role Key (bypasses RLS)
-    const supabase = createClient(
-      supabaseUrl,
-      supabaseServiceKey
-    )
-
-    console.log('Updating database functions to fix billing receivables deletion issue...')
-
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('Updating database functions to fix billing receivables deletion issue...');
     // Check if there are any triggers that might be causing billing receivables to be deleted
     const { data: triggers, error: triggersError } = await supabase.rpc('execute_sql', {
       params: {},
@@ -41,14 +32,11 @@ serve(async (req) => {
         ORDER BY trigger_name;
       `
     });
-
     if (triggersError) {
       console.error('Error checking triggers:', triggersError);
       throw triggersError;
     }
-
     console.log('Billing receivables triggers:', triggers);
-
     // Verify the calculate_payment_plan_installments function to ensure it's not accidentally deleting receivables
     const { data: updated, error: updateError } = await supabase.rpc('execute_sql', {
       params: {},
@@ -144,32 +132,31 @@ serve(async (req) => {
         $function$;
       `
     });
-
     if (updateError) {
       console.error('Error updating calculate_payment_plan_installments function:', updateError);
       throw updateError;
     }
-
     console.log('Database functions updated successfully to fix billing receivables deletion issue');
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Database functions updated successfully to fix billing receivables deletion issue'
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    );
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Database functions updated successfully to fix billing receivables deletion issue'
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 200
+    });
   } catch (error) {
     console.error('Error updating database functions:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
-    );
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 500
+    });
   }
 });

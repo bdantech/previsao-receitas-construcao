@@ -1,134 +1,122 @@
-
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 // CORS configuration
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-serve(async (req) => {
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
+serve(async (req)=>{
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, {
+      headers: corsHeaders
+    });
   }
-
   try {
     // Get environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
-
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing environment variables')
+      throw new Error('Missing environment variables');
     }
-
     // Get authorization header
-    const authHeader = req.headers.get('Authorization')
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401 
-        }
-      )
-    }
-
-    // Initialize Supabase client with user's auth token
-    const supabaseClient = createClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        global: {
-          headers: {
-            Authorization: authHeader
-          },
+      return new Response(JSON.stringify({
+        error: 'Authentication required'
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
         },
+        status: 401
+      });
+    }
+    // Initialize Supabase client with user's auth token
+    const supabaseClient = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
       }
-    )
-
+    });
     // Authenticate user
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
-    
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
-      console.error('Auth error:', authError)
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401 
-        }
-      )
+      console.error('Auth error:', authError);
+      return new Response(JSON.stringify({
+        error: 'Authentication required'
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 401
+      });
     }
-
     // Get user's companies
-    const { data: userCompanies, error: companiesError } = await supabaseClient
-      .from('user_companies')
-      .select('company_id')
-      .eq('user_id', user.id)
-
+    const { data: userCompanies, error: companiesError } = await supabaseClient.from('user_companies').select('company_id').eq('user_id', user.id);
     if (companiesError) {
-      console.error('Error fetching user companies:', companiesError)
-      return new Response(
-        JSON.stringify({ error: 'Error fetching user companies' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500 
-        }
-      )
+      console.error('Error fetching user companies:', companiesError);
+      return new Response(JSON.stringify({
+        error: 'Error fetching user companies'
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 500
+      });
     }
-
-    const companyIds = userCompanies.map(uc => uc.company_id)
-    
+    const companyIds = userCompanies.map((uc)=>uc.company_id);
     if (companyIds.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'No associated companies found' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403 
-        }
-      )
+      return new Response(JSON.stringify({
+        error: 'No associated companies found'
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 403
+      });
     }
-
     // Parse request
-    const { action, data } = await req.json()
-    console.log(`Received action: ${action}`, data)
-
+    const { action, data } = await req.json();
+    console.log(`Received action: ${action}`, data);
     // Handle different actions
-    switch (action) {
-      case 'getBoletos': {
-        const { filters } = data || {}
-        return await handleGetBoletos(supabaseClient, companyIds, filters, corsHeaders)
-      }
-
+    switch(action){
+      case 'getBoletos':
+        {
+          const { filters } = data || {};
+          return await handleGetBoletos(supabaseClient, companyIds, filters, corsHeaders);
+        }
       default:
-        return new Response(
-          JSON.stringify({ error: 'Invalid action' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
-          }
-        )
+        return new Response(JSON.stringify({
+          error: 'Invalid action'
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          },
+          status: 400
+        });
     }
   } catch (error) {
-    console.error("Error in company-boletos function:", error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
-    )
+    console.error("Error in company-boletos function:", error);
+    return new Response(JSON.stringify({
+      error: error.message
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 500
+    });
   }
-})
-
+});
 async function handleGetBoletos(supabaseClient, companyIds, filters, corsHeaders) {
-  console.log('Getting boletos for companies:', companyIds, 'with filters:', filters)
-  
-  let query = supabaseClient
-    .from('boletos')
-    .select(`
+  console.log('Getting boletos for companies:', companyIds, 'with filters:', filters);
+  let query = supabaseClient.from('boletos').select(`
       id,
       billing_receivable_id,
       valor_face,
@@ -180,47 +168,40 @@ async function handleGetBoletos(supabaseClient, companyIds, filters, corsHeaders
           numero_parcela
         )
       )
-    `)
-    .in('company_id', companyIds)
-  
+    `).in('company_id', companyIds);
   // Apply filters if provided
   if (filters) {
     if (filters.projectId) {
-      query = query.eq('project_id', filters.projectId)
+      query = query.eq('project_id', filters.projectId);
     }
-    
     if (filters.statusEmissao) {
-      query = query.eq('status_emissao', filters.statusEmissao)
+      query = query.eq('status_emissao', filters.statusEmissao);
     }
-    
     if (filters.statusPagamento) {
-      query = query.eq('status_pagamento', filters.statusPagamento)
+      query = query.eq('status_pagamento', filters.statusPagamento);
     }
-    
     if (filters.fromDate) {
-      query = query.gte('data_vencimento', filters.fromDate)
+      query = query.gte('data_vencimento', filters.fromDate);
     }
-    
     if (filters.toDate) {
-      query = query.lte('data_vencimento', filters.toDate)
+      query = query.lte('data_vencimento', filters.toDate);
     }
   }
-  
-  const { data: boletos, error } = await query.order('data_vencimento', { ascending: true })
-  
+  const { data: boletos, error } = await query.order('data_vencimento', {
+    ascending: true
+  });
   if (error) {
-    console.error('Error fetching boletos:', error)
-    throw error
+    console.error('Error fetching boletos:', error);
+    throw error;
   }
-  
-  return new Response(
-    JSON.stringify({ 
-      boletos,
-      count: boletos.length
-    }),
-    { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200 
-    }
-  )
+  return new Response(JSON.stringify({
+    boletos,
+    count: boletos.length
+  }), {
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json'
+    },
+    status: 200
+  });
 }
