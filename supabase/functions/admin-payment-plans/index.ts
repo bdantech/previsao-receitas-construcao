@@ -775,7 +775,7 @@ serve(async (req) => {
         // Recalculate payment plan
         console.log(`Recalculating payment plan for settings_id ${installment.payment_plan_settings_id}`);
         const { error: calcError } = await supabase.rpc(
-          'calculate_payment_plan_installments',
+          'recalculate_installment_values',
           { p_payment_plan_settings_id: installment.payment_plan_settings_id }
         );
 
