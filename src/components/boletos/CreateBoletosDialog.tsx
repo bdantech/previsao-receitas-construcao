@@ -18,12 +18,13 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, FilterX } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
 
 type BillingReceivable = {
   id: string;
@@ -57,26 +58,60 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
   const [isFetching, setIsFetching] = useState(true);
   const [billingReceivables, setBillingReceivables] = useState<BillingReceivable[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [monthYearFilter, setMonthYearFilter] = useState<string>("");
   const { toast } = useToast();
   const { getAuthHeader } = useAuth();
 
-  // Fetch available billing receivables when dialog opens
+  // Set default month/year filter to current month when dialog opens
   useEffect(() => {
     if (open) {
-      fetchAvailableBillingReceivables();
+      const now = new Date();
+      const currentMonthYear = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+      setMonthYearFilter(currentMonthYear);
+      fetchAvailableBillingReceivables(currentMonthYear);
     } else {
       setSelectedIds([]);
     }
   }, [open]);
 
-  const fetchAvailableBillingReceivables = async () => {
+  // Refetch when month/year filter changes
+  useEffect(() => {
+    if (open && monthYearFilter) {
+      fetchAvailableBillingReceivables(monthYearFilter);
+    }
+  }, [monthYearFilter, open]);
+
+  const fetchAvailableBillingReceivables = async (monthYear: string) => {
     setIsFetching(true);
     setBillingReceivables([]);
     try {
-      console.log("Fetching available billing receivables...");
+      console.log("Fetching available billing receivables for:", monthYear);
+      
+      // Convert month-year filter to date range
+      let fromDate, toDate;
+      if (monthYear) {
+        const [year, month] = monthYear.split('-');
+        const monthInt = parseInt(month);
+        const yearInt = parseInt(year);
+        
+        // Create date for first day of month
+        fromDate = new Date(yearInt, monthInt - 1, 1)
+          .toISOString()
+          .split('T')[0];
+        
+        // Create date for last day of month
+        toDate = new Date(yearInt, monthInt, 0)
+          .toISOString()
+          .split('T')[0];
+      }
+
       const { data, error } = await supabase.functions.invoke("admin-boletos", {
         body: {
           action: "getAvailableBillingReceivables",
+          data: {
+            fromDate,
+            toDate
+          }
         },
         headers: getAuthHeader(),
       });
@@ -128,6 +163,12 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
     } else {
       setSelectedIds((prev) => prev.filter((item) => item !== id));
     }
+  };
+
+  const handleClearFilter = () => {
+    const now = new Date();
+    const currentMonthYear = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    setMonthYearFilter(currentMonthYear);
   };
 
   const handleCreateBoletos = async () => {
@@ -193,81 +234,105 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[60vh] overflow-y-auto mt-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox
-                    checked={
-                      billingReceivables.length > 0 &&
-                      selectedIds.length === billingReceivables.length
-                    }
-                    onCheckedChange={handleSelectAllChange}
-                    disabled={isFetching || billingReceivables.length === 0}
-                  />
-                </TableHead>
-                <TableHead>Empresa</TableHead>
-                <TableHead>Projeto</TableHead>
-                <TableHead>Comprador</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Vencimento</TableHead>
-                <TableHead>Parcela</TableHead>
-                <TableHead>Índice</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isFetching ? (
+        <div className="space-y-4">
+          <div className="flex justify-between items-end">
+            <div className="w-1/2">
+              <label className="text-sm font-medium mb-1 block">
+                Filtrar por mês/ano de vencimento
+              </label>
+              <MonthYearPicker 
+                value={monthYearFilter} 
+                onChange={setMonthYearFilter}
+                placeholder="Selecione mês/ano"
+              />
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleClearFilter}
+              className="h-9"
+            >
+              <FilterX className="h-4 w-4 mr-1" />
+              Limpar Filtro
+            </Button>
+          </div>
+
+          <div className="max-h-[60vh] overflow-y-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-6">
-                    <div className="flex justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
-                    </div>
-                  </TableCell>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={
+                        billingReceivables.length > 0 &&
+                        selectedIds.length === billingReceivables.length
+                      }
+                      onCheckedChange={handleSelectAllChange}
+                      disabled={isFetching || billingReceivables.length === 0}
+                    />
+                  </TableHead>
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>Projeto</TableHead>
+                  <TableHead>Comprador</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead>Parcela</TableHead>
+                  <TableHead>Índice</TableHead>
                 </TableRow>
-              ) : billingReceivables.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-6">
-                    Não há recebíveis disponíveis para gerar boletos.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                billingReceivables.map((br) => (
-                  <TableRow key={br.id}>
-                    <TableCell className="py-2">
-                      <Checkbox
-                        checked={selectedIds.includes(br.id)}
-                        onCheckedChange={(checked) =>
-                          handleCheckboxChange(br.id, checked === true)
-                        }
-                      />
+              </TableHeader>
+              <TableBody>
+                {isFetching ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-6">
+                      <div className="flex justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+                      </div>
                     </TableCell>
-                    <TableCell className="py-2">{br.company_name}</TableCell>
-                    <TableCell className="py-2">{br.project_name}</TableCell>
-                    <TableCell className="py-2">
-                      {br.buyer_name}
-                      <div className="text-xs text-gray-500">{br.buyer_cpf}</div>
-                    </TableCell>
-                    <TableCell className="py-2">
-                      {new Intl.NumberFormat("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      }).format(br.amount)}
-                    </TableCell>
-                    <TableCell className="py-2">
-                      {format(
-                        new Date(br.nova_data_vencimento),
-                        "dd/MM/yyyy",
-                        { locale: ptBR }
-                      )}
-                    </TableCell>
-                    <TableCell className="py-2">{br.numero_parcela}</TableCell>
-                    <TableCell className="py-2">{br.index_name || "Não definido"}</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : billingReceivables.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-6">
+                      Não há recebíveis disponíveis para gerar boletos neste período.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  billingReceivables.map((br) => (
+                    <TableRow key={br.id}>
+                      <TableCell className="py-2">
+                        <Checkbox
+                          checked={selectedIds.includes(br.id)}
+                          onCheckedChange={(checked) =>
+                            handleCheckboxChange(br.id, checked === true)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="py-2">{br.company_name}</TableCell>
+                      <TableCell className="py-2">{br.project_name}</TableCell>
+                      <TableCell className="py-2">
+                        {br.buyer_name}
+                        <div className="text-xs text-gray-500">{br.buyer_cpf}</div>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        {new Intl.NumberFormat("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        }).format(br.amount)}
+                      </TableCell>
+                      <TableCell className="py-2">
+                        {format(
+                          new Date(br.nova_data_vencimento),
+                          "dd/MM/yyyy",
+                          { locale: ptBR }
+                        )}
+                      </TableCell>
+                      <TableCell className="py-2">{br.numero_parcela}</TableCell>
+                      <TableCell className="py-2">{br.index_name || "Não definido"}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
 
         <DialogFooter className="mt-4">

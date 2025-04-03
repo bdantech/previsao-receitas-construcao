@@ -1011,7 +1011,12 @@ export type Database = {
       buyer_status: "aprovado" | "reprovado" | "a_analisar"
       contract_status: "aprovado" | "reprovado" | "a_enviar" | "a_analisar"
       credit_analysis_status: "aprovado" | "reprovado" | "a_analisar"
-      document_status: "sent" | "approved" | "needs_revision" | "not_sent"
+      document_status:
+        | "sent"
+        | "approved"
+        | "needs_revision"
+        | "not_sent"
+        | "rejected"
       project_status: "active" | "inactive"
       receivable_status:
         | "enviado"

@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 
@@ -120,7 +119,8 @@ serve(async (req) => {
       }
 
       case 'getAvailableBillingReceivables': {
-        return await handleGetAvailableBillingReceivables(serviceClient, corsHeaders)
+        const { fromDate, toDate } = data || {}
+        return await handleGetAvailableBillingReceivables(serviceClient, fromDate, toDate, corsHeaders)
       }
 
       default:
@@ -249,8 +249,8 @@ async function handleGetBoletos(serviceClient, filters, corsHeaders) {
   )
 }
 
-async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) {
-  console.log('Getting available billing receivables');
+async function handleGetAvailableBillingReceivables(serviceClient, fromDate, toDate, corsHeaders) {
+  console.log('Getting available billing receivables', { fromDate, toDate });
   
   try {
     // First, get all the billing_receivable_ids that already have boletos
@@ -309,6 +309,15 @@ async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) 
     // If we have existing boletos, exclude their billing_receivable_ids
     if (existingIds.length > 0) {
       query = query.not('id', 'in', `(${existingIds.join(',')})`);
+    }
+    
+    // Apply date filters if provided
+    if (fromDate) {
+      query = query.gte('nova_data_vencimento', fromDate);
+    }
+    
+    if (toDate) {
+      query = query.lte('nova_data_vencimento', toDate);
     }
     
     const { data, error } = await query.limit(100);
