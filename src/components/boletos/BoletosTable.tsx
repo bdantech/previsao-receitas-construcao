@@ -1,7 +1,14 @@
 
-import React from "react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -10,22 +17,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { 
-  FileDown, 
-  Pencil, 
-  Trash,
-  Eye
+  Eye,
+  FileDown,
+  Pencil,
+  Trash
 } from "lucide-react";
-import { MonthYearPicker } from "@/components/ui/month-year-picker";
+import React from "react";
 
 export type Boleto = {
   id: string;
@@ -132,6 +135,9 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
   filters,
   isAdmin = false,
 }) => {
+  const { getAuthHeader } = useAuth();
+  const { toast } = useToast();
+  
   const handleMonthYearChange = (value: string) => {
     onFilterChange({
       ...filters,
@@ -152,6 +158,40 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
       statusPagamento: value,
     });
   };
+
+  const handleDownload = async (boleto: Boleto) => {
+    const { data, error } = await supabase.functions.invoke("storage-management", {
+      body: {
+        action: "downloadFile",
+        data: {
+          bucketName: 'documents',
+          filePath: boleto.arquivo_boleto_path,
+        },
+      },
+      headers: getAuthHeader(),
+    });
+
+    if (error) {
+      console.error("Error getting download URL:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: `Erro ao preparar o download: ${error.message}`,
+      });
+      return;
+    }
+    
+    if (!data || !data.url) {
+      throw new Error("Failed to get download URL");
+    }
+
+    const link = document.createElement('a');
+    link.href = data.url;
+    link.download = boleto.arquivo_boleto_name || 'boleto.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   // Determine if we're in the project dashboard context
   const isProjectContext = Boolean(filters.projectId);
@@ -284,7 +324,7 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => window.open(boleto.arquivo_boleto_path, '_blank')}
+                          onClick={() => handleDownload(boleto)}
                           title="Download do Boleto"
                         >
                           <FileDown className="h-4 w-4" />
