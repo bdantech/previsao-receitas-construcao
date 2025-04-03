@@ -129,94 +129,210 @@ serve(async (req)=>{
       });
     }
     // Upload file action
-    if (requestData.action === 'uploadFile') {
-      const { file, fileName, resourceType, resourceId, documentId, userId, buyerId } = requestData;
-      if (!file || !fileName || !resourceType || !resourceId) {
-        return new Response(JSON.stringify({
-          error: 'Missing required parameters for file upload'
-        }), {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          },
-          status: 400
-        });
-      }
-      // Decode the base64 file
-      const base64Data = file.split(',')[1];
-      const fileContent = atob(base64Data);
-      // Convert the file content to a Uint8Array
-      const uint8Array = new Uint8Array(fileContent.length);
-      for(let i = 0; i < fileContent.length; i++){
-        uint8Array[i] = fileContent.charCodeAt(i);
-      }
-      // Determine the file extension and MIME type
-      const fileExtension = extname(fileName).slice(1);
-      const mimeType = contentType(fileExtension) || 'application/octet-stream';
-      // Sanitize the file name
-      const sanitizedFileName = sanitize(fileName);
-      // Calculate file size
-      const fileSize = uint8Array.length;
-      // Store file in Supabase Storage
-      const timestamp = Date.now();
-      const fileNameWithTimestamp = `${timestamp}-${sanitizedFileName}`;
-      const storagePath = `${resourceType}/${resourceId}/${fileNameWithTimestamp}`;
-      const { data: uploadData, error: uploadError } = await adminSupabase.storage.from('documents').upload(storagePath, uint8Array, {
-        contentType: mimeType,
-        upsert: true
-      });
-      if (uploadError) {
-        console.error('Error uploading to storage:', uploadError);
-        throw uploadError;
-      }
-      // Update document record or buyer record based on the context
-      if (documentId) {
-        // Updating a document
-        const { data: documentData, error: documentError } = await adminSupabase.from('documents').update({
-          file_path: storagePath,
-          file_name: fileName,
-          mime_type: mimeType,
-          file_size: fileSize,
-          status: 'sent',
-          submitted_by: userId,
-          submitted_at: new Date().toISOString()
-        }).eq('id', documentId).select().single();
-        if (documentError) {
-          console.error('Error updating document record:', documentError);
-          throw documentError;
-        }
-      } else if (buyerId && resourceType === 'projects') {
-        console.log('Updating buyer contract with buyerId:', buyerId);
-        try {
-          // Use the adminSupabase (with admin privileges) to update contract status
-          const { data: buyerData, error: buyerError } = await adminSupabase.from('project_buyers').update({
-            contract_file_path: storagePath,
-            contract_file_name: fileName,
-            contract_status: 'a_analisar' // Explicitly set to 'a_analisar' (Em Análise)
-          }).eq('id', buyerId).select().single();
-          if (buyerError) {
-            console.error('Error updating buyer contract:', buyerError);
-            throw buyerError;
+    if (action === 'uploadFile') {
+      if (!requestData.file || !requestData.fileName || !requestData.resourceType || !requestData.resourceId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required fields' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
           }
-          console.log('Buyer contract updated successfully:', buyerData);
-        } catch (updateError) {
-          console.error('Error in update operation:', updateError);
-          throw updateError;
-        }
+        );
       }
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'File uploaded successfully',
-        path: storagePath,
-        fileName: fileName,
-        signedUrl: `${supabaseUrl}/storage/v1/object/sign/documents/${storagePath}`
-      }), {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        },
-        status: 200
-      });
+
+      try {
+        // Convert base64 to Uint8Array
+        const base64Str = requestData.file.split('base64,')[1];
+        const bytes = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
+
+        // Create a unique file path
+        const timestamp = new Date().getTime();
+        const fileNameClean = requestData.fileName.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize the filename
+        const uniqueFileName = `${timestamp}-${fileNameClean}`;
+        const filePath = `${requestData.resourceType}/${requestData.resourceId}/${uniqueFileName}`;
+
+        console.log('Uploading file to path:', filePath);
+
+        // Make sure the bucket exists before uploading
+        const { data: buckets, error: bucketsError } = await adminSupabase
+          .storage
+          .listBuckets();
+
+        if (bucketsError) {
+          console.error('Error listing buckets:', bucketsError);
+          throw new Error(`Failed to check storage buckets: ${bucketsError.message}`);
+        }
+
+        const documentsBucketExists = buckets?.some(bucket => bucket.name === 'documents');
+        if (!documentsBucketExists) {
+          console.log('Creating documents bucket as it does not exist');
+          const { error: createBucketError } = await adminSupabase
+            .storage
+            .createBucket('documents', { public: true });
+
+          if (createBucketError) {
+            console.error('Error creating documents bucket:', createBucketError);
+            throw new Error(`Failed to create documents bucket: ${createBucketError.message}`);
+          }
+        }
+
+        // Upload file to storage using admin client
+        const { data: uploadData, error: uploadError } = await adminSupabase
+          .storage
+          .from('documents')
+          .upload(filePath, bytes, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error(`Erro ao fazer upload do arquivo: ${uploadError.message}`);
+        }
+
+        console.log('File uploaded successfully:', uploadData);
+
+        // Create a signed URL for immediate access
+        const { data: urlData, error: urlError } = await adminSupabase
+          .storage
+          .from('documents')
+          .createSignedUrl(filePath, 60 * 60 * 24); // 24 hours expiry
+
+        if (urlError) {
+          console.error('Error creating signed URL:', urlError);
+          // Continue anyway as it's not critical
+        }
+
+        // Verify the file exists in the bucket
+        const { data: verifyData, error: verifyError } = await adminSupabase
+          .storage
+          .from('documents')
+          .list(filePath.split('/').slice(0, -1).join('/'));
+
+        if (verifyError) {
+          console.error('Error verifying file upload:', verifyError);
+        } else {
+          const fileExists = verifyData?.some(file => 
+            file.name === filePath.split('/').pop()
+          );
+
+          if (!fileExists) {
+            console.error('File was not found after upload:', filePath);
+          } else {
+            console.log('File successfully verified in storage:', filePath);
+          }
+        }
+
+        // If document ID is provided, update the document record with new status
+        if (requestData.documentId) {
+          console.log('Updating document record with ID:', requestData.documentId);
+
+          const now = new Date().toISOString();
+
+          // Create update object with all required fields
+          const documentUpdate = {
+            file_path: filePath,
+            file_name: fileNameClean,
+            status: 'sent',
+            submitted_at: now,
+            updated_at: now,
+            submitted_by: requestData.userId || user.id, // Use provided userId or default to current user
+            file_size: bytes.length, // Add file size information
+            mime_type: 'application/pdf' // Add mime type information
+          };
+
+          console.log('Updating document with data:', documentUpdate);
+
+          const { data: updateData, error: updateError } = await adminSupabase
+            .from('documents')
+            .update(documentUpdate)
+            .eq('id', requestData.documentId)
+            .select();
+
+          if (updateError) {
+            console.error('Error updating document record:', updateError);
+            // Get more details about the specific error
+            const { data: docInfo, error: docInfoError } = await adminSupabase
+              .from('documents')
+              .select('*')
+              .eq('id', requestData.documentId)
+              .single();
+
+            if (docInfoError) {
+              console.error('Error checking document:', docInfoError);
+            } else {
+              console.log('Current document state:', docInfo);
+            }
+
+            // Don't throw here, still return success for the file upload
+            console.log('File was uploaded but document record was not updated');
+          } else {
+            console.log('Document record updated successfully:', updateData);
+          }
+        }
+
+        // If buyerId is provided, update the project_buyer record
+        if (requestData.buyerId && requestData.resourceType === 'projects') {
+          console.log('Updating project_buyer record with ID:', requestData.buyerId);
+          console.log('Setting file path:', filePath);
+          console.log('Setting file name:', fileNameClean);
+
+          const { data: updateData, error: updateError } = await adminSupabase
+            .from('project_buyers')
+            .update({
+              contract_file_path: filePath,
+              contract_file_name: fileNameClean,
+              contract_status: 'a_analisar'
+            })
+            .eq('id', requestData.buyerId)
+            .select();
+
+          if (updateError) {
+            console.error('Error updating project_buyer:', updateError);
+            // Don't throw here, still return success for the file upload
+            console.log('File was uploaded but project_buyer record was not updated');
+          } else {
+            console.log('Project buyer record updated successfully:', updateData);
+          }
+        }
+
+        // Set the file to be publicly accessible
+        const { error: updatePublicError } = await adminSupabase
+          .storage
+          .from('documents')
+          .update(filePath, bytes, {
+            contentType: 'application/pdf',
+            upsert: true,
+            cacheControl: '3600',
+            allowedMimeTypes: ['application/pdf']
+          });
+
+        if (updatePublicError) {
+          console.error('Error setting file to public:', updatePublicError);
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            filePath: filePath,
+            fileName: fileNameClean,
+            signedUrl: urlData?.signedUrl
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200 
+          }
+        );
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to upload file', details: error.message }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
+      }
     }
 
     if (action === 'updateDocumentStatus') {

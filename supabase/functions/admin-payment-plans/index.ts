@@ -82,7 +82,7 @@ serve(async (req)=>{
     const { action, ...data } = await req.json();
     console.log(`Admin payment plans action: ${action}`, data);
     let responseData;
-    let error = null;
+    const error = null;
     // Handle different actions
     switch(action){
       case 'createPaymentPlan':
@@ -549,11 +549,11 @@ serve(async (req)=>{
           const totalAmount = (remainingReceivables || []).reduce((sum, item)=>sum + parseFloat(item.receivables.amount), 0);
           console.log(`Calculated new total amount for installment: ${totalAmount}`);
           // Get payment plan settings ID for the installment
-          const { data: installment, error: installmentError } = await supabase.from('payment_plan_installments').select('payment_plan_settings_id').eq('id', installmentId).single();
-          if (installmentError) {
-            console.error('Error getting installment:', installmentError);
-            throw new Error(`Error getting installment: ${installmentError.message}`);
-          }
+          // const { data: installment, error: installmentError } = await supabase.from('payment_plan_installments').select('payment_plan_settings_id').eq('id', installmentId).single();
+          // if (installmentError) {
+          //   console.error('Error getting installment:', installmentError);
+          //   throw new Error(`Error getting installment: ${installmentError.message}`);
+          // }
           // Update installment with new recebiveis value
           console.log(`Updating installment ${installmentId} with new recebiveis value: ${totalAmount}`);
           const { data: updatedInstallment, error: updateError } = await supabase.from('payment_plan_installments').update({
@@ -565,15 +565,15 @@ serve(async (req)=>{
           }
           console.log('Successfully updated installment with new recebiveis value');
           // Recalculate payment plan
-          console.log(`Recalculating payment plan for settings_id ${installment.payment_plan_settings_id}`);
-          const { error: calcError } = await supabase.rpc('recalculate_installment_values', {
-            p_payment_plan_settings_id: installment.payment_plan_settings_id
-          });
-          if (calcError) {
-            console.error('Error recalculating payment plan:', calcError);
-            throw new Error(`Error recalculating payment plan: ${calcError.message}`);
-          }
-          console.log('Payment plan recalculation succeeded');
+          // console.log(`Recalculating payment plan for settings_id ${installment.payment_plan_settings_id}`);
+          // const { error: calcError } = await supabase.rpc('recalculate_installment_values', {
+          //   p_payment_plan_settings_id: installment.payment_plan_settings_id
+          // });
+          // if (calcError) {
+          //   console.error('Error recalculating payment plan:', calcError);
+          //   throw new Error(`Error recalculating payment plan: ${calcError.message}`);
+          // }
+          // console.log('Payment plan recalculation succeeded');
           responseData = {
             success: true,
             removedReceivableId: billingReceivable.receivable_id,
