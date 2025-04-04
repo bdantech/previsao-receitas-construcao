@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import {
   Dialog,
@@ -309,6 +308,23 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
               <div>
                 <p className="text-sm font-medium mb-1">CPF/CNPJ</p>
                 <p className="text-sm">{boleto.payer_tax_id}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium mb-1">Valor Face</p>
+                <p className="text-sm">
+                  {new Intl.NumberFormat("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  }).format(boleto.valor_face)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium mb-1">Percentual de Atualização</p>
+                <p className="text-sm">
+                  {boleto.percentual_atualizacao !== null 
+                    ? `${boleto.percentual_atualizacao > 0 ? '+' : ''}${boleto.percentual_atualizacao.toFixed(2)}%`
+                    : "—"}
+                </p>
               </div>
               <div>
                 <p className="text-sm font-medium mb-1">Valor do Boleto</p>
