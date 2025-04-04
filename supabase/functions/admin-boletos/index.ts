@@ -102,7 +102,7 @@ serve(async (req)=>{
         }
       case 'getAvailableBillingReceivables':
         {
-          return await handleGetAvailableBillingReceivables(serviceClient, corsHeaders);
+          return await handleGetAvailableBillingReceivables(serviceClient, data, corsHeaders);
         }
       default:
         return new Response(JSON.stringify({
@@ -222,8 +222,8 @@ async function handleGetBoletos(serviceClient, filters, corsHeaders) {
     status: 200
   });
 }
-async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) {
-  console.log('Getting available billing receivables');
+async function handleGetAvailableBillingReceivables(serviceClient, data, corsHeaders) {
+  console.log('Getting available billing receivables with data:', data);
   try {
     // First, get all the billing_receivable_ids that already have boletos
     const { data: existingBoletoReceipts, error: existingError } = await serviceClient.from('boletos').select('billing_receivable_id').not('billing_receivable_id', 'is', null);
@@ -234,7 +234,28 @@ async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) 
     // Extract the IDs to an array
     const existingIds = existingBoletoReceipts.map((b)=>b.billing_receivable_id);
     console.log(`Found ${existingIds.length} existing boleto receipts to exclude`);
-    // Now get all billing receivables that don't have boletos yet
+    
+    // First get the receivables that match our date criteria
+    let receivablesQuery = serviceClient.from('receivables').select('id');
+    
+    // Apply date filters to receivables if provided
+    if (data?.fromDate) {
+      receivablesQuery = receivablesQuery.gte('due_date', data.fromDate);
+    }
+    if (data?.toDate) {
+      receivablesQuery = receivablesQuery.lte('due_date', data.toDate);
+    }
+    
+    const { data: filteredReceivables, error: receivablesError } = await receivablesQuery;
+    if (receivablesError) {
+      console.error('Error fetching filtered receivables:', receivablesError);
+      throw receivablesError;
+    }
+    
+    const filteredReceivableIds = (filteredReceivables || []).map(r => r.id);
+    console.log(`Found ${filteredReceivableIds.length} receivables matching date criteria`);
+    
+    // Now get billing receivables that don't have boletos yet and match our filtered receivables
     let query = serviceClient.from('billing_receivables').select(`
         id,
         nova_data_vencimento,
@@ -270,18 +291,37 @@ async function handleGetAvailableBillingReceivables(serviceClient, corsHeaders) 
       `).order('nova_data_vencimento', {
       ascending: true
     });
+
+    // Filter by the receivables that match our date criteria
+    if (filteredReceivableIds.length > 0) {
+      query = query.in('receivable_id', filteredReceivableIds);
+    } else {
+      // If no receivables match our criteria, return empty result
+      return new Response(JSON.stringify({
+        billingReceivables: [],
+        count: 0
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 200
+      });
+    }
+
     // If we have existing boletos, exclude their billing_receivable_ids
     if (existingIds.length > 0) {
       query = query.not('id', 'in', `(${existingIds.join(',')})`);
     }
-    const { data, error } = await query.limit(100);
+
+    const { data: billingReceivables, error } = await query.limit(100);
     if (error) {
       console.error('Error fetching available billing receivables:', error);
       throw error;
     }
-    console.log(`Successfully fetched ${data?.length || 0} available billing receivables`);
+    console.log(`Successfully fetched ${billingReceivables?.length || 0} available billing receivables`);
     // Transform the data into the expected format
-    const transformedData = (data || []).map((br)=>{
+    const transformedData = (billingReceivables || []).map((br)=>{
       // Extract project and company info
       const projectId = br.receivables?.project_id || br.payment_installments?.payment_plan_settings?.project_id;
       const projectName = br.payment_installments?.payment_plan_settings?.projects?.name || 'Unknown Project';

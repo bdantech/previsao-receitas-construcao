@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import {
   Dialog,
@@ -58,60 +57,28 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
   const [isFetching, setIsFetching] = useState(true);
   const [billingReceivables, setBillingReceivables] = useState<BillingReceivable[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [monthYearFilter, setMonthYearFilter] = useState<string>("");
   const { toast } = useToast();
   const { getAuthHeader } = useAuth();
 
-  // Set default month/year filter to current month when dialog opens
+  // Fetch billing receivables when dialog opens
   useEffect(() => {
     if (open) {
-      const now = new Date();
-      const currentMonthYear = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-      setMonthYearFilter(currentMonthYear);
-      fetchAvailableBillingReceivables(currentMonthYear);
+      fetchAvailableBillingReceivables();
     } else {
       setSelectedIds([]);
     }
   }, [open]);
 
-  // Refetch when month/year filter changes
-  useEffect(() => {
-    if (open && monthYearFilter) {
-      fetchAvailableBillingReceivables(monthYearFilter);
-    }
-  }, [monthYearFilter, open]);
-
-  const fetchAvailableBillingReceivables = async (monthYear: string) => {
+  const fetchAvailableBillingReceivables = async () => {
     setIsFetching(true);
     setBillingReceivables([]);
     try {
-      console.log("Fetching available billing receivables for:", monthYear);
+      console.log("Fetching available billing receivables");
       
-      // Convert month-year filter to date range
-      let fromDate, toDate;
-      if (monthYear) {
-        const [year, month] = monthYear.split('-');
-        const monthInt = parseInt(month);
-        const yearInt = parseInt(year);
-        
-        // Create date for first day of month
-        fromDate = new Date(yearInt, monthInt - 1, 1)
-          .toISOString()
-          .split('T')[0];
-        
-        // Create date for last day of month
-        toDate = new Date(yearInt, monthInt, 0)
-          .toISOString()
-          .split('T')[0];
-      }
-
       const { data, error } = await supabase.functions.invoke("admin-boletos", {
         body: {
           action: "getAvailableBillingReceivables",
-          data: {
-            fromDate,
-            toDate
-          }
+          data: {}
         },
         headers: getAuthHeader(),
       });
@@ -163,12 +130,6 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
     } else {
       setSelectedIds((prev) => prev.filter((item) => item !== id));
     }
-  };
-
-  const handleClearFilter = () => {
-    const now = new Date();
-    const currentMonthYear = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-    setMonthYearFilter(currentMonthYear);
   };
 
   const handleCreateBoletos = async () => {
@@ -235,25 +196,23 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex justify-between items-end">
-            <div className="w-1/2">
-              <label className="text-sm font-medium mb-1 block">
-                Filtrar por mês/ano de vencimento
-              </label>
-              <MonthYearPicker 
-                value={monthYearFilter} 
-                onChange={setMonthYearFilter}
-                placeholder="Selecione mês/ano"
-              />
-            </div>
+          <div className="flex justify-end">
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={handleClearFilter}
+              onClick={() => {
+                const currentMonthBillingReceivables = billingReceivables.filter(br => {
+                  const dueDate = new Date(br.nova_data_vencimento);
+                  const now = new Date();
+                  return dueDate.getMonth() === now.getMonth() && 
+                         dueDate.getFullYear() === now.getFullYear();
+                });
+                setSelectedIds(currentMonthBillingReceivables.map(br => br.id));
+              }}
               className="h-9"
+              disabled={isFetching || billingReceivables.length === 0}
             >
-              <FilterX className="h-4 w-4 mr-1" />
-              Limpar Filtro
+              Selecionar Mês Atual
             </Button>
           </div>
 
@@ -292,7 +251,7 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
                 ) : billingReceivables.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-6">
-                      Não há recebíveis disponíveis para gerar boletos neste período.
+                      Não há recebíveis disponíveis para gerar boletos.
                     </TableCell>
                   </TableRow>
                 ) : (
