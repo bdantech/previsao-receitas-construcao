@@ -1,28 +1,6 @@
 
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
-import { Button } from "@/components/ui/button";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle,
-  CardDescription
-} from "@/components/ui/card";
-import { toast } from "@/components/ui/use-toast";
-import { 
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose
-} from "@/components/ui/dialog";
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -33,25 +11,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Loader, ArrowLeft, Trash2, Plus, X, Check, Calendar, Edit } from "lucide-react";
-import { format, parse } from "date-fns";
+import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatCPF, formatCurrency } from "@/lib/formatters";
-import { MonthYearPicker } from "@/components/ui/month-year-picker";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -60,9 +36,31 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
-import { ptBR } from "date-fns/locale";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCPF, formatCurrency } from "@/lib/formatters";
+import { format } from "date-fns";
+import { ArrowLeft, Check, Edit, Loader, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate, useParams } from "react-router-dom";
 
 interface PaymentPlan {
   id: string;
@@ -635,14 +633,12 @@ const AdminPaymentPlanDetailPage = () => {
     try {
       setRemovingBillingReceivable(billingReceivableId);
       
-      const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
+      const { data, error } = await supabase.functions.invoke('remove-billing-receivable', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session?.access_token}`
         },
         body: {
-          action: 'removeBillingReceivable',
-          installmentId: selectedInstallment.id,
           billingReceivableId
         }
       });
