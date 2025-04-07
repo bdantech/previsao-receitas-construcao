@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Copy, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "../integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "../integrations/supabase/client";
 
 interface ApiCredential {
   id: string;
@@ -301,7 +301,7 @@ const IntegrationsPage = () => {
                   </p>
                   <pre className="bg-gray-100 p-4 rounded-md">
                     <code>
-                      Authorization: Bearer {"{client_id}:{client_secret}"}
+                      Authorization: Basic {`Base64({client_id}:{client_secret})`}
                     </code>
                   </pre>
 
@@ -309,11 +309,15 @@ const IntegrationsPage = () => {
                   <pre className="bg-gray-100 p-4 rounded-md">
                     <code>
                       {`{
-  "project_id": "uuid-do-projeto",
-  "amount": 1000.00,
-  "buyer_name": "Nome do Comprador",
-  "buyer_cpf": "123.456.789-00",
-  "due_date": "2024-12-31"
+  "project_id": "id_do_projeto",
+  "receivables": [
+    {
+        "amount": 1000.00,
+        "buyer_name": "Nome do Comprador",
+        "buyer_cpf": "123.456.789-00",
+        "due_date": "2024-12-31"
+    }
+  ]
 }`}
                     </code>
                   </pre>
@@ -322,9 +326,11 @@ const IntegrationsPage = () => {
                   <pre className="bg-gray-100 p-4 rounded-md">
                     <code>
                       {`{
-  "success": true,
-  "receivable_id": "uuid-do-recebivel",
-  "message": "Recebível criado com sucesso"
+    "success": true,
+    "message": "1 recebíveis processados com sucesso",
+    "processed": 1,
+    "total": 1,
+    "errors": null
 }`}
                     </code>
                   </pre>
