@@ -57,7 +57,7 @@ Deno.serve(async (req)=>{
     }
     const companyId = credentialData.company_id;
     if (req.method === 'POST') {
-      const { data: reqData } = await req.json();
+      const reqData = await req.json(); // Remover a desestruturação { data: reqData }
       // Validate required fields
       if (!reqData.project_id || !reqData.receivables || !Array.isArray(reqData.receivables) || reqData.receivables.length === 0) {
         return new Response(JSON.stringify({
@@ -136,7 +136,6 @@ Deno.serve(async (req)=>{
             amount: amount,
             due_date: dueDate.toISOString().split('T')[0],
             description: receivable.description || '',
-            external_id: receivable.external_id || null,
             status: status
           });
         } catch (e) {
