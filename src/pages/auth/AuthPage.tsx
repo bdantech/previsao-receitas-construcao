@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,11 +21,13 @@ const AuthPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 p-4">
+      <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-[#1A1F2C]">ONE pay</h1>
-            <div className="mt-6 bg-white p-8 rounded-lg shadow-md">
+            <div className="flex justify-center mb-6">
+              <img src="/onepay-pro.png" alt="ONE pay Pro" className="h-12" />
+            </div>
+            <div className="bg-white p-8 rounded-lg shadow-md">
               <div className="flex justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800"></div>
               </div>
@@ -39,12 +40,26 @@ const AuthPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 p-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-[#1A1F2C]">ONE pay</h1>
-          <AuthForm />
+    <div className="min-h-screen flex">
+      {/* Left side - Login Form (1/3 of the screen) */}
+      <div className="w-full lg:w-1/3 flex flex-col justify-center items-center bg-gray-50 p-8">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <div className="flex justify-center mb-6">
+              <img src="/onepay-pro.png" alt="ONE pay Pro" className="h-12" />
+            </div>
+            <AuthForm />
+          </div>
         </div>
+      </div>
+
+      {/* Right side - Background Image (2/3 of the screen) */}
+      <div className="hidden lg:block w-2/3 relative">
+        <img
+          src="/login-background.jpg"
+          alt="Login Background"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
       </div>
     </div>
   );

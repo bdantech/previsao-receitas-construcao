@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,23 +74,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const setData = async () => {
       try {
         console.log("[useAuth] Getting initial session");
+        // First try to get the session from localStorage
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
         
         console.log("[useAuth] Auth state changed: INITIAL_SESSION", session);
         
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          const role = await fetchUserRole(session.user.id);
-          setUserRole(role);
-          console.log("[useAuth] Initial user role set:", role);
+        if (session) {
+          // Try to refresh the session
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          if (!refreshError && refreshData.session) {
+            setSession(refreshData.session);
+            setUser(refreshData.session.user);
+            const role = await fetchUserRole(refreshData.session.user.id);
+            setUserRole(role);
+            console.log("[useAuth] Session refreshed and role set:", role);
+          } else {
+            console.log("[useAuth] Session refresh failed, using original session");
+            setSession(session);
+            setUser(session.user);
+            const role = await fetchUserRole(session.user.id);
+            setUserRole(role);
+          }
         } else {
-          console.log("[useAuth] No session, no role to set");
+          console.log("[useAuth] No session found");
+          setSession(null);
+          setUser(null);
+          setUserRole(null);
         }
       } catch (error) {
         console.error('[useAuth] Error getting session:', error);
+        setSession(null);
+        setUser(null);
+        setUserRole(null);
       } finally {
         setIsLoading(false);
       }
@@ -103,16 +118,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("[useAuth] Auth state changed:", event, session?.user?.id);
-        setSession(session);
-        setUser(session?.user ?? null);
         
-        if (session?.user) {
+        if (session) {
+          setSession(session);
+          setUser(session.user);
           const role = await fetchUserRole(session.user.id);
           setUserRole(role);
           console.log("[useAuth] Auth state changed: user role set to:", role);
         } else {
+          setSession(null);
+          setUser(null);
           setUserRole(null);
-          console.log("[useAuth] Auth state changed: user role cleared");
+          console.log("[useAuth] Auth state changed: session cleared");
         }
         
         setIsLoading(false);

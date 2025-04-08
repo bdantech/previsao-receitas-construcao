@@ -1,4 +1,3 @@
-
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
@@ -17,6 +16,7 @@ import AdminPaymentPlansPage from "./pages/AdminPaymentPlansPage";
 import AdminPaymentPlanDetailPage from "./pages/AdminPaymentPlanDetailPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import AdminBoletosPage from "./pages/AdminBoletosPage";
+import AdminBankAccountsPage from "./pages/AdminBankAccountsPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
@@ -24,6 +24,7 @@ import CreateAnticipationForm from "./components/anticipations/CreateAnticipatio
 import AnticipationDetails from "./components/anticipations/AnticipationDetails";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import ResetPassword from "./pages/auth/ResetPassword";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -45,6 +46,7 @@ function App() {
               {/* Public routes */}
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<AuthPage />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/admin/auth" element={<AdminAuth />} />
               
               {/* Protected routes */}
@@ -63,6 +65,7 @@ function App() {
               <Route path="/admin/payment-plans" element={<AdminPaymentPlansPage />} />
               <Route path="/admin/payment-plans/:paymentPlanId" element={<AdminPaymentPlanDetailPage />} />
               <Route path="/admin/boletos" element={<AdminBoletosPage />} />
+              <Route path="/admin/bank-accounts" element={<AdminBankAccountsPage />} />
               <Route path="/admin/settings" element={<AdminSettingsPage />} />
               
               {/* 404 */}

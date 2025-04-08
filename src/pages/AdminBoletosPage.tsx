@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import { BoletosTable, Boleto, BoletosFilters } from "@/components/boletos/BoletosTable";
@@ -182,6 +181,7 @@ const AdminBoletosPage: React.FC = () => {
           onDelete={handleDeleteBoleto}
           onFilterChange={handleFilterChange}
           filters={filters}
+          isAdmin={true}
         />
 
         <CreateBoletosDialog

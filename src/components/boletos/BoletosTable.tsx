@@ -1,4 +1,3 @@
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
@@ -26,7 +25,8 @@ import {
   Eye,
   FileDown,
   Pencil,
-  Trash
+  Trash,
+  Receipt
 } from "lucide-react";
 import React from "react";
 
@@ -44,6 +44,7 @@ export type Boleto = {
   company_id: string;
   nosso_numero?: string;
   linha_digitavel?: string;
+  external_id?: string;
   arquivo_boleto_path?: string;
   arquivo_boleto_name?: string;
   index_id?: string;
@@ -193,6 +194,47 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
     document.body.removeChild(link);
   }
 
+  const handleEmitirBoleto = async (boleto: Boleto) => {
+    try {
+      const authHeader = await getAuthHeader();
+      const { data, error } = await supabase.functions.invoke("starkbank-integration", {
+        body: {
+          action: "emitirBoleto",
+          data: {
+            boletoId: boleto.id,
+            projectId: boleto.project_id
+          },
+        },
+        headers: authHeader
+      });
+
+      if (error) {
+        console.error("Error emitting boleto:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível emitir o boleto.",
+        });
+        return;
+      }
+
+      toast({
+        title: "Boleto emitido com sucesso",
+        description: "O boleto foi emitido e será processado em breve.",
+      });
+
+      // Refresh the table
+      window.location.reload();
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao emitir boleto.",
+      });
+    }
+  };
+
   // Determine if we're in the project dashboard context
   const isProjectContext = Boolean(filters.projectId);
 
@@ -302,14 +344,26 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       {isAdmin ? (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => onUpdate(boleto)}
-                          title="Editar Boleto"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => onUpdate(boleto)}
+                            title="Editar Boleto"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          {boleto.status_emissao === 'Criado' && (
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleEmitirBoleto(boleto)}
+                              title="Emitir Boleto"
+                            >
+                              <Receipt className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </>
                       ) : (
                         <Button
                           variant="outline"
