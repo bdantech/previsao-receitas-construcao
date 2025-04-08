@@ -511,9 +511,63 @@ serve(async (req)=>{
         });
       }
     }
+    // Função para processar a requisição de redefinição de senha
+    if (action === 'reset_password') {
+      console.log('Processing password reset request for email:', email);
+      
+      if (!email) {
+        return new Response(JSON.stringify({
+          error: 'Email é obrigatório para redefinição de senha'
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          },
+          status: 400
+        });
+      }
+
+      try {
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email);
+
+        if (error) {
+          console.error('Password reset error:', error);
+          return new Response(JSON.stringify({
+            error: 'Erro ao enviar email de redefinição de senha'
+          }), {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            },
+            status: 400
+          });
+        }
+
+        return new Response(JSON.stringify({
+          message: 'Se um usuário com este email existir, você receberá instruções para redefinir sua senha'
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          },
+          status: 200
+        });
+      } catch (error) {
+        console.error('Unexpected error during password reset:', error);
+        return new Response(JSON.stringify({
+          error: 'Erro inesperado ao processar redefinição de senha'
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          },
+          status: 500
+        });
+      }
+    }
     // Se não for nenhuma ação reconhecida
     return new Response(JSON.stringify({
-      error: `Ação inválida: ${action}. As ações disponíveis são: login, register_company_user, register_admin_user`
+      error: `Ação inválida: ${action}. As ações disponíveis são: login, register_company_user, register_admin_user, reset_password`
     }), {
       headers: {
         ...corsHeaders,

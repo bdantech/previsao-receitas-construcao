@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface LoginFormProps {
   toggleView: () => void;
@@ -15,6 +23,8 @@ const LoginForm = ({ toggleView }: LoginFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [resetEmail, setResetEmail] = useState("");
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { session, userRole, setDirectAuth } = useAuth();
 
@@ -106,6 +116,44 @@ const LoginForm = ({ toggleView }: LoginFormProps) => {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetEmail) {
+      toast({
+        title: "Erro",
+        description: "Digite seu email para redefinir a senha",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      toast({
+        title: "Email enviado",
+        description: "Se o email existir em nossa base, você receberá instruções para redefinir sua senha",
+      });
+      setIsResetDialogOpen(false);
+      setResetEmail("");
+    } catch (error: any) {
+      console.error("[Auth] Password reset error:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível enviar o email de redefinição de senha",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <>
       {errorMessage && (
@@ -168,9 +216,57 @@ const LoginForm = ({ toggleView }: LoginFormProps) => {
           </div>
         </div>
 
+        <div className="flex justify-end">
+          <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="text-sm text-[#00A868] hover:text-[#008F59] hover:underline"
+              >
+                Esqueci minha senha
+              </button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Redefinir Senha</DialogTitle>
+                <DialogDescription>
+                  Digite seu email para receber as instruções de redefinição de senha.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label htmlFor="resetEmail" className="text-sm font-medium text-gray-700">
+                    Email
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <Mail className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <Input
+                      id="resetEmail"
+                      type="email"
+                      placeholder="seu@email.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={handleResetPassword}
+                  className="w-full bg-[#00A868] hover:bg-[#008F59] text-white"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Processando..." : "Enviar instruções"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
         <Button
           type="submit"
-          className="w-full bg-[#1A1F2C] hover:bg-[#2A303C] text-white"
+          className="w-full bg-[#00A868] hover:bg-[#008F59] text-white"
           disabled={isLoading}
         >
           {isLoading ? "Processando..." : "Entrar"}
@@ -180,7 +276,7 @@ const LoginForm = ({ toggleView }: LoginFormProps) => {
           <button
             type="button"
             onClick={toggleView}
-            className="text-sm text-[#6E59A5] hover:underline"
+            className="text-sm text-[#00A868] hover:text-[#008F59] hover:underline"
           >
             Não tem uma conta? Crie agora
           </button>

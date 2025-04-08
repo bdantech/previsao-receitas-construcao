@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -82,6 +81,10 @@ interface PaymentPlan {
   projects: {
     name: string;
     cnpj: string;
+  };
+  indexes?: {
+    id: string;
+    name: string;
   };
   payment_plan_installments: PaymentPlanInstallment[];
 }
@@ -208,43 +211,6 @@ const AdminPaymentPlanDetailPage = () => {
       });
     }
   }, [selectedReceivableIds, eligibleReceivables, selectedInstallment]);
-
-  const fetchIndexes = async () => {
-    if (!session) return;
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('indexes-management', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: {
-          action: 'getIndexesForSelect'
-        }
-      });
-      
-      if (error) {
-        console.error("Error fetching indexes:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro",
-          description: "Não foi possível carregar os índices."
-        });
-        return;
-      }
-      
-      if (data?.indexes) {
-        setIndexes(data.indexes);
-      }
-    } catch (error) {
-      console.error("Exception fetching indexes:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Erro ao carregar índices."
-      });
-    }
-  };
 
   const fetchPaymentPlanDetails = async () => {
     if (!session || !paymentPlanId) return;
@@ -607,7 +573,7 @@ const AdminPaymentPlanDetailPage = () => {
         console.warn("Response missing billing receivables data:", data);
         toast({
           title: "Atenção",
-          description: "Verifique se os receb��veis foram adicionados corretamente."
+          description: "Verifique se os recebíveis foram adicionados corretamente."
         });
       } else {
         console.log(`${billingReceivables.length} billing receivables created successfully`, billingReceivables);
@@ -680,9 +646,11 @@ const AdminPaymentPlanDetailPage = () => {
     return format(new Date(dateString), 'dd/MM/yyyy');
   };
 
-  const getIndexName = (indexId: string) => {
-    const index = indexes.find(idx => idx.id === indexId);
-    return index ? index.name : 'Não definido';
+  const getIndexName = () => {
+    if (!paymentPlan?.index_id) {
+      return 'Não definido';
+    }
+    return paymentPlan.indexes?.name || 'Não definido';
   };
 
   const handleAdjustmentSave = async (data: AdjustmentFormValues) => {
@@ -736,6 +704,43 @@ const AdminPaymentPlanDetailPage = () => {
       });
     } finally {
       setUpdatingAdjustment(false);
+    }
+  };
+
+  const fetchIndexes = async () => {
+    if (!session) return;
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('indexes-management', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: {
+          action: 'getIndexes'
+        }
+      });
+      
+      if (error) {
+        console.error("Error fetching indexes:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível carregar os índices."
+        });
+        return;
+      }
+      
+      if (data?.indexes) {
+        setIndexes(data.indexes);
+      }
+    } catch (error) {
+      console.error("Exception fetching indexes:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao carregar índices."
+      });
     }
   };
 
@@ -846,7 +851,7 @@ const AdminPaymentPlanDetailPage = () => {
                 <div>
                   <h4 className="text-sm font-medium text-gray-500">Índice para Reajuste</h4>
                   <p className="mt-1 text-lg">
-                    {paymentPlan.index_id ? getIndexName(paymentPlan.index_id) : 'Não definido'}
+                    {getIndexName()}
                   </p>
                 </div>
                 <div>

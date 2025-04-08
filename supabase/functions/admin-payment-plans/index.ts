@@ -184,6 +184,8 @@ serve(async (req)=>{
             teto_fundo_reserva,
             anticipation_request_id,
             project_id,
+            index_id,
+            adjustment_base_date,
             created_at,
             updated_at,
             anticipation_requests (
@@ -194,6 +196,10 @@ serve(async (req)=>{
             projects (
               name,
               cnpj
+            ),
+            indexes:index_id (
+              id,
+              name
             ),
             payment_plan_installments (
               id,

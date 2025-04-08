@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
@@ -99,78 +98,98 @@ const AdminAuth = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 p-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-[#1A1F2C]">ONE pay Admin</h1>
-          <p className="text-gray-600 mt-2">
-            Acesso restrito a administradores
+    <div className="min-h-screen flex">
+      {/* Left side - Background Image (2/3 of the screen) */}
+      <div className="hidden lg:block w-2/3 relative">
+        <img
+          src="/login-background.jpg"
+          alt="Login Background"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        {/* Gradient overlay */}
+        <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-black/70 to-transparent" />
+        {/* Text overlay */}
+        <div className="absolute top-12 left-0 right-0 text-center">
+          <p className="text-white text-4xl font-medium px-8 leading-normal">
+            Antecipando o Futuro<br />para quem Constrói o Brasil
           </p>
         </div>
+      </div>
 
-        <div className="bg-white p-8 rounded-lg shadow-md">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="admin@email.com"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="pl-10"
-                  required
-                />
-              </div>
+      {/* Right side - Login Form (1/3 of the screen) */}
+      <div className="w-full lg:w-1/3 flex flex-col justify-center items-center bg-gray-50 p-4">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <div className="flex flex-col items-center gap-2 mb-6">
+              <img src="/onepay-pro.png" alt="ONE pay Pro" className="h-12" />
+              <span className="text-sm font-medium text-gray-500">ADMIN</span>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-gray-700">
-                Senha
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
+          <div className="bg-white p-8 rounded-lg shadow-md">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                  Email
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="admin@email.com"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="pl-10"
+                    required
+                  />
                 </div>
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="pl-10 pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 flex items-center pr-3"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
-                  )}
-                </button>
               </div>
-            </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-[#1A1F2C] hover:bg-[#2A303C] text-white"
-              disabled={isLoading}
-            >
-              {isLoading ? "Processando..." : "Entrar como Admin"}
-            </Button>
-          </form>
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-sm font-medium text-gray-700">
+                  Senha
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="pl-10 pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 flex items-center pr-3"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-[#00A868] hover:bg-[#008F59] text-white"
+                disabled={isLoading}
+              >
+                {isLoading ? "Processando..." : "Entrar como Admin"}
+              </Button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
