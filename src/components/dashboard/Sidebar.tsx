@@ -1,25 +1,25 @@
-import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
-import { Button } from "../ui/button";
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  LayoutDashboard, 
-  Building2, 
-  FileText, 
-  ArrowRightLeft, 
-  LogOut 
-} from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+import {
+  ArrowRightLeft,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  LayoutDashboard,
+  LogOut
+} from "lucide-react";
+import { useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { Button } from "../ui/button";
 
 interface SidebarItemProps {
   icon: React.ElementType;
@@ -78,19 +78,16 @@ export const Sidebar = () => {
   };
 
   const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        description: "Logout realizado com sucesso",
-      });
-      navigate('/auth');
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        variant: "destructive",
-        description: "Erro ao realizar logout",
-      });
+    const { error } = await supabase.auth.signOut();
+
+    if(error)  {
+      await supabase.auth.refreshSession()
     }
+    
+    toast({
+      description: "Logout realizado com sucesso",
+    });
+    navigate('/auth');
   };
 
   const sidebarItems = [

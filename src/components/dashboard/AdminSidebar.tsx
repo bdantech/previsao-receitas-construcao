@@ -72,19 +72,16 @@ export const AdminSidebar = () => {
   };
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate('/admin/auth');
-      toast({
-        description: "Logout realizado com sucesso",
-      });
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        variant: "destructive",
-        description: "Erro ao realizar logout",
-      });
+    const { error } = await supabase.auth.signOut();
+
+    if(error)  {
+      await supabase.auth.refreshSession()
     }
+    
+    navigate('/admin/auth');
+    toast({
+      description: "Logout realizado com sucesso",
+    });
   };
 
   const sidebarItems = [
