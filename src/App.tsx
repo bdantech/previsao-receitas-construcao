@@ -4,8 +4,6 @@ import React from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import AnticipationDetails from "./components/anticipations/AnticipationDetails";
 import CreateAnticipationForm from "./components/anticipations/CreateAnticipationForm";
-import { AdminDashboardLayout } from "./components/dashboard/AdminDashboardLayout";
-import { DashboardLayout } from "./components/dashboard/DashboardLayout";
 import { AuthProvider } from "./hooks/useAuth";
 import AdminAnticipationsPage from "./pages/AdminAnticipationsPage";
 import AdminAuth from "./pages/AdminAuth";
@@ -52,31 +50,24 @@ function App() {
               <Route path="/admin/auth" element={<AdminAuth />} />
               
               {/* Protected routes */}
-              <Route
-                element={<DashboardLayout/>}
-              >
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/projects" element={<ProjectsPage />} />
-                <Route path="/project-dashboard/:projectId" element={<ProjectDashboardPage />} />
-                <Route path="/project-dashboard/:projectId/create-anticipation" element={<CreateAnticipationForm />} />
-                <Route path="/project-dashboard/:projectId/anticipation/:anticipationId" element={<AnticipationDetails />} />
-                <Route path="/company" element={<CompanyPage />} />
-                <Route path="/integrations" element={<IntegrationsPage />} />
-              </Route>
-
-              <Route element={<AdminDashboardLayout/>}>
-                <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
-                <Route path="/admin/buyers" element={<AdminBuyersPage />} />
-                <Route path="/admin/receivables" element={<AdminReceivablesPage />} />
-                <Route path="/admin/anticipations" element={<AdminAnticipationsPage />} />
-                <Route path="/admin/payment-plans" element={<AdminPaymentPlansPage />} />
-                <Route path="/admin/payment-plans/:paymentPlanId" element={<AdminPaymentPlanDetailPage />} />
-                <Route path="/admin/boletos" element={<AdminBoletosPage />} />
-                <Route path="/admin/bank-accounts" element={<AdminBankAccountsPage />} />
-                <Route path="/admin/settings" element={<AdminSettingsPage />} /> 
-              </Route>
-
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/project-dashboard/:projectId" element={<ProjectDashboardPage />} />
+              <Route path="/project-dashboard/:projectId/create-anticipation" element={<CreateAnticipationForm />} />
+              <Route path="/project-dashboard/:projectId/anticipation/:anticipationId" element={<AnticipationDetails />} />
+              <Route path="/company" element={<CompanyPage />} />
+              <Route path="/integrations" element={<IntegrationsPage />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
+              <Route path="/admin/buyers" element={<AdminBuyersPage />} />
+              <Route path="/admin/receivables" element={<AdminReceivablesPage />} />
+              <Route path="/admin/anticipations" element={<AdminAnticipationsPage />} />
+              <Route path="/admin/payment-plans" element={<AdminPaymentPlansPage />} />
+              <Route path="/admin/payment-plans/:paymentPlanId" element={<AdminPaymentPlanDetailPage />} />
+              <Route path="/admin/boletos" element={<AdminBoletosPage />} />
+              <Route path="/admin/bank-accounts" element={<AdminBankAccountsPage />} />
+              <Route path="/admin/settings" element={<AdminSettingsPage />} />
+              
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>

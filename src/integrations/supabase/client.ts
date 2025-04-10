@@ -11,7 +11,7 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // Helper to get auth headers for function calls
-const getAuthHeaders = async () => {
+export const getAuthHeaders = async () => {
   // Get the current user session
   const { data } = await supabase.auth.getSession();
   const session = data?.session;
