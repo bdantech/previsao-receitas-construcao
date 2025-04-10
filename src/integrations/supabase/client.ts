@@ -20,7 +20,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 });
 
 // Helper to get auth headers for function calls
-const getAuthHeaders = async () => {
+export const getAuthHeaders = async () => {
   // Get the current user session
   const { data } = await supabase.auth.getSession();
   const session = data?.session;

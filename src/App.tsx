@@ -17,6 +17,7 @@ import AdminPaymentPlanDetailPage from "./pages/AdminPaymentPlanDetailPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import AdminBoletosPage from "./pages/AdminBoletosPage";
 import AdminBankAccountsPage from "./pages/AdminBankAccountsPage";
+import { WebhookEndpoints } from "./pages/admin/WebhookEndpoints";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
@@ -66,6 +67,7 @@ function App() {
               <Route path="/admin/payment-plans/:paymentPlanId" element={<AdminPaymentPlanDetailPage />} />
               <Route path="/admin/boletos" element={<AdminBoletosPage />} />
               <Route path="/admin/bank-accounts" element={<AdminBankAccountsPage />} />
+              <Route path="/admin/webhook-endpoints" element={<WebhookEndpoints />} />
               <Route path="/admin/settings" element={<AdminSettingsPage />} />
               
               {/* 404 */}

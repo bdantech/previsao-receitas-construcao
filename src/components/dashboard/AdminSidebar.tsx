@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Building, Users, FileText, ReceiptText, LogOut, Calendar, Settings, File, Building2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building, Users, FileText, ReceiptText, LogOut, Calendar, Settings, File, Building2, Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -122,6 +122,11 @@ export const AdminSidebar = () => {
       icon: Building2,
       label: "Contas Bancárias",
       href: "/admin/bank-accounts"
+    },
+    {
+      icon: Bell,
+      label: "Eventos",
+      href: "/admin/webhook-endpoints"
     },
     {
       icon: Settings,
