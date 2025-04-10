@@ -1,26 +1,25 @@
 
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import { Button } from "@/components/ui/button";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
 } from "@/components/ui/card";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
-import { Loader, ArrowRight, Calendar } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { ArrowRight, Loader } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface Company {
   id: string;
@@ -217,7 +216,7 @@ const AdminPaymentPlansPage = () => {
   };
 
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Planos de Pagamento</h2>
       </div>
@@ -356,7 +355,7 @@ const AdminPaymentPlansPage = () => {
           )}
         </div>
       )}
-    </AdminDashboardLayout>
+    </>
   );
 };
 

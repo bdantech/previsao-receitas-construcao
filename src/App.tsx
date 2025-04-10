@@ -1,31 +1,36 @@
+import { Toaster } from "@/components/ui/toaster";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import AnticipationDetails from "./components/anticipations/AnticipationDetails";
+import CreateAnticipationForm from "./components/anticipations/CreateAnticipationForm";
+import { AdminDashboardLayout } from "./components/dashboard/AdminDashboardLayout";
+import { DashboardLayout } from "./components/dashboard/DashboardLayout";
 import { AuthProvider } from "./hooks/useAuth";
-import Index from "./pages/Index";
-import AuthPage from "./pages/auth/AuthPage";
-import Dashboard from "./pages/Dashboard";
-import NotFound from "./pages/NotFound";
-import { Toaster } from "@/components/ui/toaster"
-import AdminAuth from "./pages/AdminAuth";
-import AdminDashboard from "./pages/AdminDashboard";
-import AdminCompanyDetail from "./pages/AdminCompanyDetail";
-import AdminBuyersPage from "./pages/AdminBuyersPage";
-import AdminReceivablesPage from "./pages/AdminReceivablesPage";
 import AdminAnticipationsPage from "./pages/AdminAnticipationsPage";
-import AdminPaymentPlansPage from "./pages/AdminPaymentPlansPage";
+import AdminAuth from "./pages/AdminAuth";
+import AdminBankAccountsPage from "./pages/AdminBankAccountsPage";
+import AdminBoletosPage from "./pages/AdminBoletosPage";
+import AdminBuyersPage from "./pages/AdminBuyersPage";
+import AdminCompanyDetail from "./pages/AdminCompanyDetail";
+import AdminDashboard from "./pages/AdminDashboard";
 import AdminPaymentPlanDetailPage from "./pages/AdminPaymentPlanDetailPage";
+import AdminPaymentPlansPage from "./pages/AdminPaymentPlansPage";
+import AdminReceivablesPage from "./pages/AdminReceivablesPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
+import AuthPage from "./pages/auth/AuthPage";
+import ResetPassword from "./pages/auth/ResetPassword";
 import AdminBoletosPage from "./pages/AdminBoletosPage";
 import AdminBankAccountsPage from "./pages/AdminBankAccountsPage";
 import { WebhookEndpoints } from "./pages/admin/WebhookEndpoints";
 import ProjectsPage from "./pages/ProjectsPage";
 import CompanyPage from "./pages/CompanyPage";
-import ProjectDashboardPage from "./pages/ProjectDashboardPage";
-import CreateAnticipationForm from "./components/anticipations/CreateAnticipationForm";
-import AnticipationDetails from "./components/anticipations/AnticipationDetails";
+import Dashboard from "./pages/Dashboard";
+import Index from "./pages/Index";
 import IntegrationsPage from "./pages/IntegrationsPage";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import ResetPassword from "./pages/auth/ResetPassword";
+import NotFound from "./pages/NotFound";
+import ProjectDashboardPage from "./pages/ProjectDashboardPage";
+import ProjectsPage from "./pages/ProjectsPage";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -67,7 +72,6 @@ function App() {
               <Route path="/admin/payment-plans/:paymentPlanId" element={<AdminPaymentPlanDetailPage />} />
               <Route path="/admin/boletos" element={<AdminBoletosPage />} />
               <Route path="/admin/bank-accounts" element={<AdminBankAccountsPage />} />
-              <Route path="/admin/webhook-endpoints" element={<WebhookEndpoints />} />
               <Route path="/admin/settings" element={<AdminSettingsPage />} />
               
               {/* 404 */}

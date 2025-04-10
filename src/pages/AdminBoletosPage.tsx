@@ -1,13 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
-import { BoletosTable, Boleto, BoletosFilters } from "@/components/boletos/BoletosTable";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Boleto, BoletosFilters, BoletosTable } from "@/components/boletos/BoletosTable";
 import { CreateBoletosDialog } from "@/components/boletos/CreateBoletosDialog";
 import { EditBoletoDialog } from "@/components/boletos/EditBoletoDialog";
-import { useAuth } from "@/hooks/useAuth";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +11,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { Plus } from "lucide-react";
+import React, { useEffect, useState } from "react";
 
 const AdminBoletosPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -164,7 +163,7 @@ const AdminBoletosPage: React.FC = () => {
   };
 
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Boletos</h1>
@@ -220,7 +219,7 @@ const AdminBoletosPage: React.FC = () => {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </AdminDashboardLayout>
+    </>
   );
 };
 

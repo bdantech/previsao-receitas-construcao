@@ -1,19 +1,18 @@
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader } from "lucide-react";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { toast } from "@/hooks/use-toast";
 import { formatCNPJ } from "@/lib/formatters";
+import { Loader } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 
 // Placeholder dashboard for company users
 const Dashboard = () => {
   const { session, userRole, isLoading } = useAuth();
+  const navigate = useNavigate()
   const [companies, setCompanies] = useState<any[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const [companyName, setCompanyName] = useState<string>("");
-
+  
   useEffect(() => {
     const fetchCompanyData = async () => {
       if (session?.access_token) {
@@ -52,14 +51,6 @@ const Dashboard = () => {
           }
           
           setCompanies(data.companies);
-          
-          // Set company name if available
-          if (data.companies && data.companies.length > 0) {
-            console.log("Setting company name:", data.companies[0].name);
-            setCompanyName(data.companies[0].name);
-          } else {
-            console.log("No companies found for user");
-          }
         } catch (error) {
           console.error("Error fetching company data:", error);
           // You might want to show an error message to the user here
@@ -71,8 +62,14 @@ const Dashboard = () => {
       }
     };
 
-    fetchCompanyData();
-  }, [session]);
+    if(isLoading || !userRole) return;
+
+    if(userRole === 'admin'){
+      return navigate('/admin/dashboard')
+    }
+
+    fetchCompanyData()
+  }, [isLoading, userRole, session, navigate]);
 
   if (isLoading) {
     return (
@@ -86,13 +83,8 @@ const Dashboard = () => {
     return <Navigate to="/auth" />;
   }
 
-  // If user is admin, redirect to admin dashboard
-  if (userRole === 'admin') {
-    return <Navigate to="/admin/dashboard" />;
-  }
-
   return (
-    <DashboardLayout>
+    <>
       <div className="flex flex-col min-h-screen">
         {/* Company Info Section */}
         {!loadingCompanies && companies.length > 0 && (
@@ -162,7 +154,7 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 };
 

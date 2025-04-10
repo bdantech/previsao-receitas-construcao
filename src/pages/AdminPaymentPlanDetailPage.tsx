@@ -1,4 +1,3 @@
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,7 +54,6 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, formatCurrency } from "@/lib/formatters";
-import { format } from "date-fns";
 import { ArrowLeft, Check, Edit, Loader, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -638,15 +636,12 @@ const AdminPaymentPlanDetailPage = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd/MM/yyyy');
-  };
-
-  const getIndexName = () => {
-    if (!paymentPlan?.index_id) {
-      return 'Não definido';
-    }
-    return paymentPlan.indexes?.name || 'Não definido';
+  const formatDate = (date: string) => {
+    const spacer = '/'
+    const day = date.slice(8, 10)
+    const month = date.slice(5, 7)
+    const year = date.slice(0, 4)
+    return `${day}${spacer}${month}${spacer}${year}`
   };
 
   const handleAdjustmentSave = async (data: AdjustmentFormValues) => {
@@ -741,7 +736,7 @@ const AdminPaymentPlanDetailPage = () => {
   };
 
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-2">
           <Button 
@@ -847,7 +842,7 @@ const AdminPaymentPlanDetailPage = () => {
                 <div>
                   <h4 className="text-sm font-medium text-gray-500">Índice para Reajuste</h4>
                   <p className="mt-1 text-lg">
-                    {getIndexName()}
+                    {paymentPlan.indexes ? paymentPlan.indexes.name : 'Não definido'}
                   </p>
                 </div>
                 <div>
@@ -1260,7 +1255,7 @@ const AdminPaymentPlanDetailPage = () => {
           </div>
         </div>
       )}
-    </AdminDashboardLayout>
+    </>
   );
 };
 

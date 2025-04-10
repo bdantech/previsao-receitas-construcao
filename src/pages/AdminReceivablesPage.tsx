@@ -1,12 +1,8 @@
 
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { Loader, Search, RefreshCw } from "lucide-react";
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/components/ui/use-toast";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -22,10 +18,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/formatters";
+import { Loader, RefreshCw, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 
 interface Receivable {
   id: string;
@@ -176,7 +175,7 @@ const AdminReceivablesPage = () => {
   }
 
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Recebíveis</h2>
         <Button 
@@ -307,7 +306,7 @@ const AdminReceivablesPage = () => {
           )}
         </CardContent>
       </Card>
-    </AdminDashboardLayout>
+    </>
   );
 };
 

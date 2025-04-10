@@ -1,4 +1,3 @@
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -157,7 +156,7 @@ const IntegrationsPage = () => {
   }, [session]);
 
   return (
-    <DashboardLayout>
+    <>
       <div className="container mx-auto py-6">
         <h1 className="text-2xl font-bold mb-6">Integrações</h1>
         
@@ -349,7 +348,7 @@ const IntegrationsPage = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout>
+    </>
   );
 };
 

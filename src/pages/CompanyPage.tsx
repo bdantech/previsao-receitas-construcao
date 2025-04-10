@@ -1,17 +1,16 @@
 
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Loader, Save } from "lucide-react";
+import { CompanyDocuments } from "@/components/company/CompanyDocuments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
-import { formatCNPJ } from "@/lib/formatters";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CompanyDocuments } from "@/components/company/CompanyDocuments";
+import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCNPJ } from "@/lib/formatters";
+import { Loader, Save } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 
 interface Company {
   id: string;
@@ -159,7 +158,7 @@ const CompanyPage = () => {
   }
   
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-8 p-6">
         {loading ? (
           <div className="flex justify-center">
@@ -236,7 +235,7 @@ const CompanyPage = () => {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 };
 

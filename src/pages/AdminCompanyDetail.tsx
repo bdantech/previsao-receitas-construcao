@@ -2,7 +2,6 @@ import { CompanyDocuments } from "@/components/company/CompanyDocuments";
 import { CompanyStatusBadge } from "@/components/company/CompanyStatusBadge";
 import { AdminCompanyCredit } from "@/components/credit/AdminCompanyCredit";
 import { AdminCompanyProjects } from "@/components/dashboard/AdminCompanyProjects";
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -62,18 +61,18 @@ const AdminCompanyDetail = () => {
 
   if (loading) {
     return (
-      <AdminDashboardLayout>
+      <>
         <div className="space-y-4">
           <Skeleton className="h-12 w-48" />
           <Skeleton className="h-[200px] w-full" />
         </div>
-      </AdminDashboardLayout>
+      </>
     );
   }
 
   if (!company) {
     return (
-      <AdminDashboardLayout>
+      <>
         <div className="p-6 text-center">
           <h2 className="text-2xl font-bold">Company not found</h2>
           <p className="text-muted-foreground">
@@ -81,12 +80,12 @@ const AdminCompanyDetail = () => {
             permission to view it.
           </p>
         </div>
-      </AdminDashboardLayout>
+      </>
     );
   }
 
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="space-y-4">
         <h1 className="text-2xl font-bold">{company?.name}</h1>
         
@@ -131,7 +130,7 @@ const AdminCompanyDetail = () => {
           </Tabs>
         )}
       </div>
-    </AdminDashboardLayout>
+    </>
   );
 };
 

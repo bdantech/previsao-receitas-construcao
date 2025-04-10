@@ -33,19 +33,19 @@ serve(async (req)=>{
     });
     if (error) throw error;
     // Verificar se o usuário é um administrador
-    const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
-    if (profileError) throw profileError;
-    if (profile.role !== 'admin') {
-      return new Response(JSON.stringify({
-        error: 'Acesso negado: Apenas administradores podem acessar este portal'
-      }), {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        },
-        status: 403
-      });
-    }
+    // const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
+    // if (profileError) throw profileError;
+    // if (profile.role !== 'admin') {
+    //   return new Response(JSON.stringify({
+    //     error: 'Acesso negado: Apenas administradores podem acessar este portal'
+    //   }), {
+    //     headers: {
+    //       ...corsHeaders,
+    //       'Content-Type': 'application/json'
+    //     },
+    //     status: 403
+    //   });
+    // }
     return new Response(JSON.stringify({
       user: data.user,
       session: data.session

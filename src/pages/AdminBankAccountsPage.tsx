@@ -1,18 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Plus, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { CreateBankAccountDialog } from "@/components/bank-accounts/CreateBankAccountDialog";
+import { EditBankAccountDialog } from "@/components/bank-accounts/EditBankAccountDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,9 +10,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/formatters";
-import { CreateBankAccountDialog } from "@/components/bank-accounts/CreateBankAccountDialog";
-import { EditBankAccountDialog } from "@/components/bank-accounts/EditBankAccountDialog";
+import { Loader2, Plus } from "lucide-react";
+import React, { useEffect, useState } from "react";
 
 type BankAccount = {
   id: string;
@@ -170,7 +169,7 @@ const AdminBankAccountsPage: React.FC = () => {
   };
 
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Contas Bancárias</h1>
@@ -279,7 +278,7 @@ const AdminBankAccountsPage: React.FC = () => {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </AdminDashboardLayout>
+    </>
   );
 };
 
