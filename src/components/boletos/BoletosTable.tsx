@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { Checkbox } from "@/components/ui/checkbox";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import {
   Select,
   SelectContent,
@@ -20,16 +20,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { formatStringDate } from "@/utils/helpers/formatDate.helper";
 import {
   Eye,
   FileDown,
   Pencil,
-  Trash,
-  Receipt
+  Receipt,
+  Trash
 } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 export type Boleto = {
   id: string;
@@ -386,7 +385,7 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
                     )}
                   </TableCell>
                   <TableCell>
-                    {format(new Date(boleto.data_vencimento), 'dd/MM/yyyy', { locale: ptBR })}
+                    {formatStringDate(boleto.data_vencimento)}
                   </TableCell>
                   <TableCell>
                     <Badge className={getStatusEmissaoColor(boleto.status_emissao)}>
