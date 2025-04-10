@@ -18,7 +18,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { getAuthHeaders, supabase } from "@/integrations/supabase/client";
-import { Loader, Plus, Trash } from "lucide-react";
+import { Copy, Loader, Plus, Trash } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface WebhookEndpoint {
@@ -156,6 +156,16 @@ export const WebhookEndpoints = () => {
     }
   };
 
+  const copyToClipboard = (text: string) => {
+    console.log('clikc aqui')
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copiado",
+      description: "Texto copiado para a área de transferência",
+    });
+  };
+
+
   if (loading) {
     return (
       <>
@@ -241,10 +251,24 @@ export const WebhookEndpoints = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {endpoints.map((endpoint) => (
-                <TableRow key={endpoint.id}>
+              {endpoints.map((endpoint) => {
+                const urlpath = import.meta.env.VITE_SUPABASE_URL + "/functions/v1/webhook-events/" + endpoint.url_path;
+                return (
+                  <TableRow key={endpoint.id}>
                   <TableCell>{endpoint.tag}</TableCell>
-                  <TableCell>{endpoint.url_path}</TableCell>
+                  <TableCell>
+                    {urlpath}
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      style={{
+                        marginLeft: '8px'
+                      }}
+                      onClick={() => copyToClipboard(urlpath)}
+                    >
+                      <Copy size={10}/>
+                    </Button>
+                  </TableCell>
                   <TableCell>{endpoint.description || "-"}</TableCell>
                   <TableCell>
                     {new Date(endpoint.created_at).toLocaleString()}
@@ -259,7 +283,8 @@ export const WebhookEndpoints = () => {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                )
+              })}
               {endpoints.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-4">
