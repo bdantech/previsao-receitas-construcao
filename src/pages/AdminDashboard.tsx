@@ -1,13 +1,12 @@
 
-import { useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { Loader, ArrowRight } from "lucide-react";
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { formatCNPJ } from "@/lib/formatters";
+import { ArrowRight, Loader } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 
 const AdminDashboard = () => {
   const { session, userRole, isLoading } = useAuth();
@@ -87,7 +86,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Painel Administrativo</h2>
       </div>
@@ -173,7 +172,7 @@ const AdminDashboard = () => {
           )}
         </div>
       )}
-    </AdminDashboardLayout>
+    </>
   );
 };
 

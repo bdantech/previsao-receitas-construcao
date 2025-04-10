@@ -1,19 +1,18 @@
 
-import React, { useState, useEffect } from 'react';
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
+import { AdminAnticipationDetails } from "@/components/anticipations/AdminAnticipationDetails";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Loader, Search, Eye, RefreshCw, Calendar, CheckSquare, XSquare } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatCurrency } from "@/lib/formatters";
-import { AdminAnticipationDetails } from "@/components/anticipations/AdminAnticipationDetails";
+import { Eye, Loader, RefreshCw, Search } from "lucide-react";
+import { useEffect, useState } from 'react';
 
 interface Company {
   name: string;
@@ -160,7 +159,7 @@ const AdminAnticipationsPage = () => {
   };
   
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Antecipações</h1>
@@ -350,7 +349,7 @@ const AdminAnticipationsPage = () => {
           onStatusUpdate={() => fetchAnticipations(pagination.page)}
         />
       )}
-    </AdminDashboardLayout>
+    </>
   );
 };
 

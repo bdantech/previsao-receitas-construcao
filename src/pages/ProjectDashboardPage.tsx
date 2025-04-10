@@ -1,32 +1,31 @@
 
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader, UsersRound, Receipt, ArrowDownToLine, FileSpreadsheet, PencilIcon, Plus, Upload, FileText } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { formatCNPJ, formatCPF, formatCurrency, formatCompactCurrency } from "@/lib/formatters";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { ReceivableDialog } from "@/components/receivables/ReceivableDialog";
-import { ReceivableBulkImportDialog } from "@/components/receivables/ReceivableBulkImportDialog";
 import AnticipationsList from "@/components/anticipations/AnticipationsList";
-import { Switch } from "@/components/ui/switch";
 import { BoletosTable } from "@/components/boletos/BoletosTable";
 import { EditBoletoDialog } from "@/components/boletos/EditBoletoDialog";
 import { ViewBoletoDialog } from "@/components/boletos/ViewBoletoDialog";
-import { useProjectBoletos } from "@/hooks/useProjectBoletos";
 import PaymentPlansTable from "@/components/payment-plans/PaymentPlansTable";
+import { ReceivableBulkImportDialog } from "@/components/receivables/ReceivableBulkImportDialog";
+import { ReceivableDialog } from "@/components/receivables/ReceivableDialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useProjectBoletos } from "@/hooks/useProjectBoletos";
 import { useProjectPaymentPlans } from "@/hooks/useProjectPaymentPlans";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCNPJ, formatCompactCurrency, formatCPF, formatCurrency } from "@/lib/formatters";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { ArrowDownToLine, FileSpreadsheet, FileText, Loader, PencilIcon, Plus, Receipt, Upload, UsersRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 
 interface Project {
   id: string;
@@ -514,27 +513,27 @@ const ProjectDashboardPage = () => {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex justify-center items-center h-[calc(100vh-120px)]">
           <Loader className="h-8 w-8 animate-spin text-gray-500" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (!project) {
     return (
-      <DashboardLayout>
+      <>
         <div className="text-center py-10">
           <h2 className="text-2xl font-bold text-gray-900">Projeto não encontrado</h2>
           <p className="mt-2 text-gray-500">O projeto solicitado não existe ou você não tem permissão para acessá-lo.</p>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6">
         <div className="mb-8 flex justify-between items-start">
           <div>
@@ -948,7 +947,7 @@ const ProjectDashboardPage = () => {
           />
         )
       )}
-    </DashboardLayout>
+    </>
   );
 };
 

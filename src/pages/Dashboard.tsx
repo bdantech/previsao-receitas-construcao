@@ -1,4 +1,3 @@
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,7 +84,7 @@ const Dashboard = () => {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="flex flex-col min-h-screen">
         {/* Company Info Section */}
         {!loadingCompanies && companies.length > 0 && (
@@ -155,7 +154,7 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 };
 

@@ -1,14 +1,13 @@
 
+import { ProjectDialog } from "@/components/projects/ProjectDialog";
+import { ProjectsList } from "@/components/projects/ProjectsList";
+import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate } from "react-router-dom";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { ProjectsList } from "@/components/projects/ProjectsList";
-import { ProjectDialog } from "@/components/projects/ProjectDialog";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Navigate } from "react-router-dom";
 
 const ProjectsPage = () => {
   const { session, userRole, isLoading } = useAuth();
@@ -79,7 +78,7 @@ const ProjectsPage = () => {
   }
   
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold">Projetos</h1>
@@ -124,7 +123,7 @@ const ProjectsPage = () => {
           onProjectCreated={handleProjectCreated}
         />
       </div>
-    </DashboardLayout>
+    </>
   );
 };
 

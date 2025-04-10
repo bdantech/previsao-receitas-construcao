@@ -1,11 +1,10 @@
 
-import React, { useState, useEffect } from "react";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { BoletosTable, Boleto, BoletosFilters } from "@/components/boletos/BoletosTable";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { Boleto, BoletosFilters, BoletosTable } from "@/components/boletos/BoletosTable";
 import { EditBoletoDialog } from "@/components/boletos/EditBoletoDialog";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import React, { useEffect, useState } from "react";
 
 const BoletosPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -101,7 +100,7 @@ const BoletosPage: React.FC = () => {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Boletos</h1>
@@ -126,7 +125,7 @@ const BoletosPage: React.FC = () => {
           onSuccess={fetchBoletos}
         />
       </div>
-    </DashboardLayout>
+    </>
   );
 };
 

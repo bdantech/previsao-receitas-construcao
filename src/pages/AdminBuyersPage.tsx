@@ -1,4 +1,3 @@
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -195,12 +194,12 @@ export default function AdminBuyersPage() {
 
   if (isLoadingAuth) {
     return (
-      <AdminDashboardLayout>
+      <>
         <div className="flex items-center justify-center p-8">
           <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
           <span className="ml-2 text-gray-500">Verificando autenticação...</span>
         </div>
-      </AdminDashboardLayout>
+      </>
     );
   }
 
@@ -209,7 +208,7 @@ export default function AdminBuyersPage() {
   }
 
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold tracking-tight">Compradores</h1>
@@ -387,6 +386,6 @@ export default function AdminBuyersPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </AdminDashboardLayout>
+    </>
   );
 }

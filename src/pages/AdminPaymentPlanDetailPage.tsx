@@ -1,4 +1,3 @@
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -741,7 +740,7 @@ const AdminPaymentPlanDetailPage = () => {
   };
 
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-2">
           <Button 
@@ -1260,7 +1259,7 @@ const AdminPaymentPlanDetailPage = () => {
           </div>
         </div>
       )}
-    </AdminDashboardLayout>
+    </>
   );
 };
 
