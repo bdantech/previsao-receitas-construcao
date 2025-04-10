@@ -1,11 +1,11 @@
-import React, { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import React, { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 
 const AdminAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -81,8 +81,7 @@ const AdminAuth = () => {
       
       // Set direct auth with session and role
       if (data?.session && data?.role) {
-        console.log("Setting direct auth with admin role");
-        setDirectAuth(data.session, data.role);
+        await setDirectAuth(data.session, data.role);
         navigate("/admin/dashboard");
       }
     } catch (error: any) {

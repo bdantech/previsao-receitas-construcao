@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { Session, User } from "@supabase/supabase-js";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 type AuthContextType = {
   session: Session | null;
@@ -39,81 +39,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   // Function to directly set authentication state from login response
-  const setDirectAuth = (newSession: Session, role: string) => {
+  const setDirectAuth = async (newSession: Session, role: string) => {
     console.log("[useAuth] Setting direct auth with session and role:", role);
     setSession(newSession);
     setUser(newSession?.user ?? null);
     setUserRole(role);
+    await supabase.auth.setSession(newSession);
     setIsLoading(false);
   };
 
   // Function to fetch user role
-  const fetchUserRole = async (userId: string) => {
+  const fetchUserRole = useCallback(async (userId: string) => {
     console.log("[useAuth] Fetching user role for ID:", userId);
     try {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
-        .single();
-        
+        .maybeSingle();
+
       if (profileError) {
         console.error('[useAuth] Error fetching user role:', profileError);
         return null;
       }
       
       console.log("[useAuth] Profile data retrieved:", profileData);
-      return profileData?.role || null;
+      const role = profileData?.role
+      setUserRole(role);
+      console.log("[useAuth] Auth state changed: user role set to:", role);
     } catch (error) {
       console.error('[useAuth] Exception fetching user role:', error);
       return null;
     }
-  };
+  }, [setUserRole]);
 
   useEffect(() => {
-    const setData = async () => {
-      try {
-        console.log("[useAuth] Getting initial session");
-        // First try to get the session from localStorage
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        
-        console.log("[useAuth] Auth state changed: INITIAL_SESSION", session);
-        
-        if (session) {
-          // Try to refresh the session
-          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-          if (!refreshError && refreshData.session) {
-            setSession(refreshData.session);
-            setUser(refreshData.session.user);
-            const role = await fetchUserRole(refreshData.session.user.id);
-            setUserRole(role);
-            console.log("[useAuth] Session refreshed and role set:", role);
-          } else {
-            console.log("[useAuth] Session refresh failed, using original session");
-            setSession(session);
-            setUser(session.user);
-            const role = await fetchUserRole(session.user.id);
-            setUserRole(role);
-          }
-        } else {
-          console.log("[useAuth] No session found");
-          setSession(null);
-          setUser(null);
-          setUserRole(null);
-        }
-      } catch (error) {
-        console.error('[useAuth] Error getting session:', error);
-        setSession(null);
-        setUser(null);
-        setUserRole(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    setData();
-
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -122,9 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (session) {
           setSession(session);
           setUser(session.user);
-          const role = await fetchUserRole(session.user.id);
-          setUserRole(role);
-          console.log("[useAuth] Auth state changed: user role set to:", role);
+          fetchUserRole(session.user.id);
         } else {
           setSession(null);
           setUser(null);
