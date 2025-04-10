@@ -1,10 +1,4 @@
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
-import { Loader, Plus, Trash } from "lucide-react";
-import { AdminDashboardLayout } from "@/components/dashboard/AdminDashboardLayout";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +6,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -20,7 +15,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { supabase, getAuthHeaders } from "@/integrations/supabase/client";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { getAuthHeaders, supabase } from "@/integrations/supabase/client";
+import { Loader, Plus, Trash } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface WebhookEndpoint {
   id: string;
@@ -159,16 +158,16 @@ export const WebhookEndpoints = () => {
 
   if (loading) {
     return (
-      <AdminDashboardLayout>
+      <>
         <div className="flex justify-center my-10">
           <Loader className="h-8 w-8 animate-spin text-gray-500" />
         </div>
-      </AdminDashboardLayout>
+      </>
     );
   }
 
   return (
-    <AdminDashboardLayout>
+    <>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-semibold">Endpoints de Webhook</h2>
@@ -272,6 +271,6 @@ export const WebhookEndpoints = () => {
           </Table>
         </div>
       </div>
-    </AdminDashboardLayout>
+    </>
   );
 }; 
