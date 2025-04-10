@@ -1,45 +1,33 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-
 // CORS configuration
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
-
-serve(async (req) => {
+serve(async (req)=>{
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: corsHeaders
     });
   }
-
   try {
     // Get environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing environment variables');
     }
-
     // Initialize Supabase client with service role
     const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
-
     // Get the URL path from the request
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/');
     const urlPath = pathParts[pathParts.length - 1];
-
     // Find the webhook endpoint
-    const { data: endpoint, error: endpointError } = await adminSupabase
-      .from('webhook_endpoints')
-      .select('id')
-      .eq('url_path', urlPath)
-      .single();
-
+    const { data: endpoint, error: endpointError } = await adminSupabase.from('webhook_endpoints').select('id').eq('url_path', urlPath).single();
     if (endpointError || !endpoint) {
       return new Response(JSON.stringify({
         error: 'Webhook endpoint not found'
@@ -51,21 +39,19 @@ serve(async (req) => {
         status: 404
       });
     }
-
     // Get the request payload and headers
     const payload = await req.json();
+    if (!payload) {
+      throw new Error('Payload cannot be null or undefined');
+    }
     const headers = Object.fromEntries(req.headers.entries());
-
     // Save the webhook event
-    const { error: eventError } = await adminSupabase
-      .from('webhooks_events')
-      .insert({
-        endpoint_id: endpoint.id,
-        payload,
-        headers,
-        processed: false,
-        processing_result: null
-      });
+    const { error: eventError } = await adminSupabase.from('webhook_events').insert({
+      endpoint_id: endpoint.id,
+      payload,
+      headers,
+      processed: false
+    });
 
     if (eventError) {
       console.error('Error saving webhook event:', eventError);
@@ -79,7 +65,6 @@ serve(async (req) => {
         status: 500
       });
     }
-
     // Return success response
     return new Response(JSON.stringify({
       message: 'Webhook event received and saved successfully'
@@ -102,4 +87,4 @@ serve(async (req) => {
       status: 500
     });
   }
-}); 
+});
