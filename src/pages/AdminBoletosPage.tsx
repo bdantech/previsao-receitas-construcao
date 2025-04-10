@@ -162,6 +162,55 @@ const AdminBoletosPage: React.FC = () => {
     }
   };
 
+  const handleBulkEmitir = async (boletoIds: string[]) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("bulk-generate-boletos", {
+        body: { boletoIds },
+        headers: getAuthHeader(),
+      });
+
+      if (error) {
+        console.error("Error in bulk boleto generation:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Erro ao emitir boletos em lote.",
+        });
+        return;
+      }
+
+      const { results } = data;
+      
+      // Show success message with details
+      toast({
+        title: "Processamento concluído",
+        description: `${results.successful.count} boletos emitidos com sucesso. ${results.failed.count} falhas.`,
+        duration: 5000,
+      });
+
+      // If there were any failures, show them in a separate toast
+      if (results.failed.count > 0) {
+        toast({
+          variant: "destructive",
+          title: "Alguns boletos não puderam ser emitidos",
+          description: "Verifique o console para mais detalhes.",
+          duration: 7000,
+        });
+        console.error("Failed boletos:", results.failed.items);
+      }
+
+      // Refresh the boletos list
+      fetchBoletos();
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao processar boletos em lote.",
+      });
+    }
+  };
+
   return (
     <>
       <div className="container mx-auto py-6 space-y-6">
@@ -181,6 +230,7 @@ const AdminBoletosPage: React.FC = () => {
           onFilterChange={handleFilterChange}
           filters={filters}
           isAdmin={true}
+          onBulkEmitir={handleBulkEmitir}
         />
 
         <CreateBoletosDialog

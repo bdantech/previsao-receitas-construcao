@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -28,7 +29,7 @@ import {
   Trash,
   Receipt
 } from "lucide-react";
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 export type Boleto = {
   id: string;
@@ -81,7 +82,7 @@ export type Boleto = {
   };
 };
 
-type BoletosTableProps = {
+export type BoletosTableProps = {
   boletos: Boleto[];
   isLoading: boolean;
   onUpdate: (boleto: Boleto) => void;
@@ -89,6 +90,7 @@ type BoletosTableProps = {
   onFilterChange: (filters: BoletosFilters) => void;
   filters: BoletosFilters;
   isAdmin?: boolean;
+  onBulkEmitir?: (boletoIds: string[]) => void;
 };
 
 export type BoletosFilters = {
@@ -135,10 +137,37 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
   onFilterChange,
   filters,
   isAdmin = false,
+  onBulkEmitir,
 }) => {
   const { getAuthHeader } = useAuth();
   const { toast } = useToast();
+  const [selectedBoletos, setSelectedBoletos] = useState<string[]>([]);
   
+  // Reset selected boletos when boletos list changes
+  useEffect(() => {
+    setSelectedBoletos([]);
+  }, [boletos]);
+
+  const handleSelectBoleto = (boletoId: string, checked: boolean) => {
+    setSelectedBoletos(prev => 
+      checked 
+        ? [...prev, boletoId]
+        : prev.filter(id => id !== boletoId)
+    );
+  };
+
+  const handleSelectAllBoletos = (checked: boolean) => {
+    const criadoBoletos = boletos.filter(b => b.status_emissao === 'Criado');
+    setSelectedBoletos(checked ? criadoBoletos.map(b => b.id) : []);
+  };
+
+  const handleBulkEmitir = () => {
+    if (onBulkEmitir && selectedBoletos.length > 0) {
+      onBulkEmitir(selectedBoletos);
+      setSelectedBoletos([]); // Reset selection after action
+    }
+  };
+
   const handleMonthYearChange = (value: string) => {
     onFilterChange({
       ...filters,
@@ -278,12 +307,31 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
             </SelectContent>
           </Select>
         </div>
+        {isAdmin && onBulkEmitir && selectedBoletos.length > 0 && (
+          <div className="flex items-end">
+            <Button onClick={handleBulkEmitir} variant="default">
+              <Receipt className="mr-2 h-4 w-4" />
+              Emitir Boletos Selecionados ({selectedBoletos.length})
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
+              {isAdmin && onBulkEmitir && (
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={
+                      boletos.filter(b => b.status_emissao === 'Criado').length > 0 &&
+                      selectedBoletos.length === boletos.filter(b => b.status_emissao === 'Criado').length
+                    }
+                    onCheckedChange={(checked) => handleSelectAllBoletos(checked === true)}
+                  />
+                </TableHead>
+              )}
               {!isProjectContext && <TableHead>Empresa</TableHead>}
               {!isProjectContext && <TableHead>Projeto</TableHead>}
               <TableHead>Pagador</TableHead>
@@ -297,19 +345,28 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={isProjectContext ? 6 : 8} className="text-center py-4">
+                <TableCell colSpan={isProjectContext ? 7 : 9} className="text-center py-4">
                   Carregando boletos...
                 </TableCell>
               </TableRow>
             ) : boletos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isProjectContext ? 6 : 8} className="text-center py-4">
+                <TableCell colSpan={isProjectContext ? 7 : 9} className="text-center py-4">
                   Nenhum boleto encontrado.
                 </TableCell>
               </TableRow>
             ) : (
               boletos.map((boleto) => (
                 <TableRow key={boleto.id}>
+                  {isAdmin && onBulkEmitir && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedBoletos.includes(boleto.id)}
+                        onCheckedChange={(checked) => handleSelectBoleto(boleto.id, checked === true)}
+                        disabled={boleto.status_emissao !== 'Criado'}
+                      />
+                    </TableCell>
+                  )}
                   {!isProjectContext && <TableCell>{boleto.companies?.name || 'N/A'}</TableCell>}
                   {!isProjectContext && <TableCell>{boleto.projects?.name || 'N/A'}</TableCell>}
                   <TableCell>
@@ -368,7 +425,7 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => onUpdate(boleto)} 
+                          onClick={() => onUpdate(boleto)}
                           title="Ver Detalhes"
                         >
                           <Eye className="h-4 w-4" />
