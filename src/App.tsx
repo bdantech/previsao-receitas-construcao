@@ -4,6 +4,7 @@ import React from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import AnticipationDetails from "./components/anticipations/AnticipationDetails";
 import CreateAnticipationForm from "./components/anticipations/CreateAnticipationForm";
+import { AdminDashboardLayout } from "./components/dashboard/AdminDashboardLayout";
 import { DashboardLayout } from "./components/dashboard/DashboardLayout";
 import { AuthProvider } from "./hooks/useAuth";
 import AdminAnticipationsPage from "./pages/AdminAnticipationsPage";
@@ -61,6 +62,9 @@ function App() {
                 <Route path="/project-dashboard/:projectId/anticipation/:anticipationId" element={<AnticipationDetails />} />
                 <Route path="/company" element={<CompanyPage />} />
                 <Route path="/integrations" element={<IntegrationsPage />} />
+              </Route>
+
+              <Route element={<AdminDashboardLayout/>}>
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
                 <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
                 <Route path="/admin/buyers" element={<AdminBuyersPage />} />
@@ -72,7 +76,7 @@ function App() {
                 <Route path="/admin/bank-accounts" element={<AdminBankAccountsPage />} />
                 <Route path="/admin/settings" element={<AdminSettingsPage />} /> 
               </Route>
-              
+
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>
