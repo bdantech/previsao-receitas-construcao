@@ -181,11 +181,10 @@ serve(async (req)=>{
           const { data: paymentPlan, error: ppError } = await supabase.from('payment_plan_settings').select(`
             id, 
             dia_cobranca, 
+            adjustment_base_date,
             teto_fundo_reserva,
             anticipation_request_id,
             project_id,
-            index_id,
-            adjustment_base_date,
             created_at,
             updated_at,
             anticipation_requests (
@@ -193,13 +192,12 @@ serve(async (req)=>{
               valor_liquido,
               status
             ),
+            indexes (
+              name
+            ),
             projects (
               name,
               cnpj
-            ),
-            indexes:index_id (
-              id,
-              name
             ),
             payment_plan_installments (
               id,
