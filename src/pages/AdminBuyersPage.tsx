@@ -171,7 +171,7 @@ export default function AdminBuyersPage() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = buyer.contract_file_path.split('/').pop();
+        a.download = buyer.contract_file_name || 'contrato.pdf'; 
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
