@@ -46,17 +46,39 @@ serve(async (req)=>{
     }
     const headers = Object.fromEntries(req.headers.entries());
     // Save the webhook event
-    const { error: eventError } = await adminSupabase.from('webhook_events').insert({
+    const { error: eventError, data: eventData } = await adminSupabase.from('webhook_events').insert({
       endpoint_id: endpoint.id,
       payload,
       headers,
       processed: false
-    });
-
+    }).select().single();
     if (eventError) {
       console.error('Error saving webhook event:', eventError);
       return new Response(JSON.stringify({
         error: 'Failed to save webhook event'
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 500
+      });
+    }
+    const { error: processEventError } = await adminSupabase.functions.invoke('process-webhook-events', {
+      body: {
+        record: {
+          id: eventData.id,
+          endpoint_id: endpoint.id,
+          payload,
+          headers,
+          processed: false
+        }
+      }
+    });
+    if (processEventError) {
+      console.error('Error processing webhook event:', processEventError);
+      return new Response(JSON.stringify({
+        error: 'Failed to process webhook event'
       }), {
         headers: {
           ...corsHeaders,
