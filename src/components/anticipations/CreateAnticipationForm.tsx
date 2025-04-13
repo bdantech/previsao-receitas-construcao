@@ -1,22 +1,22 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Loader, ChevronRight, ChevronLeft, CheckCircle, AlertCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Loader } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 interface Receivable {
   id: string;
@@ -50,7 +50,8 @@ const CreateAnticipationForm = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { session } = useAuth();
+  const { session,getAuthHeader, user } = useAuth();
+  console.log(user)
   
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,22 +98,23 @@ const CreateAnticipationForm = () => {
         } else {
           // Fetch company name separately if needed
           const { data: companyResult } = await supabase.functions.invoke('company-data', {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`
-            },
+            method: 'POST',
+            headers: await getAuthHeader(),
             body: {
-              action: 'getCompany',
+              action: 'getCompanyDetails',
               companyId: projectData.project.company_id
             }
           });
-          
+          console.log('companyResult')
+          console.log(companyResult)
           if (companyResult && companyResult.company) {
             companyName = companyResult.company.name;
           } else {
             companyName = 'Company';  // Fallback name
           }
         }
-        
+        console.log('projectData')
+        console.log(projectData)
         setCompanyData({
           id: projectData.project.company_id,
           name: companyName
