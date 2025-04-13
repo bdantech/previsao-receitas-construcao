@@ -47,7 +47,6 @@ const statusLabels = {
   'reprovado': 'Reprovado',
   'elegivel_para_antecipacao': 'Elegível para Antecipação',
   'antecipado': 'Antecipado',
-  'pago': 'Pago'
 };
 
 const statusColors = {
@@ -66,7 +65,7 @@ const AdminReceivablesPage = () => {
   const [companySearch, setCompanySearch] = useState<string>("");
   const [summary, setSummary] = useState<Summary>({ totalAmount: 0, count: 0 });
 
-  const fetchReceivables = async () => {
+  const fetchReceivables = async (defaultFilters?: {status:string ,companyName: string }) => {
     if (session && userRole === 'admin') {
       try {
         setLoadingReceivables(true);
@@ -78,6 +77,10 @@ const AdminReceivablesPage = () => {
         }
         if (companySearch.trim()) {
           filters.companyName = companySearch.trim();
+        }
+        if(defaultFilters)  {
+          filters.status = defaultFilters.status;
+          filters.companyName = defaultFilters.companyName;
         }
         
         const { data, error } = await supabase.functions.invoke('admin-receivables', {
@@ -142,7 +145,10 @@ const AdminReceivablesPage = () => {
   const handleClearFilters = () => {
     setSelectedStatus(null);
     setCompanySearch("");
-    fetchReceivables();
+    fetchReceivables({
+      companyName: "",
+      status: null
+    });
   };
 
   const formatCpf = (cpf: string) => {
