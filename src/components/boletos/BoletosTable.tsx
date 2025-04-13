@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatStringDate } from "@/utils/helpers/formatDate.helper";
+import { formatCPF } from "@/lib/formatters";
 import {
   Eye,
   FileDown,
@@ -81,6 +82,14 @@ export type Boleto = {
   };
 };
 
+export type BoletosFilters = {
+  companyId?: string;
+  projectId?: string;
+  statusEmissao?: string;
+  statusPagamento?: string;
+  monthYear?: string;
+};
+
 export type BoletosTableProps = {
   boletos: Boleto[];
   isLoading: boolean;
@@ -90,14 +99,6 @@ export type BoletosTableProps = {
   filters: BoletosFilters;
   isAdmin?: boolean;
   onBulkEmitir?: (boletoIds: string[]) => void;
-};
-
-export type BoletosFilters = {
-  companyId?: string;
-  projectId?: string;
-  statusEmissao?: string;
-  statusPagamento?: string;
-  monthYear?: string;
 };
 
 const getStatusEmissaoColor = (status: string) => {
@@ -141,11 +142,45 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
   const { getAuthHeader } = useAuth();
   const { toast } = useToast();
   const [selectedBoletos, setSelectedBoletos] = useState<string[]>([]);
+  const [companies, setCompanies] = useState<{id: string, name: string}[]>([]);
+  const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
   
   // Reset selected boletos when boletos list changes
   useEffect(() => {
     setSelectedBoletos([]);
   }, [boletos]);
+
+  // Fetch companies and projects for filters
+  useEffect(() => {
+    const fetchCompaniesAndProjects = async () => {
+      try {
+        const { data: companiesData, error: companiesError } = await supabase
+          .from('companies')
+          .select('id, name')
+          .order('name');
+
+        if (companiesError) throw companiesError;
+        setCompanies(companiesData || []);
+
+        const { data: projectsData, error: projectsError } = await supabase
+          .from('projects')
+          .select('id, name')
+          .order('name');
+
+        if (projectsError) throw projectsError;
+        setProjects(projectsData || []);
+      } catch (error) {
+        console.error('Error fetching companies and projects:', error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível carregar as empresas e projetos.",
+        });
+      }
+    };
+
+    fetchCompaniesAndProjects();
+  }, []);
 
   const handleSelectBoleto = (boletoId: string, checked: boolean) => {
     setSelectedBoletos(prev => 
@@ -156,7 +191,11 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
   };
 
   const handleSelectAllBoletos = (checked: boolean) => {
-    const criadoBoletos = boletos.filter(b => b.status_emissao === 'Criado');
+    const today = new Date().toISOString().split('T')[0];
+    const criadoBoletos = boletos.filter(b => 
+      b.status_emissao === 'Criado' && 
+      b.data_vencimento >= today
+    );
     setSelectedBoletos(checked ? criadoBoletos.map(b => b.id) : []);
   };
 
@@ -185,6 +224,20 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
     onFilterChange({
       ...filters,
       statusPagamento: value,
+    });
+  };
+
+  const handleCompanyChange = (value: string) => {
+    onFilterChange({
+      ...filters,
+      companyId: value === 'all' ? undefined : value,
+    });
+  };
+
+  const handleProjectChange = (value: string) => {
+    onFilterChange({
+      ...filters,
+      projectId: value === 'all' ? undefined : value,
     });
   };
 
@@ -266,54 +319,220 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
   // Determine if we're in the project dashboard context
   const isProjectContext = Boolean(filters.projectId);
 
+  // Calculate totals for each status
+  const calculateStatusTotals = () => {
+    const totals = {
+      total: 0,
+      criado: 0,
+      emitido: 0,
+      cancelado: 0,
+      pago: 0,
+      emAberto: 0,
+      emAtraso: 0
+    };
+
+    boletos.forEach(boleto => {
+      totals.total += boleto.valor_boleto;
+      
+      // Status de Emissão
+      if (boleto.status_emissao === 'Criado') totals.criado += boleto.valor_boleto;
+      if (boleto.status_emissao === 'Emitido') totals.emitido += boleto.valor_boleto;
+      if (boleto.status_emissao === 'Cancelado') totals.cancelado += boleto.valor_boleto;
+      
+      // Status de Pagamento
+      if (boleto.status_pagamento === 'Pago') totals.pago += boleto.valor_boleto;
+      if (boleto.status_pagamento === 'Em Aberto') totals.emAberto += boleto.valor_boleto;
+      if (boleto.status_pagamento === 'Em Atraso') totals.emAtraso += boleto.valor_boleto;
+    });
+
+    return totals;
+  };
+
+  const statusTotals = calculateStatusTotals();
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-4 pb-4">
-        <div className="min-w-[220px]">
-          <label className="text-sm font-medium mb-1 block">Mês/Ano de Vencimento</label>
-          <MonthYearPicker
-            value={filters.monthYear || ''}
-            onChange={handleMonthYearChange}
-            placeholder="Selecione mês/ano"
-          />
+      {/* Status Indicators */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Total Geral</h3>
+          <p className="text-2xl font-bold mt-2">
+            {new Intl.NumberFormat('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            }).format(statusTotals.total)}
+          </p>
         </div>
-        <div className="min-w-[180px]">
-          <label className="text-sm font-medium mb-1 block">Status de Emissão</label>
-          <Select value={filters.statusEmissao || 'all'} onValueChange={handleStatusEmissaoChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Todos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="Criado">Criado</SelectItem>
-              <SelectItem value="Emitido">Emitido</SelectItem>
-              <SelectItem value="Cancelado">Cancelado</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="min-w-[180px]">
-          <label className="text-sm font-medium mb-1 block">Status de Pagamento</label>
-          <Select value={filters.statusPagamento || 'all'} onValueChange={handleStatusPagamentoChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Todos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="N/A">N/A</SelectItem>
-              <SelectItem value="Pago">Pago</SelectItem>
-              <SelectItem value="Em Aberto">Em Aberto</SelectItem>
-              <SelectItem value="Em Atraso">Em Atraso</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {isAdmin && onBulkEmitir && selectedBoletos.length > 0 && (
-          <div className="flex items-end">
-            <Button onClick={handleBulkEmitir} variant="default">
-              <Receipt className="mr-2 h-4 w-4" />
-              Emitir Boletos Selecionados ({selectedBoletos.length})
-            </Button>
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Status de Emissão</h3>
+          <div className="space-y-2 mt-2">
+            <div className="flex justify-between items-center">
+              <Badge className={getStatusEmissaoColor('Criado')}>Criado</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.criado)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <Badge className={getStatusEmissaoColor('Emitido')}>Emitido</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.emitido)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <Badge className={getStatusEmissaoColor('Cancelado')}>Cancelado</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.cancelado)}
+              </span>
+            </div>
           </div>
-        )}
+        </div>
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Status de Pagamento</h3>
+          <div className="space-y-2 mt-2">
+            <div className="flex justify-between items-center">
+              <Badge className={getStatusPagamentoColor('Pago')}>Pago</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.pago)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <Badge className={getStatusPagamentoColor('Em Aberto')}>Em Aberto</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.emAberto)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <Badge className={getStatusPagamentoColor('Em Atraso')}>Em Atraso</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.emAtraso)}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Resumo</h3>
+          <div className="space-y-2 mt-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Total de Boletos:</span>
+              <span className="font-medium">{boletos.length}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Selecionados:</span>
+              <span className="font-medium">{selectedBoletos.length}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white p-4 rounded-lg border shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium text-gray-500">Filtros</h3>
+          <Button variant="outline" size="sm" onClick={() => onFilterChange({})}>
+            Limpar Filtros
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {!isProjectContext && (
+            <>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Empresa</label>
+                <Select value={filters.companyId || 'all'} onValueChange={handleCompanyChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas as empresas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as empresas</SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Projeto</label>
+                <Select value={filters.projectId || 'all'} onValueChange={handleProjectChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos os projetos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os projetos</SelectItem>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Mês/Ano de Vencimento</label>
+            <MonthYearPicker
+              value={filters.monthYear || ''}
+              onChange={handleMonthYearChange}
+              placeholder="Selecione mês/ano"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Status de Emissão</label>
+            <Select value={filters.statusEmissao || 'all'} onValueChange={handleStatusEmissaoChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="Criado">Criado</SelectItem>
+                <SelectItem value="Emitido">Emitido</SelectItem>
+                <SelectItem value="Cancelado">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Status de Pagamento</label>
+            <Select value={filters.statusPagamento || 'all'} onValueChange={handleStatusPagamentoChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="N/A">N/A</SelectItem>
+                <SelectItem value="Pago">Pago</SelectItem>
+                <SelectItem value="Em Aberto">Em Aberto</SelectItem>
+                <SelectItem value="Em Atraso">Em Atraso</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {isAdmin && onBulkEmitir && selectedBoletos.length > 0 && (
+            <div className="flex items-end">
+              <Button onClick={handleBulkEmitir} variant="default">
+                <Receipt className="mr-2 h-4 w-4" />
+                Emitir Boletos Selecionados ({selectedBoletos.length})
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="rounded-md border">
@@ -324,8 +543,14 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
                 <TableHead className="w-[50px]">
                   <Checkbox
                     checked={
-                      boletos.filter(b => b.status_emissao === 'Criado').length > 0 &&
-                      selectedBoletos.length === boletos.filter(b => b.status_emissao === 'Criado').length
+                      boletos.filter(b => 
+                        b.status_emissao === 'Criado' && 
+                        b.data_vencimento >= new Date().toISOString().split('T')[0]
+                      ).length > 0 &&
+                      selectedBoletos.length === boletos.filter(b => 
+                        b.status_emissao === 'Criado' && 
+                        b.data_vencimento >= new Date().toISOString().split('T')[0]
+                      ).length
                     }
                     onCheckedChange={(checked) => handleSelectAllBoletos(checked === true)}
                   />
@@ -362,7 +587,10 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
                       <Checkbox
                         checked={selectedBoletos.includes(boleto.id)}
                         onCheckedChange={(checked) => handleSelectBoleto(boleto.id, checked === true)}
-                        disabled={boleto.status_emissao !== 'Criado'}
+                        disabled={
+                          boleto.status_emissao !== 'Criado' || 
+                          boleto.data_vencimento < new Date().toISOString().split('T')[0]
+                        }
                       />
                     </TableCell>
                   )}
@@ -370,7 +598,7 @@ export const BoletosTable: React.FC<BoletosTableProps> = ({
                   {!isProjectContext && <TableCell>{boleto.projects?.name || 'N/A'}</TableCell>}
                   <TableCell>
                     {boleto.billing_receivables?.receivables?.buyer_name || 'N/A'}
-                    <div className="text-xs text-gray-500">{boleto.payer_tax_id}</div>
+                    <div className="text-xs text-gray-500">{formatCPF(boleto.payer_tax_id)}</div>
                   </TableCell>
                   <TableCell>
                     {new Intl.NumberFormat('pt-BR', {

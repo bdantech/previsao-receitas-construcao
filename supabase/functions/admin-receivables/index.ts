@@ -117,7 +117,37 @@ serve(async (req)=>{
         query = query.eq('project_id', filters.projectId);
       }
       if (filters.companyId) {
-        query = query.eq('projects.company_id', filters.companyId);
+        // First get all projects for the company
+        const { data: companyProjects, error: projectsError } = await serviceClient
+          .from('projects')
+          .select('id')
+          .eq('company_id', filters.companyId);
+        
+        if (projectsError) {
+          console.error('Error fetching company projects:', projectsError);
+          throw projectsError;
+        }
+        
+        if (companyProjects && companyProjects.length > 0) {
+          const projectIds = companyProjects.map(p => p.id);
+          query = query.in('project_id', projectIds);
+        } else {
+          // No projects for this company, return empty result
+          return new Response(JSON.stringify({
+            receivables: [],
+            count: 0,
+            summary: {
+              totalAmount: 0,
+              count: 0
+            }
+          }), {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            },
+            status: 200
+          });
+        }
       }
       if (filters.status) {
         query = query.eq('status', filters.status);
@@ -201,9 +231,11 @@ serve(async (req)=>{
       throw receivablesError;
     }
     // Process results to add company name at top level for easier access
-    const processedReceivables = receivables.map((item)=>({
+    const processedReceivables = receivables
+      .filter(item => item.projects?.companies?.name) // Only include receivables with a valid company
+      .map((item)=>({
         ...item,
-        company_name: item.projects?.companies?.name || 'Unknown Company',
+        company_name: item.projects.companies.name,
         project_name: item.projects?.name || 'Unknown Project'
       }));
     // Calculate summary data

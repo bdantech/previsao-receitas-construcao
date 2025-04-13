@@ -213,8 +213,8 @@ const AdminBoletosPage: React.FC = () => {
 
   return (
     <>
-      <div className="container mx-auto py-6 space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="container mx-auto py-6">
+        <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Boletos</h1>
           <Button onClick={() => setCreateDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />

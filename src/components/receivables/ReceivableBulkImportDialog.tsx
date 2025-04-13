@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -234,13 +233,10 @@ export function ReceivableBulkImportDialog({
         
         {importStep === 'upload' && (
           <div className="space-y-6">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center">
-              <Upload className="mx-auto h-12 w-12 text-gray-400" />
-              <div className="mt-4">
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <span className="mt-2 block text-sm font-medium text-gray-700">
-                    Clique para selecionar um arquivo Excel
-                  </span>
+            <label htmlFor="file-upload" className="cursor-pointer block">
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center">
+                <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                <div className="mt-4">
                   <input
                     id="file-upload"
                     name="file-upload"
@@ -249,12 +245,15 @@ export function ReceivableBulkImportDialog({
                     accept=".xlsx,.xls"
                     onChange={handleFileChange}
                   />
-                </label>
+                  <span className="mt-2 block text-sm font-medium text-gray-700">
+                    Clique para selecionar um arquivo Excel
+                  </span>
+                  <p className="text-xs text-gray-500 mt-2">
+                    XLSX, XLS até 10MB
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                XLSX, XLS até 10MB
-              </p>
-            </div>
+            </label>
             
             <div className="bg-blue-50 p-4 rounded-md">
               <div className="flex">

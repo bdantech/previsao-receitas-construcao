@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,6 +6,7 @@ import { useToast } from "./use-toast";
 
 export const useProjectBoletos = (projectId: string) => {
   const [boletos, setBoletos] = useState<Boleto[]>([]);
+  const [totalBoletos, setTotalBoletos] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState<BoletosFilters>({});
   const { toast } = useToast();
@@ -19,12 +19,42 @@ export const useProjectBoletos = (projectId: string) => {
     setFilters({ monthYear: currentMonthYear });
   }, []);
 
+  // Fetch total boletos count when projectId changes
+  useEffect(() => {
+    if (projectId) {
+      fetchTotalBoletos();
+    }
+  }, [projectId]);
+
   // Fetch boletos when filters change
   useEffect(() => {
     if (projectId) {
       fetchBoletos();
     }
   }, [projectId, filters]);
+
+  const fetchTotalBoletos = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("company-boletos", {
+        body: {
+          action: "getBoletos",
+          data: {
+            filters: { projectId },
+          },
+        },
+        headers: await getAuthHeader(),
+      });
+
+      if (error) {
+        console.error("Error fetching total boletos:", error);
+        return;
+      }
+
+      setTotalBoletos(data.boletos?.length || 0);
+    } catch (error) {
+      console.error("Error fetching total boletos:", error);
+    }
+  };
 
   const fetchBoletos = async () => {
     setIsLoading(true);
@@ -106,6 +136,7 @@ export const useProjectBoletos = (projectId: string) => {
 
   return {
     boletos,
+    totalBoletos,
     isLoading,
     filters,
     handleFilterChange,

@@ -313,7 +313,14 @@ export const AdminAnticipationDetails: React.FC<AdminAnticipationDetailsProps> =
   }
   
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 bg-gray-500 bg-opacity-50 z-50 flex items-center justify-center p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-white p-6 rounded-md max-w-3xl w-full overflow-auto max-h-[90vh]">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold">Detalhes da Antecipação</h2>

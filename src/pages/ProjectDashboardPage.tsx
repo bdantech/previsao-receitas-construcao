@@ -1,4 +1,3 @@
-
 import AnticipationsList from "@/components/anticipations/AnticipationsList";
 import { BoletosTable } from "@/components/boletos/BoletosTable";
 import { EditBoletoDialog } from "@/components/boletos/EditBoletoDialog";
@@ -26,6 +25,7 @@ import { ptBR } from "date-fns/locale";
 import { ArrowDownToLine, FileSpreadsheet, FileText, Loader, PencilIcon, Plus, Receipt, Upload, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Project {
   id: string;
@@ -95,7 +95,23 @@ const ProjectDashboardPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("compradores");
   const [projectBuyers, setProjectBuyers] = useState<ProjectBuyer[]>([]);
+  const [filteredBuyers, setFilteredBuyers] = useState<ProjectBuyer[]>([]);
+  const [buyerFilters, setBuyerFilters] = useState({
+    name: '',
+    cpf: '',
+    status: 'all',
+    contractStatus: 'all',
+    creditStatus: 'all'
+  });
   const [receivables, setReceivables] = useState<Receivable[]>([]);
+  const [filteredReceivables, setFilteredReceivables] = useState<Receivable[]>([]);
+  const [receivableFilters, setReceivableFilters] = useState({
+    buyerName: '',
+    buyerCpf: '',
+    status: 'all',
+    dueDateStart: '',
+    dueDateEnd: ''
+  });
   const [isLoadingBuyers, setIsLoadingBuyers] = useState(false);
   const [isLoadingReceivables, setIsLoadingReceivables] = useState(false);
   const [receivableDialogOpen, setReceivableDialogOpen] = useState(false);
@@ -123,7 +139,7 @@ const ProjectDashboardPage = () => {
     totalInvoices: 0
   });
 
-  const { boletos, isLoading: isLoadingBoletos, filters: boletoFilters, handleFilterChange: handleBoletoFilterChange, refreshBoletos } = 
+  const { boletos, totalBoletos, isLoading: isLoadingBoletos, filters: boletoFilters, handleFilterChange: handleBoletoFilterChange, refreshBoletos } = 
     useProjectBoletos(projectId || "");
   const [selectedBoleto, setSelectedBoleto] = useState<any>(null);
   const [editBoletoDialogOpen, setEditBoletoDialogOpen] = useState(false);
@@ -188,12 +204,78 @@ const ProjectDashboardPage = () => {
     updateDashboardSummary();
   }, [projectBuyers, receivables, anticipations, boletos]);
 
+  useEffect(() => {
+    // Apply filters to project buyers
+    let filtered = [...projectBuyers];
+    
+    if (buyerFilters.name) {
+      filtered = filtered.filter(buyer => 
+        buyer.full_name.toLowerCase().includes(buyerFilters.name.toLowerCase())
+      );
+    }
+    
+    if (buyerFilters.cpf) {
+      filtered = filtered.filter(buyer => 
+        buyer.cpf.replace(/\D/g, '').includes(buyerFilters.cpf.replace(/\D/g, ''))
+      );
+    }
+    
+    if (buyerFilters.status !== 'all') {
+      filtered = filtered.filter(buyer => buyer.buyer_status === buyerFilters.status);
+    }
+    
+    if (buyerFilters.contractStatus !== 'all') {
+      filtered = filtered.filter(buyer => buyer.contract_status === buyerFilters.contractStatus);
+    }
+    
+    if (buyerFilters.creditStatus !== 'all') {
+      filtered = filtered.filter(buyer => buyer.credit_analysis_status === buyerFilters.creditStatus);
+    }
+    
+    setFilteredBuyers(filtered);
+  }, [projectBuyers, buyerFilters]);
+
+  useEffect(() => {
+    // Apply filters to receivables
+    let filtered = [...receivables];
+    
+    if (receivableFilters.buyerName) {
+      filtered = filtered.filter(receivable => 
+        receivable.buyer_name?.toLowerCase().includes(receivableFilters.buyerName.toLowerCase())
+      );
+    }
+    
+    if (receivableFilters.buyerCpf) {
+      filtered = filtered.filter(receivable => 
+        receivable.buyer_cpf.replace(/\D/g, '').includes(receivableFilters.buyerCpf.replace(/\D/g, ''))
+      );
+    }
+    
+    if (receivableFilters.status !== 'all') {
+      filtered = filtered.filter(receivable => receivable.status === receivableFilters.status);
+    }
+    
+    if (receivableFilters.dueDateStart) {
+      filtered = filtered.filter(receivable => 
+        new Date(receivable.due_date) >= new Date(receivableFilters.dueDateStart)
+      );
+    }
+    
+    if (receivableFilters.dueDateEnd) {
+      filtered = filtered.filter(receivable => 
+        new Date(receivable.due_date) <= new Date(receivableFilters.dueDateEnd)
+      );
+    }
+    
+    setFilteredReceivables(filtered);
+  }, [receivables, receivableFilters]);
+
   const updateDashboardSummary = () => {
     setDashboardSummary({
       totalBuyers: projectBuyers.length,
       totalReceivablesAmount: receivables.reduce((sum, r) => sum + Number(r.amount), 0),
       totalAnticipationsAmount: anticipations.reduce((sum, a) => sum + Number(a.valor_total), 0),
-      totalInvoices: boletos.length
+      totalInvoices: totalBoletos
     });
   };
 
@@ -690,54 +772,155 @@ const ProjectDashboardPage = () => {
                 <CardTitle>Compradores</CardTitle>
               </CardHeader>
               <CardContent>
-                {isLoadingBuyers ? (
-                  <div className="flex justify-center py-8">
-                    <Loader className="h-6 w-6 animate-spin text-gray-500" />
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="buyerName">Nome</Label>
+                      <Input
+                        id="buyerName"
+                        placeholder="Buscar por nome..."
+                        value={buyerFilters.name}
+                        onChange={(e) => {
+                          setBuyerFilters(prev => ({
+                            ...prev,
+                            name: e.target.value
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="buyerCpf">CPF</Label>
+                      <Input
+                        id="buyerCpf"
+                        placeholder="Buscar por CPF..."
+                        value={buyerFilters.cpf}
+                        onChange={(e) => {
+                          setBuyerFilters(prev => ({
+                            ...prev,
+                            cpf: e.target.value
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="buyerStatus">Status</Label>
+                      <Select 
+                        value={buyerFilters.status}
+                        onValueChange={(value) => {
+                          setBuyerFilters(prev => ({
+                            ...prev,
+                            status: value
+                          }));
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="aprovado">Aprovado</SelectItem>
+                          <SelectItem value="reprovado">Reprovado</SelectItem>
+                          <SelectItem value="a_analisar">Em Análise</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contractStatus">Contrato</Label>
+                      <Select 
+                        value={buyerFilters.contractStatus}
+                        onValueChange={(value) => {
+                          setBuyerFilters(prev => ({
+                            ...prev,
+                            contractStatus: value
+                          }));
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="aprovado">Aprovado</SelectItem>
+                          <SelectItem value="reprovado">Reprovado</SelectItem>
+                          <SelectItem value="a_enviar">A Enviar</SelectItem>
+                          <SelectItem value="a_analisar">Em Análise</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="creditStatus">Crédito</Label>
+                      <Select 
+                        value={buyerFilters.creditStatus}
+                        onValueChange={(value) => {
+                          setBuyerFilters(prev => ({
+                            ...prev,
+                            creditStatus: value
+                          }));
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="aprovado">Aprovado</SelectItem>
+                          <SelectItem value="reprovado">Reprovado</SelectItem>
+                          <SelectItem value="a_analisar">Em Análise</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                ) : projectBuyers.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>CPF</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Contrato</TableHead>
-                        <TableHead>Análise de Crédito</TableHead>
-                        <TableHead>Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {projectBuyers.map((buyer) => (
-                        <TableRow key={buyer.id}>
-                          <TableCell className="font-medium">{buyer.full_name}</TableCell>
-                          <TableCell>{formatCPF(buyer.cpf)}</TableCell>
-                          <TableCell>{getBuyerStatusBadge(buyer.buyer_status)}</TableCell>
-                          <TableCell>{getBuyerStatusBadge(buyer.contract_status)}</TableCell>
-                          <TableCell>{getBuyerStatusBadge(buyer.credit_analysis_status)}</TableCell>
-                          <TableCell>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleContractClick(buyer)}
-                              className="flex items-center gap-2"
-                              disabled={buyer.contract_status !== 'a_enviar'}
-                              title={buyer.contract_status !== 'a_enviar' ? 
-                                "Não é possível modificar o contrato no status atual" : 
-                                "Enviar contrato"}
-                            >
-                              <Upload className="h-4 w-4" />
-                              Contrato
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <p className="text-center text-gray-500 py-8">
-                    Nenhum comprador cadastrado para este projeto ainda.
-                  </p>
-                )}
+                  <div className="border-t pt-6">
+                    {isLoadingBuyers ? (
+                      <div className="flex justify-center py-8">
+                        <Loader className="h-6 w-6 animate-spin text-gray-500" />
+                      </div>
+                    ) : projectBuyers.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>CPF</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Contrato</TableHead>
+                            <TableHead>Análise de Crédito</TableHead>
+                            <TableHead>Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredBuyers.map((buyer) => (
+                            <TableRow key={buyer.id}>
+                              <TableCell className="font-medium">{buyer.full_name}</TableCell>
+                              <TableCell>{formatCPF(buyer.cpf)}</TableCell>
+                              <TableCell>{getBuyerStatusBadge(buyer.buyer_status)}</TableCell>
+                              <TableCell>{getBuyerStatusBadge(buyer.contract_status)}</TableCell>
+                              <TableCell>{getBuyerStatusBadge(buyer.credit_analysis_status)}</TableCell>
+                              <TableCell>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => handleContractClick(buyer)}
+                                  className="flex items-center gap-2"
+                                  disabled={buyer.contract_status !== 'a_enviar'}
+                                  title={buyer.contract_status !== 'a_enviar' ? 
+                                    "Não é possível modificar o contrato no status atual" : 
+                                    "Enviar contrato"}
+                                >
+                                  <Upload className="h-4 w-4" />
+                                  Contrato
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <p className="text-center text-gray-500 py-8">
+                        Nenhum comprador cadastrado para este projeto ainda.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -762,44 +945,129 @@ const ProjectDashboardPage = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {isLoadingReceivables ? (
-                  <div className="flex justify-center py-8">
-                    <Loader className="h-6 w-6 animate-spin text-gray-500" />
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="receivableBuyerName">Nome</Label>
+                      <Input
+                        id="receivableBuyerName"
+                        placeholder="Buscar por nome..."
+                        value={receivableFilters.buyerName}
+                        onChange={(e) => {
+                          setReceivableFilters(prev => ({
+                            ...prev,
+                            buyerName: e.target.value
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="receivableBuyerCpf">CPF</Label>
+                      <Input
+                        id="receivableBuyerCpf"
+                        placeholder="Buscar por CPF..."
+                        value={receivableFilters.buyerCpf}
+                        onChange={(e) => {
+                          setReceivableFilters(prev => ({
+                            ...prev,
+                            buyerCpf: e.target.value
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="receivableStatus">Status</Label>
+                      <Select 
+                        value={receivableFilters.status}
+                        onValueChange={(value) => {
+                          setReceivableFilters(prev => ({
+                            ...prev,
+                            status: value
+                          }));
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="enviado">Enviado</SelectItem>
+                          <SelectItem value="elegivel_para_antecipacao">Elegível para Antecipação</SelectItem>
+                          <SelectItem value="reprovado">Reprovado</SelectItem>
+                          <SelectItem value="antecipado">Antecipado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dueDateStart">Vencimento Inicial</Label>
+                      <Input
+                        id="dueDateStart"
+                        type="date"
+                        value={receivableFilters.dueDateStart}
+                        onChange={(e) => {
+                          setReceivableFilters(prev => ({
+                            ...prev,
+                            dueDateStart: e.target.value
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dueDateEnd">Vencimento Final</Label>
+                      <Input
+                        id="dueDateEnd"
+                        type="date"
+                        value={receivableFilters.dueDateEnd}
+                        onChange={(e) => {
+                          setReceivableFilters(prev => ({
+                            ...prev,
+                            dueDateEnd: e.target.value
+                          }));
+                        }}
+                      />
+                    </div>
                   </div>
-                ) : receivables.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome do Comprador</TableHead>
-                        <TableHead>CPF do Comprador</TableHead>
-                        <TableHead>Valor</TableHead>
-                        <TableHead>Data de Vencimento</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Descrição</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {receivables.map((receivable) => (
-                        <TableRow key={receivable.id}>
-                          <TableCell className="font-medium">{receivable.buyer_name || "—"}</TableCell>
-                          <TableCell>{formatCPF(receivable.buyer_cpf)}</TableCell>
-                          <TableCell>{formatCurrency(receivable.amount)}</TableCell>
-                          <TableCell>
-                            {format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })}
-                          </TableCell>
-                          <TableCell>{getReceivableStatusBadge(receivable.status)}</TableCell>
-                          <TableCell className="max-w-xs truncate">
-                            {receivable.description || "-"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <p className="text-center text-gray-500 py-8">
-                    Nenhum recebível cadastrado para este projeto ainda.
-                  </p>
-                )}
+                  <div className="border-t pt-6">
+                    {isLoadingReceivables ? (
+                      <div className="flex justify-center py-8">
+                        <Loader className="h-6 w-6 animate-spin text-gray-500" />
+                      </div>
+                    ) : receivables.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nome do Comprador</TableHead>
+                            <TableHead>CPF do Comprador</TableHead>
+                            <TableHead>Valor</TableHead>
+                            <TableHead>Data de Vencimento</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Descrição</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredReceivables.map((receivable) => (
+                            <TableRow key={receivable.id}>
+                              <TableCell className="font-medium">{receivable.buyer_name || "—"}</TableCell>
+                              <TableCell>{formatCPF(receivable.buyer_cpf)}</TableCell>
+                              <TableCell>{formatCurrency(receivable.amount)}</TableCell>
+                              <TableCell>
+                                {format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                              </TableCell>
+                              <TableCell>{getReceivableStatusBadge(receivable.status)}</TableCell>
+                              <TableCell className="max-w-xs truncate">
+                                {receivable.description || "-"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <p className="text-center text-gray-500 py-8">
+                        Nenhum recebível cadastrado para este projeto ainda.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
