@@ -1,51 +1,16 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Lock, ArrowLeft } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { ArrowLeft, Lock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  useEffect(() => {
-    const setupAuth = async () => {
-      try {
-        // Check for error parameters
-        const errorCode = searchParams.get('error_code');
-        const errorDescription = searchParams.get('error_description');
-
-        if (errorCode) {
-          console.error('Error in URL:', { errorCode, errorDescription });
-          const message = errorDescription?.replace(/\+/g, ' ') || 'Link de recuperação inválido ou expirado';
-          setError(message);
-          return;
-        }
-
-        // Get the recovery token from the URL
-        const token = searchParams.get('token');
-        const type = searchParams.get('type');
-
-        if (!token || type !== 'recovery') {
-          console.error('Invalid recovery parameters:', { token, type });
-          setError('Link de recuperação inválido');
-          return;
-        }
-
-        console.log('Recovery parameters found:', { token, type });
-      } catch (error) {
-        console.error('Error in setupAuth:', error);
-        setError('Erro ao verificar o link de recuperação');
-      }
-    };
-
-    setupAuth();
-  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +95,31 @@ const ResetPassword = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Error getting session:', error);
+        setError('Erro ao verificar a sessão. Por favor, tente novamente.');
+        return;
+      }
+
+      if (session) {
+        console.log('User is already logged in, redirecting to dashboard...');
+      }else {
+        navigate('/auth');
+      }
+    } 
+    checkSession();
+
+    localStorage.setItem('isResettingPassword', 'true');
+
+    return () => {
+      // Limpar a flag ao sair da tela
+      localStorage.removeItem('isResettingPassword');
+    };
+  }, [])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

@@ -1,11 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +7,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface LoginFormProps {
   toggleView: () => void;
@@ -127,13 +127,18 @@ const LoginForm = ({ toggleView }: LoginFormProps) => {
     }
 
     setIsLoading(true);
+
+    const mapCodeErros = {
+      'over_email_send_rate_limit': 'Infelizmente, você atingiu o limite de envios de email. Aguarde alguns minutos e tente novamente.',
+    }
+
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
         redirectTo: `${window.location.origin}/reset-password`
       });
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(mapCodeErros[error.code] || error.message);
       }
 
       toast({
@@ -142,11 +147,11 @@ const LoginForm = ({ toggleView }: LoginFormProps) => {
       });
       setIsResetDialogOpen(false);
       setResetEmail("");
-    } catch (error: any) {
-      console.error("[Auth] Password reset error:", error);
+    } catch (error) {
+      console.log(error);
       toast({
         title: "Erro",
-        description: "Não foi possível enviar o email de redefinição de senha",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
