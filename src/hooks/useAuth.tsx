@@ -77,6 +77,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        const isResettingPassword = localStorage.getItem('isResettingPassword');
+        if(isResettingPassword) {
+          setIsLoading(false)
+          return;
+        }
+
+        console.log('------------------------------------------')
+        console.log('session')
+        console.log(session)
+        console.log('------------------------------------------')
         console.log("[useAuth] Auth state changed:", event, session?.user?.id);
         
         if (session) {

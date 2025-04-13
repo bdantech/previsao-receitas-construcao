@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -21,7 +20,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/formatters";
-import { Loader, RefreshCw, Search } from "lucide-react";
+import { Loader, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 
@@ -46,7 +45,6 @@ const statusLabels = {
   'reprovado': 'Reprovado',
   'elegivel_para_antecipacao': 'Elegível para Antecipação',
   'antecipado': 'Antecipado',
-  'pago': 'Pago'
 };
 
 const statusColors = {
