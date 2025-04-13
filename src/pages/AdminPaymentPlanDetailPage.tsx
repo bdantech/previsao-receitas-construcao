@@ -210,10 +210,10 @@ const AdminPaymentPlanDetailPage = () => {
 
   const fetchPaymentPlanDetails = async () => {
     if (!session || !paymentPlanId) return;
-    
+  
     try {
       setLoading(true);
-      
+  
       const { data, error } = await supabase.functions.invoke('admin-payment-plans', {
         method: 'POST',
         headers: {
@@ -224,7 +224,7 @@ const AdminPaymentPlanDetailPage = () => {
           paymentPlanId
         }
       });
-      
+  
       if (error) {
         console.error("Error fetching payment plan details:", error);
         toast({
@@ -234,7 +234,7 @@ const AdminPaymentPlanDetailPage = () => {
         });
         return;
       }
-      
+  
       if (!data?.data) {
         console.error("No payment plan data returned:", data);
         toast({
@@ -244,13 +244,13 @@ const AdminPaymentPlanDetailPage = () => {
         });
         return;
       }
-      
+  
       if (data.data.payment_plan_installments) {
         data.data.payment_plan_installments.sort((a, b) => a.numero_parcela - b.numero_parcela);
       }
-      
+  
       setPaymentPlan(data.data);
-      
+  
       if (!data.data.payment_plan_installments || data.data.payment_plan_installments.length === 0) {
         console.warn("Payment plan has no installments:", data.data);
         toast({
@@ -260,13 +260,18 @@ const AdminPaymentPlanDetailPage = () => {
         });
         return;
       }
-      
+  
       console.log("Payment plan loaded with installments:", data.data.payment_plan_installments);
-      
-      const firstInstallment = data.data.payment_plan_installments[0];
-      setSelectedInstallment(firstInstallment);
-      
-      await fetchInstallmentReceivables(firstInstallment.id);
+  
+      // Apenas definir a primeira parcela se selectedInstallment ainda não estiver definida
+      if (!selectedInstallment) {
+        const firstInstallment = data.data.payment_plan_installments[0];
+        setSelectedInstallment(firstInstallment);
+        await fetchInstallmentReceivables(firstInstallment.id);
+      } else {
+        // Recarregar os recebíveis da parcela atualmente selecionada
+        await fetchInstallmentReceivables(selectedInstallment.id);
+      }
     } catch (error) {
       console.error("Exception fetching payment plan details:", error);
       toast({
@@ -502,7 +507,7 @@ const AdminPaymentPlanDetailPage = () => {
       });
       return;
     }
-
+  
     if (selectedReceivableIds.length === 0) {
       toast({
         variant: "destructive",
@@ -511,12 +516,12 @@ const AdminPaymentPlanDetailPage = () => {
       });
       return;
     }
-    
+  
     try {
       setUpdatingBillingReceivables(true);
-      
+  
       console.log(`Sending add-billing-receivables request for installment: ${selectedInstallment.id} with receivables: ${selectedReceivableIds.length}`);
-      
+  
       const { data, error } = await supabase.functions.invoke('add-billing-receivables', {
         method: 'POST',
         headers: {
@@ -527,7 +532,7 @@ const AdminPaymentPlanDetailPage = () => {
           receivableIds: selectedReceivableIds
         }
       });
-      
+  
       if (error) {
         console.error("Error updating billing receivables:", error);
         toast({
@@ -537,7 +542,7 @@ const AdminPaymentPlanDetailPage = () => {
         });
         return;
       }
-      
+  
       if (!data) {
         console.error("No response data received");
         toast({
@@ -547,9 +552,9 @@ const AdminPaymentPlanDetailPage = () => {
         });
         return;
       }
-      
+  
       console.log("Response from add-billing-receivables:", data);
-      
+  
       if (data.warning) {
         console.warn("Warning when updating billing receivables:", data.warning);
         toast({
@@ -562,9 +567,9 @@ const AdminPaymentPlanDetailPage = () => {
           description: "Recebíveis de cobrança adicionados com sucesso."
         });
       }
-      
+  
       const billingReceivables = data.billingReceivables;
-      
+  
       if (!billingReceivables || !Array.isArray(billingReceivables)) {
         console.warn("Response missing billing receivables data:", data);
         toast({
@@ -574,11 +579,13 @@ const AdminPaymentPlanDetailPage = () => {
       } else {
         console.log(`${billingReceivables.length} billing receivables created successfully`, billingReceivables);
       }
-      
+  
       setIsAddBillingReceivablesOpen(false);
-      
+  
+      // Reabrir o diálogo de recebíveis com a mesma parcela
       await fetchInstallmentReceivables(selectedInstallment.id);
       await fetchPaymentPlanDetails();
+      setIsReceivablesDialogOpen(true); // Reabre o diálogo
     } catch (error) {
       console.error("Exception updating billing receivables:", error);
       toast({
@@ -590,13 +597,13 @@ const AdminPaymentPlanDetailPage = () => {
       setUpdatingBillingReceivables(false);
     }
   };
-
+  
   const handleRemoveBillingReceivable = async (billingReceivableId: string) => {
     if (!selectedInstallment) return;
-    
+  
     try {
       setRemovingBillingReceivable(billingReceivableId);
-      
+  
       const { data, error } = await supabase.functions.invoke('remove-billing-receivable', {
         method: 'POST',
         headers: {
@@ -606,7 +613,7 @@ const AdminPaymentPlanDetailPage = () => {
           billingReceivableId
         }
       });
-      
+  
       if (error) {
         console.error("Error removing billing receivable:", error);
         toast({
@@ -616,14 +623,16 @@ const AdminPaymentPlanDetailPage = () => {
         });
         return;
       }
-      
+  
       toast({
         title: "Sucesso",
         description: "Recebível de cobrança removido com sucesso."
       });
-      
+  
+      // Reabrir o diálogo de recebíveis com a mesma parcela
       await fetchInstallmentReceivables(selectedInstallment.id);
       await fetchPaymentPlanDetails();
+      setIsReceivablesDialogOpen(true); // Reabre o diálogo
     } catch (error) {
       console.error("Error removing billing receivable:", error);
       toast({
