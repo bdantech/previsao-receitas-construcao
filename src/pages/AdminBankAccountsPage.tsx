@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/formatters";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, RefreshCw } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
 type BankAccount = {
@@ -50,6 +50,7 @@ type BankAccount = {
 
 const AdminBankAccountsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const [isUpdatingBalances, setIsUpdatingBalances] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -168,15 +169,69 @@ const AdminBankAccountsPage: React.FC = () => {
     }
   };
 
+  const updateBankBalances = async () => {
+    setIsUpdatingBalances(true);
+    try {
+      const { error } = await supabase.functions.invoke("update-bank-balances", {
+        method: 'POST',
+        headers: {
+          ...getAuthHeader(),
+          'Content-Type': 'application/json'
+        },
+      });
+
+      if (error) {
+        console.error("Error updating bank balances:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível atualizar os saldos das contas bancárias.",
+        });
+        return;
+      }
+
+      toast({
+        title: "Saldos atualizados com sucesso",
+        description: "Os saldos das contas bancárias foram atualizados.",
+      });
+      
+      // Refresh the bank accounts list to show updated balances
+      fetchBankAccounts();
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao atualizar saldos das contas bancárias.",
+      });
+    } finally {
+      setIsUpdatingBalances(false);
+    }
+  };
+
   return (
     <>
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Contas Bancárias</h1>
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova Conta Bancária
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={updateBankBalances}
+              disabled={isUpdatingBalances}
+              variant="outline"
+            >
+              {isUpdatingBalances ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Atualizar Saldos
+            </Button>
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Conta Bancária
+            </Button>
+          </div>
         </div>
 
         <div className="rounded-md border">

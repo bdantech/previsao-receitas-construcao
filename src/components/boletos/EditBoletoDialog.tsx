@@ -33,6 +33,7 @@ import { Boleto } from "./BoletosTable";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { formatCPF } from "@/lib/formatters";
 
 const formSchema = z.object({
   status_emissao: z.enum(["Criado", "Emitido", "Cancelado"]),
@@ -99,11 +100,14 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
     
     setDownloading(true);
     try {
-      // Use document-management function to get a signed URL
-      const { data, error } = await supabase.functions.invoke("document-management", {
+      // Use storage-management function to get a signed URL
+      const { data, error } = await supabase.functions.invoke("storage-management", {
         body: {
           action: "downloadFile",
-          filePath: boleto.arquivo_boleto_path
+          data: {
+            bucketName: 'documents',
+            filePath: boleto.arquivo_boleto_path,
+          },
         },
         headers: await getAuthHeader()
       });
@@ -307,7 +311,7 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
               </div>
               <div>
                 <p className="text-sm font-medium mb-1">CPF/CNPJ</p>
-                <p className="text-sm">{boleto.payer_tax_id}</p>
+                <p className="text-sm">{formatCPF(boleto.payer_tax_id)}</p>
               </div>
               <div>
                 <p className="text-sm font-medium mb-1">Valor Face</p>

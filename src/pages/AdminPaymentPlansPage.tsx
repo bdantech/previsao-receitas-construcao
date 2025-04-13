@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -216,9 +215,9 @@ const AdminPaymentPlansPage = () => {
   };
 
   return (
-    <>
+    <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Planos de Pagamento</h2>
+        <h1 className="text-2xl font-bold">Planos de Pagamento</h1>
       </div>
 
       <Card className="mb-6">
@@ -355,7 +354,7 @@ const AdminPaymentPlansPage = () => {
           )}
         </div>
       )}
-    </>
+    </div>
   );
 };
 

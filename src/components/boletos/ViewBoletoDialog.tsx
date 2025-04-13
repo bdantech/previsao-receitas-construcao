@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +14,7 @@ import { Boleto } from "./BoletosTable";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { formatCPF } from "@/lib/formatters";
 
 type ViewBoletoDialogProps = {
   boleto: Boleto | null;
@@ -28,8 +28,37 @@ export const ViewBoletoDialog: React.FC<ViewBoletoDialogProps> = ({
   onClose,
 }) => {
   const [downloading, setDownloading] = useState(false);
+  const [companyName, setCompanyName] = useState<string>("");
   const { toast } = useToast();
-  const { getAuthHeader } = useAuth();
+  const { getAuthHeader, session } = useAuth();
+
+  useEffect(() => {
+    const fetchCompanyName = async () => {
+      if (!session?.access_token) return;
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('user-company-data', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        });
+        
+        if (error) {
+          console.error("Error fetching company data:", error);
+          return;
+        }
+        
+        if (data.companies && data.companies.length > 0) {
+          setCompanyName(data.companies[0].name);
+        }
+      } catch (error) {
+        console.error("Error:", error);
+      }
+    };
+
+    fetchCompanyName();
+  }, [session]);
 
   // Function to download the existing boleto file
   const handleDownloadFile = async () => {
@@ -37,11 +66,14 @@ export const ViewBoletoDialog: React.FC<ViewBoletoDialogProps> = ({
     
     setDownloading(true);
     try {
-      // Use document-management function to get a signed URL
-      const { data, error } = await supabase.functions.invoke("document-management", {
+      // Use storage-management function to get a signed URL
+      const { data, error } = await supabase.functions.invoke("storage-management", {
         body: {
           action: "downloadFile",
-          filePath: boleto.arquivo_boleto_path
+          data: {
+            bucketName: 'documents',
+            filePath: boleto.arquivo_boleto_path,
+          },
         },
         headers: await getAuthHeader()
       });
@@ -96,7 +128,7 @@ export const ViewBoletoDialog: React.FC<ViewBoletoDialogProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm font-medium mb-1">Empresa</p>
-              <p className="text-sm">{boleto.companies?.name || "N/A"}</p>
+              <p className="text-sm">{companyName || "N/A"}</p>
             </div>
             <div>
               <p className="text-sm font-medium mb-1">Projeto</p>
@@ -110,7 +142,7 @@ export const ViewBoletoDialog: React.FC<ViewBoletoDialogProps> = ({
             </div>
             <div>
               <p className="text-sm font-medium mb-1">CPF/CNPJ</p>
-              <p className="text-sm">{boleto.payer_tax_id}</p>
+              <p className="text-sm">{formatCPF(boleto.payer_tax_id)}</p>
             </div>
             <div>
               <p className="text-sm font-medium mb-1">Valor do Boleto</p>

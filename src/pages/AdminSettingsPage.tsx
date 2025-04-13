@@ -663,9 +663,9 @@ const UpdatesManagement = () => {
 const AdminSettingsPage = () => {
   return (
     <>
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold">Configurações</h1>
+      <div className="container mx-auto py-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Configurações</h1>
           <p className="text-muted-foreground mt-2">Gerencie índices e outras configurações do sistema</p>
         </div>
         

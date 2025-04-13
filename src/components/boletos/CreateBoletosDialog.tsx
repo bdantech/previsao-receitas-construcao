@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
+import { formatCPF } from "@/lib/formatters";
 
 type BillingReceivable = {
   id: string;
@@ -269,7 +270,7 @@ export const CreateBoletosDialog: React.FC<CreateBoletosDialogProps> = ({
                       <TableCell className="py-2">{br.project_name}</TableCell>
                       <TableCell className="py-2">
                         {br.buyer_name}
-                        <div className="text-xs text-gray-500">{br.buyer_cpf}</div>
+                        <div className="text-xs text-gray-500">{formatCPF(br.buyer_cpf)}</div>
                       </TableCell>
                       <TableCell className="py-2">
                         {new Intl.NumberFormat("pt-BR", {

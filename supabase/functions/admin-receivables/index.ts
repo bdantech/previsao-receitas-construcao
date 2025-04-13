@@ -117,7 +117,37 @@ serve(async (req)=>{
         query = query.eq('project_id', filters.projectId);
       }
       if (filters.companyId) {
-        query = query.eq('projects.company_id', filters.companyId);
+        // First get all projects for the company
+        const { data: companyProjects, error: projectsError } = await serviceClient
+          .from('projects')
+          .select('id')
+          .eq('company_id', filters.companyId);
+        
+        if (projectsError) {
+          console.error('Error fetching company projects:', projectsError);
+          throw projectsError;
+        }
+        
+        if (companyProjects && companyProjects.length > 0) {
+          const projectIds = companyProjects.map(p => p.id);
+          query = query.in('project_id', projectIds);
+        } else {
+          // No projects for this company, return empty result
+          return new Response(JSON.stringify({
+            receivables: [],
+            count: 0,
+            summary: {
+              totalAmount: 0,
+              count: 0
+            }
+          }), {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            },
+            status: 200
+          });
+        }
       }
       if (filters.status) {
         query = query.eq('status', filters.status);

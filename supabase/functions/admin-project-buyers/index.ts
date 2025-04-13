@@ -94,6 +94,32 @@ serve(async (req)=>{
         `).order('created_at', {
         ascending: false
       });
+
+      // Apply filters if provided
+      if (filters) {
+        if (filters.fullName) {
+          baseQuery = baseQuery.ilike('full_name', `%${filters.fullName}%`);
+        }
+        if (filters.cpf) {
+          baseQuery = baseQuery.ilike('cpf', `%${filters.cpf}%`);
+        }
+        if (filters.companyName) {
+          baseQuery = baseQuery.ilike('projects.companies.name', `%${filters.companyName}%`);
+        }
+        if (filters.projectName) {
+          baseQuery = baseQuery.ilike('projects.name', `%${filters.projectName}%`);
+        }
+        if (filters.buyerStatus) {
+          baseQuery = baseQuery.eq('buyer_status', filters.buyerStatus);
+        }
+        if (filters.contractStatus) {
+          baseQuery = baseQuery.eq('contract_status', filters.contractStatus);
+        }
+        if (filters.creditAnalysisStatus) {
+          baseQuery = baseQuery.eq('credit_analysis_status', filters.creditAnalysisStatus);
+        }
+      }
+
       if (companyId) {
         const { data, error } = await baseQuery.eq('projects.company_id', companyId);
         if (error) {

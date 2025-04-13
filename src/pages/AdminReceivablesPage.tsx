@@ -1,8 +1,6 @@
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -22,7 +20,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/formatters";
-import { Loader, RefreshCw, Search } from "lucide-react";
+import { Loader, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 
@@ -62,10 +60,85 @@ const AdminReceivablesPage = () => {
   const [receivables, setReceivables] = useState<Receivable[]>([]);
   const [loadingReceivables, setLoadingReceivables] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [companySearch, setCompanySearch] = useState<string>("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [companies, setCompanies] = useState<{id: string, name: string}[]>([]);
+  const [projects, setProjects] = useState<{id: string, name: string, company_id: string}[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<{id: string, name: string, company_id: string}[]>([]);
   const [summary, setSummary] = useState<Summary>({ totalAmount: 0, count: 0 });
 
-  const fetchReceivables = async (defaultFilters?: {status:string ,companyName: string }) => {
+  // Calculate totals by status
+  const calculateStatusTotals = () => {
+    const totals = {
+      total: 0,
+      enviado: 0,
+      reprovado: 0,
+      elegivel_para_antecipacao: 0,
+      antecipado: 0,
+      pago: 0
+    };
+
+    receivables.forEach(receivable => {
+      totals.total += Number(receivable.amount);
+      
+      if (receivable.status === 'enviado') totals.enviado += Number(receivable.amount);
+      if (receivable.status === 'reprovado') totals.reprovado += Number(receivable.amount);
+      if (receivable.status === 'elegivel_para_antecipacao') totals.elegivel_para_antecipacao += Number(receivable.amount);
+      if (receivable.status === 'antecipado') totals.antecipado += Number(receivable.amount);
+      if (receivable.status === 'pago') totals.pago += Number(receivable.amount);
+    });
+
+    return totals;
+  };
+
+  const statusTotals = calculateStatusTotals();
+
+  // Fetch companies and projects
+  const fetchCompaniesAndProjects = async () => {
+    try {
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('companies')
+        .select('id, name')
+        .order('name');
+
+      if (companiesError) throw companiesError;
+      setCompanies(companiesData || []);
+
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name, company_id')
+        .order('name');
+
+      if (projectsError) throw projectsError;
+      setProjects(projectsData || []);
+    } catch (error) {
+      console.error('Error fetching companies and projects:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Não foi possível carregar as empresas e projetos.",
+      });
+    }
+  };
+
+  // Update filtered projects when company changes
+  useEffect(() => {
+    if (selectedCompanyId) {
+      setFilteredProjects(projects.filter(project => project.company_id === selectedCompanyId));
+      setSelectedProjectId(null);
+    } else {
+      setFilteredProjects(projects);
+    }
+  }, [selectedCompanyId, projects]);
+
+  // Fetch companies and projects on mount
+  useEffect(() => {
+    if (session && userRole === 'admin') {
+      fetchCompaniesAndProjects();
+    }
+  }, [session, userRole]);
+
+  const fetchReceivables = async () => {
     if (session && userRole === 'admin') {
       try {
         setLoadingReceivables(true);
@@ -75,12 +148,11 @@ const AdminReceivablesPage = () => {
         if (selectedStatus) {
           filters.status = selectedStatus;
         }
-        if (companySearch.trim()) {
-          filters.companyName = companySearch.trim();
+        if (selectedCompanyId) {
+          filters.companyId = selectedCompanyId;
         }
-        if(defaultFilters)  {
-          filters.status = defaultFilters.status;
-          filters.companyName = defaultFilters.companyName;
+        if (selectedProjectId) {
+          filters.projectId = selectedProjectId;
         }
         
         const { data, error } = await supabase.functions.invoke('admin-receivables', {
@@ -144,11 +216,9 @@ const AdminReceivablesPage = () => {
 
   const handleClearFilters = () => {
     setSelectedStatus(null);
-    setCompanySearch("");
-    fetchReceivables({
-      companyName: "",
-      status: null
-    });
+    setSelectedCompanyId(null);
+    setSelectedProjectId(null);
+    fetchReceivables();
   };
 
   const formatCpf = (cpf: string) => {
@@ -181,88 +251,162 @@ const AdminReceivablesPage = () => {
   }
 
   return (
-    <>
+    <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Recebíveis</h2>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="flex items-center gap-2"
-          onClick={fetchReceivables}
-        >
-          <RefreshCw className="h-4 w-4" />
-          Atualizar
-        </Button>
+        <h1 className="text-2xl font-bold">Recebíveis</h1>
       </div>
-      
+
+      {/* Status Indicators */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Total Geral</h3>
+          <p className="text-2xl font-bold mt-2">
+            {new Intl.NumberFormat('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            }).format(statusTotals.total)}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">{receivables.length} recebíveis</p>
+        </div>
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Status</h3>
+          <div className="space-y-2 mt-2">
+            <div className="flex justify-between items-center">
+              <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Enviado</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.enviado)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <Badge variant="outline" className="bg-green-100 text-green-800">Elegível para Antecipação</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.elegivel_para_antecipacao)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <Badge variant="outline" className="bg-red-100 text-red-800">Reprovado</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.reprovado)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <Badge variant="outline" className="bg-blue-100 text-blue-800">Antecipado</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.antecipado)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <Badge variant="outline" className="bg-purple-100 text-purple-800">Pago</Badge>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(statusTotals.pago)}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Resumo</h3>
+          <div className="space-y-2 mt-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Total de Recebíveis:</span>
+              <span className="font-medium">{receivables.length}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Valor Médio:</span>
+              <span className="font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                }).format(receivables.length > 0 ? statusTotals.total / receivables.length : 0)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Filters */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Status</label>
-              <Select
-                value={selectedStatus || "all"}
-                onValueChange={(value) => setSelectedStatus(value === "all" ? null : value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Filtrar por status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Empresa</label>
-              <div className="flex gap-2">
-                <Input 
-                  placeholder="Buscar por empresa" 
-                  value={companySearch}
-                  onChange={(e) => setCompanySearch(e.target.value)}
-                />
-              </div>
-            </div>
+      <div className="bg-white p-4 rounded-lg border shadow-sm mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Status</label>
+            <Select
+              value={selectedStatus || "all"}
+              onValueChange={(value) => setSelectedStatus(value === "all" ? null : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                {Object.entries(statusLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
-          <div className="flex items-center justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={handleClearFilters}>
-              Limpar Filtros
-            </Button>
-            <Button onClick={handleSearch} className="flex items-center gap-2">
-              <Search className="h-4 w-4" />
-              Buscar
-            </Button>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Empresa</label>
+            <Select
+              value={selectedCompanyId || "all"}
+              onValueChange={(value) => setSelectedCompanyId(value === "all" ? null : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as empresas</SelectItem>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </CardContent>
-      </Card>
-      
-      {/* Summary Card */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Resumo</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500 mb-1">Total de Recebíveis</div>
-              <div className="text-2xl font-bold">{summary.count}</div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500 mb-1">Valor Total</div>
-              <div className="text-2xl font-bold">{formatCurrency(summary.totalAmount)}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Projeto</label>
+            <Select
+              value={selectedProjectId || "all"}
+              onValueChange={(value) => setSelectedProjectId(value === "all" ? null : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por projeto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os projetos</SelectItem>
+                {filteredProjects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={handleClearFilters}>
+            Limpar Filtros
+          </Button>
+          <Button onClick={handleSearch} className="flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            Buscar
+          </Button>
+        </div>
+      </div>
+      
       {/* Receivables List */}
       <Card>
         <CardContent className="p-0">
@@ -312,7 +456,7 @@ const AdminReceivablesPage = () => {
           )}
         </CardContent>
       </Card>
-    </>
+    </div>
   );
 };
 
