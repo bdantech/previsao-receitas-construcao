@@ -34,6 +34,7 @@ const formSchema = z.object({
   public_key: z.string().optional(),
   company_id: z.string().min(1, "Empresa é obrigatória"),
   project_id: z.string().min(1, "Projeto é obrigatório"),
+  bank_account_url: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -64,6 +65,7 @@ export const CreateBankAccountDialog: React.FC<CreateBankAccountDialogProps> = (
       public_key: "",
       company_id: "",
       project_id: "",
+      bank_account_url: "",
     },
   });
 
@@ -234,6 +236,20 @@ export const CreateBankAccountDialog: React.FC<CreateBankAccountDialogProps> = (
                   <FormLabel>Chave Pública</FormLabel>
                   <FormControl>
                     <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="bank_account_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL da Conta Bancária</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="https://..." />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

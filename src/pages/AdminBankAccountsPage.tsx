@@ -36,6 +36,7 @@ type BankAccount = {
   public_key: string | null;
   company_id: string;
   project_id: string;
+  bank_account_url: string | null;
   created_at: string;
   updated_at: string;
   companies: {
@@ -243,23 +244,21 @@ const AdminBankAccountsPage: React.FC = () => {
                 <TableHead>Nome da Conta</TableHead>
                 <TableHead>Número da Conta</TableHead>
                 <TableHead>Saldo</TableHead>
-                <TableHead>ID do Projeto (Banco)</TableHead>
+                <TableHead>URL da Conta</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-4">
-                    <div className="flex justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
-                    </div>
+                  <TableCell colSpan={7} className="text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
               ) : bankAccounts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-4">
-                    Nenhuma conta bancária encontrada.
+                  <TableCell colSpan={7} className="text-center">
+                    Nenhuma conta bancária encontrada
                   </TableCell>
                 </TableRow>
               ) : (
@@ -270,25 +269,36 @@ const AdminBankAccountsPage: React.FC = () => {
                     <TableCell>{account.account_name}</TableCell>
                     <TableCell>{account.account_number}</TableCell>
                     <TableCell>{formatCurrency(account.balance)}</TableCell>
-                    <TableCell>{account.bank_project_id || 'N/A'}</TableCell>
+                    <TableCell>
+                      {account.bank_account_url ? (
+                        <a 
+                          href={account.bank_account_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 underline"
+                        >
+                          Ver Conta
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditAccount(account)}
-                        >
-                          Editar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteAccount(account.id)}
-                          className="text-red-500 hover:text-red-600"
-                        >
-                          Excluir
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditAccount(account)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:text-red-800"
+                        onClick={() => handleDeleteAccount(account.id)}
+                      >
+                        Excluir
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))

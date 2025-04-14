@@ -583,6 +583,22 @@ async function handleUpdateBoleto(serviceClient, boletoId, updateData, corsHeade
       status: 404
     });
   }
+
+  // Validate due date update
+  if (updateData.data_vencimento) {
+    if (currentBoleto.status_emissao !== 'Criado' || currentBoleto.status_pagamento !== 'N/A') {
+      return new Response(JSON.stringify({
+        error: 'A data de vencimento só pode ser alterada quando o status de emissão é "Criado" e o status de pagamento é "N/A"'
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 400
+      });
+    }
+  }
+
   // Process status_emissao changes - update status_pagamento if needed
   if (updateData.status_emissao) {
     if (updateData.status_emissao === 'Criado' || updateData.status_emissao === 'Cancelado') {
@@ -591,6 +607,7 @@ async function handleUpdateBoleto(serviceClient, boletoId, updateData, corsHeade
       updateData.status_pagamento = 'Em Aberto';
     }
   }
+
   // Update the boleto
   const { data: updatedBoleto, error: updateError } = await serviceClient.from('boletos').update(updateData).eq('id', boletoId).select().single();
   if (updateError) {
@@ -605,6 +622,7 @@ async function handleUpdateBoleto(serviceClient, boletoId, updateData, corsHeade
       status: 500
     });
   }
+
   return new Response(JSON.stringify({
     success: true,
     boleto: updatedBoleto

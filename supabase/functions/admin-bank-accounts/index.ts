@@ -128,7 +128,7 @@ serve(async (req) => {
       }
 
       case "create": {
-        const { account_name, account_number, balance, private_key, public_key, bank_project_id, company_id, project_id } = data;
+        const { account_name, account_number, balance, private_key, public_key, bank_project_id, company_id, project_id, bank_account_url } = data;
         
         // Verify company exists
         const { data: company, error: companyError } = await adminSupabase
@@ -175,7 +175,8 @@ serve(async (req) => {
             public_key,
             bank_project_id,
             company_id,
-            project_id
+            project_id,
+            bank_account_url
           })
           .select()
           .single();
