@@ -1,5 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { SMTPClient } from "https://deno.land/x/denomailer/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+
 // CORS configuration
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -73,7 +75,7 @@ serve(async (req)=>{
         }
       case 'createAnticipation':
         {
-          return await handleCreateAnticipation(supabaseClient, serviceClient, data, corsHeaders, user.id);
+          return await handleCreateAnticipation(supabaseClient, serviceClient, data, corsHeaders, user);
         }
       case 'getAnticipations':
         {
@@ -271,8 +273,8 @@ async function handleGetReceivablesForAnticipation(supabaseClient, serviceClient
   });
 }
 // Handler for creating a new anticipation request
-async function handleCreateAnticipation(supabaseClient, serviceClient, data, corsHeaders, userId) {
-  const { companyId, projectId, receivableIds, valorTotal, valorLiquido, taxaJuros180, taxaJuros360, taxaJuros720, taxaJurosLongoPrazo, tarifaPorRecebivel } = data;
+async function handleCreateAnticipation(supabaseClient, serviceClient, data, corsHeaders, user) {
+  const { companyId, projectId, receivableIds, valorTotal, valorLiquido, taxaJuros180, taxaJuros360, taxaJuros720, taxaJurosLongoPrazo, tarifaPorRecebivel, fileBase64 } = data;
   // Validate required fields
   if (!companyId || !projectId || !receivableIds || !valorTotal || !valorLiquido) {
     return new Response(JSON.stringify({
@@ -334,6 +336,55 @@ async function handleCreateAnticipation(supabaseClient, serviceClient, data, cor
       console.error('Error updating receivables status:', updateReceivablesError);
       throw updateReceivablesError;
     }
+
+    // Send email with PDF attachment if fileBase64 is provided
+    if (fileBase64) {
+      const smtpConfig = {
+        hostname: Deno.env.get('SMTP_HOST') || 'smtp.gmail.com',
+        port: parseInt(Deno.env.get('SMTP_PORT') || '587'),
+        username: Deno.env.get('SMTP_USERNAME'),
+        password: Deno.env.get('SMTP_PASSWORD')
+      };
+
+      if (!smtpConfig.hostname || !smtpConfig.username || !smtpConfig.password) {
+        console.error('Missing SMTP configuration');
+        throw new Error('SMTP configuration required');
+      }
+
+      const client = new SMTPClient({
+        connection: {
+          hostname: smtpConfig.hostname,
+          port: smtpConfig.port,
+          tls: true,
+          auth: {
+            username: smtpConfig.username,
+            password: smtpConfig.password
+          },
+        },
+      });
+
+      function base64ToHtml(base64String) {
+        return decodeURIComponent(atob(base64String).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+      }
+      
+      const email = {
+        from: Deno.env.get('SMTP_FROM'),
+        to: [user.email],
+        cc: [Deno.env.get('SMTP_CC_TERMS')],
+        subject: `Onepay Pro - Antecipação criada com sucesso`,
+        html: base64ToHtml(fileBase64),
+      };
+
+      try {
+        await client.send(email);
+        await client.close();
+      } catch (emailError) {
+        console.error('Error sending email:', emailError);
+        // Note: We're not throwing here to allow the anticipation creation to succeed
+        // even if email sending fails
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
       anticipation
