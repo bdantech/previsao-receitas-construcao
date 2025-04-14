@@ -34,6 +34,7 @@ const formSchema = z.object({
   public_key: z.string().optional(),
   company_id: z.string().min(1, "Empresa é obrigatória"),
   project_id: z.string().min(1, "Projeto é obrigatório"),
+  bank_account_url: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -48,6 +49,7 @@ interface BankAccount {
   public_key: string | null;
   company_id: string;
   project_id: string;
+  bank_account_url: string | null;
 }
 
 interface EditBankAccountDialogProps {
@@ -78,6 +80,7 @@ export const EditBankAccountDialog: React.FC<EditBankAccountDialogProps> = ({
       public_key: "",
       company_id: "",
       project_id: "",
+      bank_account_url: "",
     },
   });
 
@@ -92,6 +95,7 @@ export const EditBankAccountDialog: React.FC<EditBankAccountDialogProps> = ({
         public_key: account.public_key || "",
         company_id: account.company_id,
         project_id: account.project_id,
+        bank_account_url: account.bank_account_url || "",
       });
     }
   }, [account, form]);
@@ -265,6 +269,20 @@ export const EditBankAccountDialog: React.FC<EditBankAccountDialogProps> = ({
                   <FormLabel>Chave Pública</FormLabel>
                   <FormControl>
                     <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="bank_account_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL da Conta Bancária</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="https://..." />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

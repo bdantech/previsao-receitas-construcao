@@ -22,10 +22,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCNPJ, formatCompactCurrency, formatCPF, formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowDownToLine, FileSpreadsheet, FileText, Loader, PencilIcon, Plus, Receipt, Upload, UsersRound } from "lucide-react";
+import { ArrowDownToLine, Banknote, FileSpreadsheet, FileText, Loader, PencilIcon, Plus, Receipt, Upload, UsersRound, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BankAccountTab } from "@/components/project/BankAccountTab";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Project {
   id: string;
@@ -621,6 +628,16 @@ const ProjectDashboardPage = () => {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{project.name}</h1>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>ID do Projeto: {project.id}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Badge variant={project.status === 'active' ? 'success' : 'secondary'}>
                 {project.status === 'active' ? 'Ativo' : 'Inativo'}
               </Badge>
@@ -763,6 +780,10 @@ const ProjectDashboardPage = () => {
             <TabsTrigger value="plano-pagamento" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Plano de Pagamento
+            </TabsTrigger>
+            <TabsTrigger value="conta-bancaria" className="flex items-center gap-2">
+              <Banknote className="h-4 w-4" />
+              Conta Bancária
             </TabsTrigger>
           </TabsList>
           
@@ -1119,6 +1140,10 @@ const ProjectDashboardPage = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+          
+          <TabsContent value="conta-bancaria" className="mt-6">
+            <BankAccountTab projectId={projectId || ""} />
           </TabsContent>
         </Tabs>
       </div>

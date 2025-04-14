@@ -40,6 +40,7 @@ const formSchema = z.object({
   status_pagamento: z.enum(["N/A", "Pago", "Em Aberto", "Em Atraso"]),
   nosso_numero: z.string().optional(),
   linha_digitavel: z.string().optional(),
+  data_vencimento: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -82,6 +83,7 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
         status_pagamento: boleto.status_pagamento,
         nosso_numero: boleto.nosso_numero || "",
         linha_digitavel: boleto.linha_digitavel || "",
+        data_vencimento: boleto.data_vencimento,
       });
       // Reset file state when boleto changes
       setFile(null);
@@ -429,6 +431,27 @@ export const EditBoletoDialog: React.FC<EditBoletoDialogProps> = ({
                     <FormLabel>Linha Digitável</FormLabel>
                     <FormControl>
                       <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="data_vencimento"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de Vencimento</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        disabled={
+                          boleto.status_emissao !== "Criado" ||
+                          boleto.status_pagamento !== "N/A"
+                        }
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
