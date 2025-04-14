@@ -74,6 +74,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [setUserRole]);
 
   useEffect(() => {
+    // Carregar sessão inicial
+    const initializeSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("[useAuth] Error loading initial session:", error);
+        setIsLoading(false);
+        return;
+      }
+      if (data.session) {
+        setSession(data.session);
+        setUser(data.session.user);
+        await fetchUserRole(data.session.user.id);
+      }
+      setIsLoading(false);
+    };
+
+    initializeSession();
+
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -109,7 +127,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       authListener.subscription.unsubscribe();
     };
   }, []);
-
+  console.log('----------------------------------------')
+  console.log(session)
+  console.log('----------------------------------------')
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
