@@ -1,6 +1,10 @@
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -9,19 +13,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { documentManagementApi, supabase } from "@/integrations/supabase/client";
 import { formatCPF } from "@/lib/formatters";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Loader2, PenSquare, Users, FileCheck, CreditCard } from "lucide-react";
+import { FileText, Loader2, PenSquare, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+
 
 export default function AdminBuyersPage() {
   const { session, userRole, isLoading: isLoadingAuth } = useAuth();
@@ -30,24 +30,23 @@ export default function AdminBuyersPage() {
   const [statusType, setStatusType] = useState<'contract' | 'credit'>('contract');
   const [selectedBuyerId, setSelectedBuyerId] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [companies, setCompanies] = useState<{id: string, name: string}[]>([]);
+  const [projects, setProjects] = useState<{id: string, name: string, company_id: string}[]>([]);
+  
+  // State for filters and applied filters
   const [filters, setFilters] = useState({
-    name: '',
-    cpf: '',
-    company: '',
-    project: '',
+    name: null,
+    cpf: null,
+    companyId: null,
+    projectId: null,
     status: 'all',
     contractStatus: 'all',
-    creditAnalysisStatus: 'all'
+    creditAnalysisStatus: 'all',
   });
-
-  useEffect(() => {
-    if (!isLoadingAuth && (!session || userRole !== 'admin')) {
-      navigate('/admin/auth');
-    }
-  }, [session, userRole, isLoadingAuth, navigate]);
+  const [appliedFilters, setAppliedFilters] = useState(filters);
 
   const { data: buyers, isLoading: isLoadingBuyers, error, refetch } = useQuery({
-    queryKey: ['admin-buyers', filters],
+    queryKey: ['admin-buyers', appliedFilters],
     queryFn: async () => {
       try {
         if (!session?.access_token) {
@@ -63,26 +62,26 @@ export default function AdminBuyersPage() {
         console.log('Fetching buyers with session:', {
           hasAccessToken: !!session.access_token,
           userRole,
-          userId: session.user.id
+          userId: session.user.id,
         });
 
         const { data, error } = await supabase.functions.invoke('admin-project-buyers', {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${session.access_token}`
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: {
             action: 'list',
             filters: {
-              fullName: filters.name,
-              cpf: filters.cpf,
-              companyName: filters.company,
-              projectName: filters.project,
-              buyerStatus: filters.status !== 'all' ? filters.status : undefined,
-              contractStatus: filters.contractStatus !== 'all' ? filters.contractStatus : undefined,
-              creditAnalysisStatus: filters.creditAnalysisStatus !== 'all' ? filters.creditAnalysisStatus : undefined
-            }
-          }
+              fullName: appliedFilters.name,
+              cpf: appliedFilters.cpf,
+              companyId: appliedFilters.companyId,
+              projectId: appliedFilters.projectId,
+              buyerStatus: appliedFilters.status !== 'all' ? appliedFilters.status : undefined,
+              contractStatus: appliedFilters.contractStatus !== 'all' ? appliedFilters.contractStatus : undefined,
+              creditAnalysisStatus: appliedFilters.creditAnalysisStatus !== 'all' ? appliedFilters.creditAnalysisStatus : undefined,
+            },
+          },
         });
 
         if (error) {
@@ -105,6 +104,31 @@ export default function AdminBuyersPage() {
     enabled: !!session?.access_token && userRole === 'admin' && !isLoadingAuth,
   });
 
+  const handleSearch = () => {
+    setAppliedFilters(filters);
+  };
+
+  const handleClearFilters = () => {
+    const defaultFilters = {
+      name: null,
+      cpf: null,
+      companyId: null,
+      projectId: null,
+      status: 'all',
+      contractStatus: 'all',
+      creditAnalysisStatus: 'all',
+    };
+    setFilters(defaultFilters);
+    setAppliedFilters(defaultFilters);
+  };
+
+  useEffect(() => {
+    if (!isLoadingAuth && (!session || userRole !== 'admin')) {
+      navigate('/admin/auth');
+    }
+    fetchCompaniesAndProjects()
+  }, [session, userRole, isLoadingAuth, navigate]);
+
   const getStatusDisplay = (status: string) => {
     const statusMap: Record<string, { label: string, className: string }> = {
       'aprovado': { label: 'Aprovado', className: 'text-green-600' },
@@ -123,13 +147,46 @@ export default function AdminBuyersPage() {
     setStatusDialogOpen(true);
   };
 
+    // Fetch companies and projects
+    const fetchCompaniesAndProjects = async () => {
+      try {
+        const { data: companiesData, error: companiesError } = await supabase
+          .from('companies')
+          .select('id, name')
+          .order('name');
+  
+        if (companiesError) throw companiesError;
+        setCompanies(companiesData || []);
+  
+        const { data: projectsData, error: projectsError } = await supabase
+          .from('projects')
+          .select('id, name, company_id')
+          .order('name');
+  
+        if (projectsError) throw projectsError;
+        setProjects(projectsData || []);
+      } catch (error) {
+        console.error('Error fetching companies and projects:', error);
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Não foi possível carregar as empresas e projetos.",
+        });
+      }
+    };
+  
+
   const handleStatusChange = async () => {
     if (!selectedBuyerId || !selectedStatus) return;
 
     try {
       const selectedBuyer = buyers?.find(buyer => buyer.id === selectedBuyerId);
       if (!selectedBuyer) {
-        toast.error("Comprador não encontrado");
+        toast({
+          variant: 'destructive',
+          title: 'Erro',
+          description: 'Comprador não encontrado.',
+        })
         return;
       }
 
@@ -164,18 +221,30 @@ export default function AdminBuyersPage() {
       console.log('data', data);
       console.log('error', error);  
       
-      toast.success("Status atualizado com sucesso");
+      toast({
+        variant: "default",
+        title: "Sucesso",
+        description: "Status atualizado com sucesso.",
+      })
       setStatusDialogOpen(false);
       refetch();
     } catch (error) {
       console.error("Error updating status:", error);
-      toast.error("Erro ao atualizar status");
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Não foi possível atualizar o status do comprador.',
+      })
     }
   };
 
   const downloadContract = async (buyer: any) => {
     if (!buyer.contract_file_path || buyer.contract_file_path.trim() === '') {
-      toast.error("Este comprador não possui contrato para download");
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Este comprador não possui contrato para download",
+      })
       return;
     }
 
@@ -202,16 +271,24 @@ export default function AdminBuyersPage() {
       }
 
 
-      toast.success("Download do contrato iniciado");
+      toast({
+        variant: "default",
+        title: "Sucesso",
+        description: "Contrato baixado com sucesso.",
+      })
     } catch (error) {
       console.error('Error downloading contract:', error);
       
       const errorMessage = error instanceof Error ? error.message : "Erro ao baixar o contrato";
       const isFileNotFound = errorMessage.includes("not found") || errorMessage.includes("does not exist");
       
-      toast.error(isFileNotFound 
-        ? "Contrato não encontrado. O arquivo pode ter sido removido."
-        : errorMessage);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: isFileNotFound 
+          ? "Contrato não encontrado. O arquivo pode ter sido removido."
+          : errorMessage,
+      })
     }
   };
 
@@ -303,8 +380,8 @@ export default function AdminBuyersPage() {
             <Label htmlFor="name">Nome do Comprador</Label>
             <Input
               id="name"
-              placeholder="Buscar por nome..."
-              value={filters.name}
+              placeholder="Buscar por nome"
+              value={filters.name || ''}
               onChange={(e) => setFilters(prev => ({ ...prev, name: e.target.value }))}
             />
           </div>
@@ -312,28 +389,50 @@ export default function AdminBuyersPage() {
             <Label htmlFor="cpf">CPF</Label>
             <Input
               id="cpf"
-              placeholder="Buscar por CPF..."
-              value={filters.cpf}
+              placeholder="Buscar por CPF"
+              value={filters.cpf || ''}
               onChange={(e) => setFilters(prev => ({ ...prev, cpf: e.target.value }))}
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="company">Empresa</Label>
-            <Input
-              id="company"
-              placeholder="Buscar por empresa..."
-              value={filters.company}
-              onChange={(e) => setFilters(prev => ({ ...prev, company: e.target.value }))}
-            />
+            <label className="text-sm font-medium">Empresa</label>
+            <Select
+              value={
+                filters.companyId || "all"}
+              onValueChange={(value) => {
+                setFilters(prev => ({ ...prev, companyId: value === "all" ? null : value })); // Update the filters state
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as empresas</SelectItem>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
           <div className="space-y-1">
-            <Label htmlFor="project">Projeto</Label>
-            <Input
-              id="project"
-              placeholder="Buscar por projeto..."
-              value={filters.project}
-              onChange={(e) => setFilters(prev => ({ ...prev, project: e.target.value }))}
-            />
+            <label className="text-sm font-medium">Projeto</label>
+            <Select
+              value={filters.projectId || "all"}
+              onValueChange={(value) => {
+                setFilters(prev => ({ ...prev, projectId: value === "all" ? null : value })); // Update the filters state
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por projeto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os projetos</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label htmlFor="status">Status do Comprador</Label>
@@ -386,6 +485,16 @@ export default function AdminBuyersPage() {
                 <SelectItem value="a_analisar">Em Análise</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div></div>
+          <div className="flex items-center justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={handleClearFilters}>
+              Limpar Filtros
+            </Button>
+            <Button onClick={handleSearch} className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Buscar
+            </Button>
           </div>
         </div>
       </div>

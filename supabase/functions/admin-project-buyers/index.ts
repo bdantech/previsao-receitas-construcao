@@ -94,75 +94,58 @@ serve(async (req)=>{
         `).order('created_at', {
         ascending: false
       });
-
       // Apply filters if provided
       if (filters) {
-        if (filters.fullName) {
-          baseQuery = baseQuery.ilike('full_name', `%${filters.fullName}%`);
+        const { fullName, cpf, companyId, projectId, buyerStatus, contractStatus, creditAnalysisStatus } = filters;
+        // Filter by companyId
+        if (companyId) {
+          baseQuery = baseQuery.eq('projects.company_id', companyId);
         }
-        if (filters.cpf) {
-          baseQuery = baseQuery.ilike('cpf', `%${filters.cpf}%`);
+        // Filter by projectId
+        if (projectId) {
+          baseQuery = baseQuery.eq('project_id', projectId);
         }
-        if (filters.companyName) {
-          baseQuery = baseQuery.ilike('projects.companies.name', `%${filters.companyName}%`);
+        // Filter by name (case-insensitive partial match)
+        if (fullName) {
+          baseQuery = baseQuery.ilike('full_name', `%${fullName}%`);
         }
-        if (filters.projectName) {
-          baseQuery = baseQuery.ilike('projects.name', `%${filters.projectName}%`);
+        // Filter by CPF (exact match)
+        if (cpf) {
+          baseQuery = baseQuery.eq('cpf', cpf);
         }
-        if (filters.buyerStatus) {
-          baseQuery = baseQuery.eq('buyer_status', filters.buyerStatus);
+        // Filter by buyer_status
+        if (buyerStatus) {
+          baseQuery = baseQuery.eq('buyer_status', buyerStatus);
         }
-        if (filters.contractStatus) {
-          baseQuery = baseQuery.eq('contract_status', filters.contractStatus);
+        // Filter by contract_status
+        if (contractStatus) {
+          baseQuery = baseQuery.eq('contract_status', contractStatus);
         }
-        if (filters.creditAnalysisStatus) {
-          baseQuery = baseQuery.eq('credit_analysis_status', filters.creditAnalysisStatus);
+        // Filter by credit_analysis_status
+        if (creditAnalysisStatus) {
+          baseQuery = baseQuery.eq('credit_analysis_status', creditAnalysisStatus);
         }
       }
-
-      if (companyId) {
-        const { data, error } = await baseQuery.eq('projects.company_id', companyId);
-        if (error) {
-          console.error('Project buyers query error:', error);
-          throw error;
-        }
-        const transformedBuyers = data.map((buyer)=>({
-            ...buyer,
-            project_name: buyer.projects?.name || '',
-            company_name: buyer.projects?.companies?.name || '',
-            company_id: buyer.projects?.companies?.id || ''
-          }));
-        return new Response(JSON.stringify({
-          buyers: transformedBuyers
-        }), {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          },
-          status: 200
-        });
-      } else {
-        const { data, error } = await baseQuery;
-        if (error) {
-          console.error('Project buyers query error:', error);
-          throw error;
-        }
-        const transformedBuyers = data.map((buyer)=>({
-            ...buyer,
-            project_name: buyer.projects?.name || '',
-            company_name: buyer.projects?.companies?.name || '',
-            company_id: buyer.projects?.companies?.id || ''
-          }));
-        return new Response(JSON.stringify({
-          buyers: transformedBuyers
-        }), {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          },
-          status: 200
-        });
+      const { data, error } = await baseQuery;
+      if (error) {
+        console.error('Project buyers query error:', error);
+        throw error;
       }
+      const transformedBuyers = data.map((buyer)=>({
+          ...buyer,
+          project_name: buyer.projects?.name || '',
+          company_name: buyer.projects?.companies?.name || '',
+          company_id: buyer.projects?.companies?.id || ''
+        }));
+      return new Response(JSON.stringify({
+        buyers: transformedBuyers
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 200
+      });
     }
     if (action === 'get' && buyerId) {
       const query = `
