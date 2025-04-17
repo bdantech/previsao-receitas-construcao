@@ -68,6 +68,17 @@ const CreateAnticipationForm = () => {
     console.log('Operation Days Limit:', operationDaysLimit);
   }, [operationDaysLimit]);
   
+  // Add function to check if a receivable is within the operation days limit
+  const isReceivableWithinLimit = (receivable: Receivable) => {
+    if (!operationDaysLimit) return true;
+    
+    const today = new Date();
+    const dueDate = new Date(receivable.due_date);
+    const daysToDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return daysToDue <= operationDaysLimit;
+  };
+  
   // Fetch receivables and company data
   useEffect(() => {
     const fetchData = async () => {
@@ -189,6 +200,15 @@ const CreateAnticipationForm = () => {
   
   // Toggle receivable selection
   const toggleReceivable = (receivable: Receivable) => {
+    if (!isReceivableWithinLimit(receivable)) {
+      toast({
+        title: "Recebível fora do prazo",
+        description: `Este recebível possui vencimento além do limite de ${operationDaysLimit} dias.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (selectedReceivables.some(r => r.id === receivable.id)) {
       setSelectedReceivables(selectedReceivables.filter(r => r.id !== receivable.id));
     } else {
@@ -198,7 +218,16 @@ const CreateAnticipationForm = () => {
   
   // Select all receivables
   const selectAllReceivables = () => {
-    setSelectedReceivables([...receivables]);
+    const eligibleReceivables = receivables.filter(isReceivableWithinLimit);
+    setSelectedReceivables(eligibleReceivables);
+    
+    if (eligibleReceivables.length < receivables.length) {
+      toast({
+        title: "Alguns recebíveis não foram selecionados",
+        description: `Apenas recebíveis com vencimento dentro de ${operationDaysLimit} dias foram selecionados.`,
+        variant: "default"
+      });
+    }
   };
   
   // Deselect all receivables
@@ -455,29 +484,38 @@ const CreateAnticipationForm = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {receivables.map((receivable) => (
-                        <tr 
-                          key={receivable.id} 
-                          className={`border-b hover:bg-gray-50 cursor-pointer ${
-                            selectedReceivables.some(r => r.id === receivable.id) ? 'bg-primary/5' : ''
-                          }`}
-                          onClick={() => toggleReceivable(receivable)}
-                        >
-                          <td className="py-3 px-4">
-                            <Checkbox 
-                              checked={selectedReceivables.some(r => r.id === receivable.id)}
-                              onCheckedChange={() => toggleReceivable(receivable)}
-                              className="ml-1"
-                            />
-                          </td>
-                          <td className="py-3 px-4 font-medium">{receivable.buyer_name || "—"}</td>
-                          <td className="py-3 px-4">{formatCPF(receivable.buyer_cpf)}</td>
-                          <td className="py-3 px-4">
-                            {format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })}
-                          </td>
-                          <td className="py-3 px-4 text-right">{formatCurrency(receivable.amount)}</td>
-                        </tr>
-                      ))}
+                      {receivables.map((receivable) => {
+                        const isWithinLimit = isReceivableWithinLimit(receivable);
+                        return (
+                          <tr 
+                            key={receivable.id} 
+                            className={`border-b hover:bg-gray-50 cursor-pointer ${
+                              selectedReceivables.some(r => r.id === receivable.id) ? 'bg-primary/5' : ''
+                            } ${!isWithinLimit ? 'opacity-50' : ''}`}
+                            onClick={() => isWithinLimit && toggleReceivable(receivable)}
+                          >
+                            <td className="py-3 px-4">
+                              <Checkbox 
+                                checked={selectedReceivables.some(r => r.id === receivable.id)}
+                                onCheckedChange={() => isWithinLimit && toggleReceivable(receivable)}
+                                className="ml-1"
+                                disabled={!isWithinLimit}
+                              />
+                            </td>
+                            <td className="py-3 px-4 font-medium">{receivable.buyer_name || "—"}</td>
+                            <td className="py-3 px-4">{formatCPF(receivable.buyer_cpf)}</td>
+                            <td className="py-3 px-4">
+                              {format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })}
+                              {!isWithinLimit && (
+                                <span className="ml-2 text-xs text-red-500">
+                                  (Fora do prazo)
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right">{formatCurrency(receivable.amount)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
