@@ -37,6 +37,7 @@ interface CreditAnalysis {
   interest_rate_720: number;
   interest_rate_long_term: number;
   fee_per_receivable: number;
+  operation_days_limit: number;
 }
 
 interface CalculationResult {
@@ -60,6 +61,12 @@ const CreateAnticipationForm = () => {
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [companyData, setCompanyData] = useState<{ id: string; name: string } | null>(null);
+  const [operationDaysLimit, setOperationDaysLimit] = useState<number | null>(null);
+  
+  // Add useEffect to log operationDaysLimit changes
+  useEffect(() => {
+    console.log('Operation Days Limit:', operationDaysLimit);
+  }, [operationDaysLimit]);
   
   // Fetch receivables and company data
   useEffect(() => {
@@ -119,6 +126,31 @@ const CreateAnticipationForm = () => {
           id: projectData.project.company_id,
           name: companyName
         });
+        
+        // Get the active credit analysis for the company
+        const { data: creditAnalysisData, error: creditAnalysisError } = await supabase
+          .rpc('get_active_credit_analysis_for_company', {
+            p_company_id: projectData.project.company_id
+          });
+
+        console.log('Credit Analysis Data:', creditAnalysisData);
+        console.log('Credit Analysis Error:', creditAnalysisError);
+
+        if (creditAnalysisError) {
+          console.error('Error fetching credit analysis:', creditAnalysisError);
+          throw new Error('Não foi possível obter a análise de crédito da empresa');
+        }
+
+        // Check if we got a valid result
+        if (!creditAnalysisData) {
+          console.log('No credit analysis data found');
+          throw new Error('Não foi encontrada análise de crédito ativa para esta empresa');
+        }
+
+        // Set the operation days limit
+        const creditAnalysis = creditAnalysisData as unknown as CreditAnalysis;
+        console.log('Parsed Credit Analysis:', creditAnalysis);
+        setOperationDaysLimit(creditAnalysis.operation_days_limit);
         
         // Get receivables eligible for anticipation
         const response = await supabase.functions.invoke('company-anticipations', {
@@ -368,6 +400,16 @@ const CreateAnticipationForm = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {operationDaysLimit && (
+                <div className="mb-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="flex items-center gap-2 text-primary">
+                    <AlertCircle className="h-5 w-5" />
+                    <p className="text-sm">
+                      Você pode antecipar os seus recebíveis que possuem um vencimento máximo de {operationDaysLimit} dias a partir da data de hoje.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="mb-4 flex justify-between items-center">
                 <div>
                   <span className="font-semibold">Valor total selecionado:</span> {formatCurrency(totalSelectedAmount)}

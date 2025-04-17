@@ -166,7 +166,11 @@ async function handleCalculateValorLiquido(supabaseClient, serviceClient, data, 
         interest_rate_360,
         interest_rate_720,
         interest_rate_long_term,
-        fee_per_receivable
+        fee_per_receivable,
+        credit_limit,
+        consumed_credit,
+        operation_days_limit,
+        status
       `).eq('company_id', companyId).eq('status', 'Ativa').single();
     if (creditAnalysisError) {
       console.error('Error fetching credit analysis:', creditAnalysisError);
@@ -215,6 +219,9 @@ async function handleGetReceivablesForAnticipation(supabaseClient, serviceClient
     });
   }
   // Get available receivables that are eligible for anticipation
+  const fiveDaysFromNow = new Date();
+  fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
+  
   let query = supabaseClient.from('receivables').select(`
       id,
       amount,
@@ -224,7 +231,8 @@ async function handleGetReceivablesForAnticipation(supabaseClient, serviceClient
       description,
       project_id,
       projects:project_id (name)
-    `).eq('status', status);
+    `).eq('status', status)
+    .gt('due_date', fiveDaysFromNow.toISOString());
   // If projectId is provided, filter by project
   if (projectId) {
     query = query.eq('project_id', projectId);

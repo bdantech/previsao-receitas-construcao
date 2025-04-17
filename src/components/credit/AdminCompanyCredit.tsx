@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +20,7 @@ interface CreditAnalysis {
   credit_limit: number;
   consumed_credit: number;
   available_credit: number;
+  operation_days_limit: number;
   status: 'Ativa' | 'Inativa';
   created_at: string;
   updated_at: string;
@@ -276,6 +276,10 @@ export function AdminCompanyCredit({ companyId, companyName }: AdminCompanyCredi
                   <div>
                     <p className="text-sm font-medium">Tarifa por Recebível</p>
                     <p>{formatCurrency(analysis.fee_per_receivable)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Limite de Dias da Operação</p>
+                    <p>{analysis.operation_days_limit} dias</p>
                   </div>
                 </div>
               </CardContent>

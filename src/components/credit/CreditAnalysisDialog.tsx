@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -36,6 +35,7 @@ interface CreditAnalysis {
   credit_limit: number;
   consumed_credit: number;
   available_credit: number;
+  operation_days_limit: number;
   status: 'Ativa' | 'Inativa';
   created_at: string;
   updated_at: string;
@@ -49,6 +49,7 @@ const formSchema = z.object({
   fee_per_receivable: z.coerce.number().min(0, "Tarifa deve ser positiva"),
   credit_limit: z.coerce.number().min(0, "Limite de crédito deve ser positivo"),
   consumed_credit: z.coerce.number().min(0, "Crédito consumido deve ser positivo"),
+  operation_days_limit: z.coerce.number().min(1, "Limite de dias da operação deve ser pelo menos 1"),
   status: z.enum(['Ativa', 'Inativa'])
 });
 
@@ -79,6 +80,7 @@ export function CreditAnalysisDialog({
       fee_per_receivable: initialData?.fee_per_receivable || 0,
       credit_limit: initialData?.credit_limit || 0,
       consumed_credit: initialData?.consumed_credit || 0,
+      operation_days_limit: initialData?.operation_days_limit || 1,
       status: initialData?.status || 'Ativa'
     }
   });
@@ -95,6 +97,7 @@ export function CreditAnalysisDialog({
         fee_per_receivable: initialData?.fee_per_receivable || 0,
         credit_limit: initialData?.credit_limit || 0,
         consumed_credit: initialData?.consumed_credit || 0,
+        operation_days_limit: initialData?.operation_days_limit || 1,
         status: initialData?.status || 'Ativa'
       });
     }
@@ -344,6 +347,28 @@ export function CreditAnalysisDialog({
                           field.onChange(rawValue ? parseInt(rawValue, 10) / 100 : 0);
                         }}
                         value={formatCurrency(field.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="operation_days_limit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Limite de Dias da Operação</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        placeholder="1"
+                        onChange={(e) => {
+                          const rawValue = parseCurrency(e.target.value);
+                          field.onChange(rawValue ? parseInt(rawValue, 10) : 1);
+                        }}
+                        value={field.value.toString()}
                       />
                     </FormControl>
                     <FormMessage />

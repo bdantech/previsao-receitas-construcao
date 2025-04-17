@@ -252,6 +252,7 @@ serve(async (req)=>{
               fee_per_receivable: analysisData.fee_per_receivable,
               credit_limit: analysisData.credit_limit,
               consumed_credit: analysisData.consumed_credit || 0,
+              operation_days_limit: analysisData.operation_days_limit,
               status: analysisData.status
             })
           });
@@ -366,6 +367,7 @@ serve(async (req)=>{
               fee_per_receivable: analysisData.fee_per_receivable,
               credit_limit: analysisData.credit_limit,
               consumed_credit: analysisData.consumed_credit,
+              operation_days_limit: analysisData.operation_days_limit,
               status: analysisData.status
             })
           });
