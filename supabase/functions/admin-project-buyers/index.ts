@@ -99,7 +99,7 @@ serve(async (req)=>{
         const { fullName, cpf, companyId, projectId, buyerStatus, contractStatus, creditAnalysisStatus } = filters;
         // Filter by companyId
         if (companyId) {
-          baseQuery = baseQuery.eq('projects.company_id', companyId);
+          baseQuery = baseQuery.eq('projects.companies.id', companyId).not('projects', 'is', null);
         }
         // Filter by projectId
         if (projectId) {
@@ -131,7 +131,13 @@ serve(async (req)=>{
         console.error('Project buyers query error:', error);
         throw error;
       }
-      const transformedBuyers = data.map((buyer)=>({
+      const transformedBuyers = data.filter((buyer)=>{
+        // Se companyId foi fornecido, garantir que o registro pertence à empresa filtrada
+        if (filters?.companyId) {
+          return buyer.projects?.companies?.id === filters.companyId;
+        }
+        return true; // Se não há companyId, incluir todos os registros
+      }).map((buyer)=>({
           ...buyer,
           project_name: buyer.projects?.name || '',
           company_name: buyer.projects?.companies?.name || '',

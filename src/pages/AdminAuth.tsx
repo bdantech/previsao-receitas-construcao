@@ -34,7 +34,7 @@ const AdminAuth = () => {
 
     try {
       const { email, password } = formData;
-      
+
       if (!email || !password) {
         toast({
           title: "Erro",
@@ -78,7 +78,7 @@ const AdminAuth = () => {
         title: "Login bem-sucedido",
         description: "Você entrou com sucesso na sua conta de administrador",
       });
-      
+
       // Set direct auth with session and role
       if (data?.session && data?.role) {
         await setDirectAuth(data.session, data.role);
@@ -187,7 +187,17 @@ const AdminAuth = () => {
               >
                 {isLoading ? "Processando..." : "Entrar como Admin"}
               </Button>
+
             </form>
+            <div className="space-y-2 mt-4">
+              <Button
+                variant="link"
+                className="w-full text-sm text-gray-500 hover:text-gray-700"
+                onClick={() => navigate("/auth")}
+              >
+                Entrar como Usuário
+              </Button>
+            </div>
           </div>
         </div>
       </div>
