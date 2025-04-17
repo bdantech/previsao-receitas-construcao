@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import AuthForm from "./components/AuthForm";
 
 const AuthPage = () => {
@@ -25,7 +25,7 @@ const AuthPage = () => {
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <div className="flex justify-center mb-6">
-              <img src="/onepay-pro.png" alt="ONE pay Pro" className="h-12" />
+              <img src="/onepay-pro.png" alt="ONE pay Pro" className="h-16" />
             </div>
             <div className="bg-white p-8 rounded-lg shadow-md">
               <div className="flex justify-center">
@@ -46,7 +46,7 @@ const AuthPage = () => {
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <div className="flex justify-center mb-6">
-              <img src="/onepay-pro.png" alt="ONE pay Pro" className="h-12" />
+              <img src="/onepay-pro.png" alt="ONE pay Pro" className="h-16" />
             </div>
             <AuthForm />
           </div>

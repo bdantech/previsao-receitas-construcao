@@ -23,7 +23,6 @@ import AuthPage from "./pages/auth/AuthPage";
 import ResetPassword from "./pages/auth/ResetPassword";
 import CompanyPage from "./pages/CompanyPage";
 import Dashboard from "./pages/Dashboard";
-import Index from "./pages/Index";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import NotFound from "./pages/NotFound";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
@@ -47,7 +46,8 @@ function App() {
           <AuthProvider>
             <Routes>
               {/* Public routes */}
-              <Route path="/" element={<Index />} />
+              {/* <Route path="/" element={<Index />} /> */}
+              <Route path="/" element={<AuthPage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/admin/auth" element={<AdminAuth />} />

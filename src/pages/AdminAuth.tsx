@@ -120,7 +120,7 @@ const AdminAuth = () => {
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <div className="flex flex-col items-center gap-2 mb-6">
-              <img src="/onepay-pro.png" alt="ONE pay Pro" className="h-12" />
+              <img src="/onepay-pro.png" alt="ONE pay Pro" className="h-16" />
               <span className="text-sm font-medium text-gray-500">ADMIN</span>
             </div>
           </div>
