@@ -63,18 +63,6 @@ serve(async (req)=>{
       });
     }
     const userRole = profileData.role;
-    // This endpoint is for admin users only
-    if (userRole !== "admin") {
-      return new Response(JSON.stringify({
-        error: "Unauthorized. Admin access required."
-      }), {
-        status: 403,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
-      });
-    }
     // Parse request body if it exists
     let requestBody = {};
     if (req.method === "POST") {
@@ -87,53 +75,80 @@ serve(async (req)=>{
     }
     const { action, companyId } = requestBody;
     // Handle admin actions
-    if (action === "getCompanyDetails" && companyId) {
-      console.log(`Fetching details for company: ${companyId}`);
-      // Fetch specific company details
-      const { data: company, error: companyError } = await supabaseAdmin.from("companies").select("*").eq("id", companyId).maybeSingle(); // Using maybeSingle instead of single to avoid errors
-      if (companyError) {
-        console.error("Error fetching company details:", companyError);
-        return new Response(JSON.stringify({
-          error: "Failed to fetch company details",
-          details: companyError
-        }), {
-          status: 500,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json"
-          }
-        });
-      }
-      if (!company) {
-        console.error("Company not found:", companyId);
-        return new Response(JSON.stringify({
-          error: "Company not found"
-        }), {
-          status: 404,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json"
-          }
-        });
-      }
-      console.log("Company details found:", company.name);
-      return new Response(JSON.stringify({
-        company
-      }), {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
+    if (userRole === "admin") {
+      // Admins can access any company or all companies
+      if (action === "getCompanyDetails" && companyId) {
+        console.log(`Fetching details for company: ${companyId}`);
+        // Fetch specific company details
+        const { data: company, error: companyError } = await supabaseAdmin.from("companies").select("*").eq("id", companyId).maybeSingle();
+        if (companyError) {
+          console.error("Error fetching company details:", companyError);
+          return new Response(JSON.stringify({
+            error: "Failed to fetch company details",
+            details: companyError
+          }), {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json"
+            }
+          });
         }
-      });
+        if (!company) {
+          console.error("Company not found:", companyId);
+          return new Response(JSON.stringify({
+            error: "Company not found"
+          }), {
+            status: 404,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json"
+            }
+          });
+        }
+        console.log("Company details found:", company.name);
+        return new Response(JSON.stringify({
+          company
+        }), {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        });
+      } else {
+        // Default action: Fetch all companies
+        const { data: companies, error: companiesError } = await supabaseAdmin.from("companies").select("*").order("name", {
+          ascending: true
+        });
+        if (companiesError) {
+          return new Response(JSON.stringify({
+            error: "Failed to fetch companies",
+            details: companiesError
+          }), {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json"
+            }
+          });
+        }
+        return new Response(JSON.stringify({
+          companies
+        }), {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        });
+      }
     } else {
-      // Default action: Fetch all companies
-      const { data: companies, error: companiesError } = await supabaseAdmin.from("companies").select("*").order("name", {
-        ascending: true
-      });
-      if (companiesError) {
+      // Non-admin users: Check user_companies table
+      const { data: userCompanies, error: userCompaniesError } = await supabaseAdmin.from("user_companies").select("company_id").eq("user_id", user.id);
+      if (userCompaniesError) {
+        console.error("Error fetching user companies:", userCompaniesError);
         return new Response(JSON.stringify({
-          error: "Failed to fetch companies",
-          details: companiesError
+          error: "Failed to fetch user companies",
+          details: userCompaniesError
         }), {
           status: 500,
           headers: {
@@ -142,14 +157,95 @@ serve(async (req)=>{
           }
         });
       }
-      return new Response(JSON.stringify({
-        companies
-      }), {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
+      if (!userCompanies || userCompanies.length === 0) {
+        return new Response(JSON.stringify({
+          error: "User is not associated with any company"
+        }), {
+          status: 403,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        });
+      }
+      // Extract array of company IDs the user is associated with
+      const userCompanyIds = userCompanies.map((uc)=>uc.company_id);
+      if (action === "getCompanyDetails" && companyId) {
+        // Check if the requested companyId is in the user's company IDs
+        if (!userCompanyIds.includes(companyId)) {
+          return new Response(JSON.stringify({
+            error: "Unauthorized: You can only access your own company's data"
+          }), {
+            status: 403,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json"
+            }
+          });
         }
-      });
+        // Fetch the requested company details
+        const { data: company, error: companyError } = await supabaseAdmin.from("companies").select("*").eq("id", companyId).maybeSingle();
+        if (companyError) {
+          console.error("Error fetching company details:", companyError);
+          return new Response(JSON.stringify({
+            error: "Failed to fetch company details",
+            details: companyError
+          }), {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json"
+            }
+          });
+        }
+        if (!company) {
+          console.error("Company not found:", companyId);
+          return new Response(JSON.stringify({
+            error: "Company not found"
+          }), {
+            status: 404,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json"
+            }
+          });
+        }
+        console.log("Company details found:", company.name);
+        return new Response(JSON.stringify({
+          company
+        }), {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        });
+      } else {
+        // Default action for non-admins: Return all companies the user is associated with
+        const { data: companies, error: companiesError } = await supabaseAdmin.from("companies").select("*").in("id", userCompanyIds).order("name", {
+          ascending: true
+        });
+        if (companiesError) {
+          console.error("Error fetching user companies:", companiesError);
+          return new Response(JSON.stringify({
+            error: "Failed to fetch companies",
+            details: companiesError
+          }), {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json"
+            }
+          });
+        }
+        return new Response(JSON.stringify({
+          companies
+        }), {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        });
+      }
     }
   } catch (error) {
     console.error("Unexpected error:", error);

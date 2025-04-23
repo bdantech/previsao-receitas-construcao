@@ -1,21 +1,18 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-
 // CORS headers configuration
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, OPTIONS'
 };
-
-serve(async (req) => {
+serve(async (req)=>{
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: corsHeaders
     });
   }
-
   try {
     // Get authorization header
     const authHeader = req.headers.get('Authorization');
@@ -30,12 +27,10 @@ serve(async (req) => {
         }
       });
     }
-
     // Get Supabase configuration
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
     if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
       console.error('Missing environment variables:', {
         url: !!supabaseUrl,
@@ -52,17 +47,12 @@ serve(async (req) => {
         }
       });
     }
-
     try {
       // Initialize Supabase clients
       const supabase = createClient(supabaseUrl, supabaseKey);
       const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
-
       // Get user from token
-      const { data: { user }, error: userError } = await supabase.auth.getUser(
-        authHeader.replace('Bearer ', '')
-      );
-
+      const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
       if (userError) {
         console.error('User authentication error:', userError);
         return new Response(JSON.stringify({
@@ -75,7 +65,6 @@ serve(async (req) => {
           }
         });
       }
-
       if (!user) {
         console.error('No user found with token');
         return new Response(JSON.stringify({
@@ -88,15 +77,9 @@ serve(async (req) => {
           }
         });
       }
-
       console.log('User authenticated:', user.id);
-
       // Get user's companies
-      const { data: userCompanies, error: companiesError } = await adminSupabase
-        .from('user_companies')
-        .select('company_id')
-        .eq('user_id', user.id);
-
+      const { data: userCompanies, error: companiesError } = await adminSupabase.from('user_companies').select('company_id').eq('user_id', user.id);
       if (companiesError) {
         console.error('Companies error:', companiesError);
         return new Response(JSON.stringify({
@@ -110,7 +93,6 @@ serve(async (req) => {
           }
         });
       }
-
       if (!userCompanies || userCompanies.length === 0) {
         console.log('No companies found for user:', user.id);
         return new Response(JSON.stringify({
@@ -123,15 +105,11 @@ serve(async (req) => {
           status: 200
         });
       }
-
-      const companyIds = userCompanies.map(uc => uc.company_id);
+      const companyIds = userCompanies.map((uc)=>uc.company_id);
       console.log('Found company IDs:', companyIds);
-
       try {
         // Get bank accounts for user's companies
-        const { data: bankAccounts, error: bankAccountsError } = await adminSupabase
-          .from('bank_accounts')
-          .select(`
+        const { data: bankAccounts, error: bankAccountsError } = await adminSupabase.from('bank_accounts').select(`
             id,
             account_name,
             account_number,
@@ -141,9 +119,7 @@ serve(async (req) => {
             project_id,
             created_at,
             updated_at
-          `)
-          .in('company_id', companyIds);
-
+          `).in('company_id', companyIds);
         if (bankAccountsError) {
           console.error('Bank accounts error:', bankAccountsError);
           return new Response(JSON.stringify({
@@ -157,9 +133,7 @@ serve(async (req) => {
             }
           });
         }
-
         console.log('Found bank accounts:', JSON.stringify(bankAccounts, null, 2));
-
         return new Response(JSON.stringify({
           bankAccounts: bankAccounts || []
         }), {
@@ -208,4 +182,4 @@ serve(async (req) => {
       status: 500
     });
   }
-}); 
+});

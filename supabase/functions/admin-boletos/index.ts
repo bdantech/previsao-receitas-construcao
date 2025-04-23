@@ -234,10 +234,8 @@ async function handleGetAvailableBillingReceivables(serviceClient, data, corsHea
     // Extract the IDs to an array
     const existingIds = existingBoletoReceipts.map((b)=>b.billing_receivable_id);
     console.log(`Found ${existingIds.length} existing boleto receipts to exclude`);
-    
     // First get the receivables that match our date criteria
     let receivablesQuery = serviceClient.from('receivables').select('id');
-    
     // Apply date filters to receivables if provided
     if (data?.fromDate) {
       receivablesQuery = receivablesQuery.gte('due_date', data.fromDate);
@@ -245,16 +243,13 @@ async function handleGetAvailableBillingReceivables(serviceClient, data, corsHea
     if (data?.toDate) {
       receivablesQuery = receivablesQuery.lte('due_date', data.toDate);
     }
-    
     const { data: filteredReceivables, error: receivablesError } = await receivablesQuery;
     if (receivablesError) {
       console.error('Error fetching filtered receivables:', receivablesError);
       throw receivablesError;
     }
-    
-    const filteredReceivableIds = (filteredReceivables || []).map(r => r.id);
+    const filteredReceivableIds = (filteredReceivables || []).map((r)=>r.id);
     console.log(`Found ${filteredReceivableIds.length} receivables matching date criteria`);
-    
     // Now get billing receivables that don't have boletos yet and match our filtered receivables
     let query = serviceClient.from('billing_receivables').select(`
         id,
@@ -291,7 +286,6 @@ async function handleGetAvailableBillingReceivables(serviceClient, data, corsHea
       `).order('nova_data_vencimento', {
       ascending: true
     });
-
     // Filter by the receivables that match our date criteria
     if (filteredReceivableIds.length > 0) {
       query = query.in('receivable_id', filteredReceivableIds);
@@ -308,12 +302,10 @@ async function handleGetAvailableBillingReceivables(serviceClient, data, corsHea
         status: 200
       });
     }
-
     // If we have existing boletos, exclude their billing_receivable_ids
     if (existingIds.length > 0) {
       query = query.not('id', 'in', `(${existingIds.join(',')})`);
     }
-
     const { data: billingReceivables, error } = await query.limit(100);
     if (error) {
       console.error('Error fetching available billing receivables:', error);
@@ -583,7 +575,6 @@ async function handleUpdateBoleto(serviceClient, boletoId, updateData, corsHeade
       status: 404
     });
   }
-
   // Validate due date update
   if (updateData.data_vencimento) {
     if (currentBoleto.status_emissao !== 'Criado' || currentBoleto.status_pagamento !== 'N/A') {
@@ -598,7 +589,6 @@ async function handleUpdateBoleto(serviceClient, boletoId, updateData, corsHeade
       });
     }
   }
-
   // Process status_emissao changes - update status_pagamento if needed
   if (updateData.status_emissao) {
     if (updateData.status_emissao === 'Criado' || updateData.status_emissao === 'Cancelado') {
@@ -607,7 +597,6 @@ async function handleUpdateBoleto(serviceClient, boletoId, updateData, corsHeade
       updateData.status_pagamento = 'Em Aberto';
     }
   }
-
   // Update the boleto
   const { data: updatedBoleto, error: updateError } = await serviceClient.from('boletos').update(updateData).eq('id', boletoId).select().single();
   if (updateError) {
@@ -622,7 +611,6 @@ async function handleUpdateBoleto(serviceClient, boletoId, updateData, corsHeade
       status: 500
     });
   }
-
   return new Response(JSON.stringify({
     success: true,
     boleto: updatedBoleto

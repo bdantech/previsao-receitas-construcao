@@ -116,7 +116,7 @@ serve(async (req)=>{
     // Create the Starkbank request body
     const boletoData = {
       amount: Math.round(boleto.valor_boleto * 100),
-      name: "NOME TESTE",
+      name: boleto.payer_name || "NOME TESTE",
       taxId: boleto.payer_tax_id,
       streetLine1: "Av. Faria Lima, 1844",
       streetLine2: "CJ 13",
@@ -177,7 +177,6 @@ serve(async (req)=>{
       console.log('Starkbank response:', JSON.stringify(starkbankBoleto, null, 2));
       // Since Starkbank returns an array of boletos, get the first one
       const createdBoleto = Array.isArray(starkbankBoleto.boletos) ? starkbankBoleto.boletos[0] : starkbankBoleto;
-
       // GET PDF
       const responsePdf = await fetch(`${starkbankApiUrl}/${createdBoleto.id}/pdf`, {
         method: 'GET',
@@ -189,7 +188,6 @@ serve(async (req)=>{
           'User-Agent': 'Mozilla/5.0'
         }
       });
-
       if (!responsePdf.ok) {
         const errorData = await responsePdf.json();
         console.error('PDF fetch error:', errorData);
@@ -204,7 +202,6 @@ serve(async (req)=>{
           status: responsePdf.status
         });
       }
-
       // save PDF to Supabase storage
       const pdfBlob = await responsePdf.blob();
       const pdfArrayBuffer = await pdfBlob.arrayBuffer();
@@ -228,7 +225,6 @@ serve(async (req)=>{
           status: 500
         });
       }
-
       console.log('Created boleto:', JSON.stringify(createdBoleto, null, 2));
       // Add detailed logging of the specific fields and response structure
       console.log('Response keys:', Object.keys(createdBoleto));
@@ -263,7 +259,7 @@ serve(async (req)=>{
         linha_digitavel: createdBoleto.line,
         external_id: createdBoleto.id,
         arquivo_boleto_path: pdfFilePath,
-        arquivo_boleto_name: pdfFileName,
+        arquivo_boleto_name: pdfFileName
       };
       // Only add nosso_numero if we found a value
       if (nossoNumero) {

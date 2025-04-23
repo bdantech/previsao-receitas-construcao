@@ -117,37 +117,7 @@ serve(async (req)=>{
         query = query.eq('project_id', filters.projectId);
       }
       if (filters.companyId) {
-        // First get all projects for the company
-        const { data: companyProjects, error: projectsError } = await serviceClient
-          .from('projects')
-          .select('id')
-          .eq('company_id', filters.companyId);
-        
-        if (projectsError) {
-          console.error('Error fetching company projects:', projectsError);
-          throw projectsError;
-        }
-        
-        if (companyProjects && companyProjects.length > 0) {
-          const projectIds = companyProjects.map(p => p.id);
-          query = query.in('project_id', projectIds);
-        } else {
-          // No projects for this company, return empty result
-          return new Response(JSON.stringify({
-            receivables: [],
-            count: 0,
-            summary: {
-              totalAmount: 0,
-              count: 0
-            }
-          }), {
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json'
-            },
-            status: 200
-          });
-        }
+        query = query.eq('projects.company_id', filters.companyId);
       }
       if (filters.status) {
         query = query.eq('status', filters.status);
@@ -167,21 +137,6 @@ serve(async (req)=>{
       if (filters.toDate) {
         query = query.lte('due_date', filters.toDate);
       }
-      if (filters.companyName) {
-        // Busca empresas que correspondem ao filtro e têm nome não-nulo
-        const { data: companies, error: companiesError } = await serviceClient.from('companies').select('id').ilike('name', `%${filters.companyName}%`).not('name', 'is', null); // Exclui empresas com nome nulo
-        if (companiesError) {
-          console.error('Companies lookup error:', companiesError);
-          throw companiesError;
-        }
-        if (companies && companies.length > 0) {
-          const companyIds = companies.map((c)=>c.id);
-          query = query.in('projects.company_id', companyIds);
-        } else {
-          // Se não encontrar empresas, força resultado vazio
-          query = query.eq('project_id', 'non-existent-id');
-        }
-      }
     }
     // Execute query and handle result
     const { data: receivables, error: receivablesError } = await query.order('due_date', {
@@ -192,19 +147,18 @@ serve(async (req)=>{
       throw receivablesError;
     }
     // Process results to add company name at top level for easier access
-    const processedReceivables = receivables.map((item)=>{
+    const processedReceivables = receivables.filter((item)=>filters.companyId ? item.projects?.company_id === filters.companyId : true).map((item)=>{
       const companyName = item.projects?.companies?.name;
       const projectName = item.projects?.name;
-      // Se companyName estiver ativo, só inclui se companyName for válido
       if (filters?.companyName && (!companyName || companyName === 'Unknown Company')) {
-        return null; // Exclui registros inválidos
+        return null;
       }
       return {
         ...item,
         company_name: companyName || 'Unknown Company',
         project_name: projectName || 'Unknown Project'
       };
-    }).filter((item)=>item !== null); // Remove nulos do resultado
+    }).filter((item)=>item !== null);
     // Calculate summary data
     const totalAmount = processedReceivables.reduce((sum, item)=>sum + Number(item.amount), 0);
     const count = processedReceivables.length;
