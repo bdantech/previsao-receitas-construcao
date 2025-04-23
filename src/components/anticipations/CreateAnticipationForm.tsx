@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,12 +12,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCPF, formatCurrency } from "@/lib/formatters";
+import { formatCNPJ, formatCPF, formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Loader } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { AnticipationTerms } from "./Terms";
 
 interface Receivable {
   id: string;
@@ -60,9 +62,10 @@ const CreateAnticipationForm = () => {
   const [selectedReceivables, setSelectedReceivables] = useState<Receivable[]>([]);
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [companyData, setCompanyData] = useState<{ id: string; name: string } | null>(null);
+  const [companyData, setCompanyData] = useState<{ id: string; name: string, cnpj: string } | null>(null);
   const [operationDaysLimit, setOperationDaysLimit] = useState<number | null>(null);
-  
+  const reportTemplateRef = useRef(null)
+
   // Add useEffect to log operationDaysLimit changes
   useEffect(() => {
     console.log('Operation Days Limit:', operationDaysLimit);
@@ -109,6 +112,7 @@ const CreateAnticipationForm = () => {
         // Store company data - Note that company name might be stored differently
         // First, try to access it from the expected path
         let companyName = '';
+        let companyCnpj = '';
         
         // Check if we have company data in a nested structure
         if (projectData.project.companies && projectData.project.companies.name) {
@@ -127,15 +131,18 @@ const CreateAnticipationForm = () => {
           console.log(companyResult)
           if (companyResult && companyResult.company) {
             companyName = companyResult.company.name;
+            companyCnpj = companyResult.company.cnpj;
           } else {
             companyName = 'Company';  // Fallback name
+            companyCnpj = '00.000.000/0000-00';  // Fallback CNPJ
           }
         }
         console.log('projectData')
         console.log(projectData)
         setCompanyData({
           id: projectData.project.company_id,
-          name: companyName
+          name: companyName,
+          cnpj: companyCnpj,
         });
         
         // Get the active credit analysis for the company
@@ -336,6 +343,15 @@ const CreateAnticipationForm = () => {
     
     try {
       setIsSubmitting(true);
+
+      function htmlToBase64(htmlString) {
+        return btoa(encodeURIComponent(htmlString).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode(`0x${p1}` as any)));
+      }
+
+      // Exemplo de uso
+      const html = `<!DOCTYPE html><html><body>` + reportTemplateRef.current.outerHTML + `</body></html>`;
+      const base64 = htmlToBase64(html);
+
       
       const response = await supabase.functions.invoke('company-anticipations', {
         headers: {
@@ -352,7 +368,8 @@ const CreateAnticipationForm = () => {
           taxaJuros360: calculationResult.taxas.interest_rate_360,
           taxaJuros720: calculationResult.taxas.interest_rate_720,
           taxaJurosLongoPrazo: calculationResult.taxas.interest_rate_long_term,
-          tarifaPorRecebivel: calculationResult.taxas.fee_per_receivable
+          tarifaPorRecebivel: calculationResult.taxas.fee_per_receivable,
+          fileBase64: base64,
         }
       });
       
@@ -617,7 +634,33 @@ const CreateAnticipationForm = () => {
                 </div>
                 
                 <div className="bg-primary/5 p-6 rounded-lg border">
-                  <h3 className="font-medium text-lg mb-4">Termos e Condições</h3>
+                  <AnticipationTerms
+                    refComponent={reportTemplateRef}
+                    user={{
+                      email: user.email,
+                    }}
+                    cedente={{
+                      razaoSocial: companyData.name,
+                      cnpj: formatCNPJ(companyData.cnpj),
+                    }}
+                    devedor="Nome do Devedor"
+                    devedorSolidario="Nome do Devedor Solidário"
+                    recebiveis={selectedReceivables.map((receivable) => ({
+                      comprador: receivable.buyer_name || "—",
+                      cpf: formatCPF(receivable.buyer_cpf),
+                      valor: formatCurrency(receivable.amount),
+                      vencimento: format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR }),
+                    }))}
+                    valores={{
+                      // DATA DO DIA DA OPERAÇAO. SE ATE AS 14HRS, HOJE, SE DEPOIS, AMANHA
+                      dataPagamento: format(new Date(), 'dd/MM/yyyy', { locale: ptBR }),
+                      descontos: calculationResult.taxas.fee_per_receivable,
+                      formaPagamento: "A Vista",
+                      precoPagoCessao: calculationResult.valorLiquido,
+                      valorLiquidoPagoAoCedente: calculationResult.valorLiquido,
+                      valorTotalCreditosVencimento: calculationResult.valorTotal,
+                    }}
+                  />
                   <p className="text-sm text-gray-600 mb-4">
                     Ao clicar em "Confirmar Antecipação", você concorda com os seguintes termos:
                   </p>
