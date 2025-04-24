@@ -661,6 +661,7 @@ const CreateAnticipationForm = () => {
                       valorTotalCreditosVencimento: calculationResult.valorTotal,
                     }}
                   />
+                  <div className="my-6 bg-gray-300 h-[1px]"/>
                   <p className="text-sm text-gray-600 mb-4">
                     Ao clicar em "Confirmar Antecipação", você concorda com os seguintes termos:
                   </p>
