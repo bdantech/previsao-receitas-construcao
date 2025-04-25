@@ -417,6 +417,7 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
             id,
             amount,
             buyer_cpf,
+            buyer_name,
             project_id
           ),
           payment_installments:installment_id (
@@ -471,6 +472,7 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
       }
       const valorFace = receivables.amount;
       const payerTaxId = receivables.buyer_cpf;
+      const payerName = receivables.buyer_name;
       const projectId = receivables.project_id;
       const projectTaxId = payment_installments.payment_plan_settings.projects.cnpj;
       const companyId = payment_installments.payment_plan_settings.projects.company_id;
@@ -512,6 +514,7 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
         status_emissao: 'Criado',
         status_pagamento: 'N/A',
         payer_tax_id: payerTaxId,
+        payer_name: payerName,
         project_tax_id: projectTaxId,
         project_id: projectId,
         company_id: companyId
