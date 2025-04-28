@@ -13,15 +13,20 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { Edit, FileText, Plus, RefreshCw, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
+
 const formatReferenceMonth = (dateString: string) => {
+  // 2025-03-01
+  console.log(dateString);
   try {
-    return format(new Date(dateString), "MMMM yyyy");
+    return new Intl.DateTimeFormat("pt-BR", {
+      year: "numeric",
+      month: "long",
+    }).format(new Date(`${dateString}T00:00:00`));
   } catch (error) {
     console.error("Error formatting date:", error);
     return dateString;
@@ -276,21 +281,25 @@ const IndexUpdateDialog = ({
 }) => {
   const queryClient = useQueryClient();
   const { getAuthHeader } = useAuth();
-
+  
   const form = useForm<IndexUpdateFormValues>({
     resolver: zodResolver(indexUpdateSchema),
     defaultValues: {
       indexId: initialIndexId || "",
-      referenceMonth: currentUpdate?.reference_month ? format(new Date(currentUpdate.reference_month), "yyyy-MM") : "",
+      referenceMonth: currentUpdate?.reference_month
+        ? currentUpdate.reference_month
+        : "",
       monthlyAdjustment: currentUpdate?.monthly_adjustment || 0,
     },
   });
+  console.log('form: ' );
+  console.log(form.getValues());
 
   React.useEffect(() => {
     if (isOpen) {
       form.reset({
         indexId: initialIndexId || currentUpdate?.index_id || "",
-        referenceMonth: currentUpdate?.reference_month ? format(new Date(currentUpdate.reference_month), "yyyy-MM") : "",
+        referenceMonth: currentUpdate?.reference_month ? currentUpdate.reference_month.slice(0, 7) : "",
         monthlyAdjustment: currentUpdate?.monthly_adjustment || 0,
       });
     }
