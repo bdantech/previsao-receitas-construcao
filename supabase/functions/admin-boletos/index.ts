@@ -418,7 +418,8 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
             amount,
             buyer_cpf,
             buyer_name,
-            project_id
+            project_id,
+            due_date
           ),
           payment_installments:installment_id (
             id,
@@ -474,6 +475,7 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
       const payerTaxId = receivables.buyer_cpf;
       const payerName = receivables.buyer_name;
       const projectId = receivables.project_id;
+      const dueDate = receivables.due_date;
       const projectTaxId = payment_installments.payment_plan_settings.projects.cnpj;
       const companyId = payment_installments.payment_plan_settings.projects.company_id;
       const indexId = payment_installments.payment_plan_settings.index_id;
@@ -481,14 +483,16 @@ async function handleCreateBoletos(serviceClient, billingReceivableIds, corsHead
       // Calculate adjustment percentage if index is set
       let percentualAtualizacao = null;
       let valorBoleto = valorFace;
+
+      const dueDateFormatted = new Date(dueDate);
+      const lastDayOfPreviousMonth = new Date(dueDateFormatted.getFullYear(), dueDateFormatted.getMonth(), 0);
+
       if (indexId && adjustmentBaseDate) {
-        const currentDate = new Date().toISOString().split('T')[0] // Today in YYYY-MM-DD format
-        ;
         // Get adjustment percentage from the database function
         const { data: adjustmentResult, error: adjustmentError } = await serviceClient.rpc('calculate_index_adjustment', {
           p_index_id: indexId,
           p_start_date: adjustmentBaseDate,
-          p_end_date: currentDate
+          p_end_date: lastDayOfPreviousMonth,
         });
         if (adjustmentError) {
           console.error(`Error calculating adjustment for boleto:`, adjustmentError);
