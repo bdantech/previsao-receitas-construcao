@@ -68,6 +68,49 @@ serve(async (req)=>{
         if (updateError) {
           throw new Error(`Error updating boleto: ${updateError.message}`);
         }
+
+        // Só deduz crédito se estiver pago
+        if (statusMapping[status] === 'Pago') {
+          const { data: billing_receivable } = await supabase
+            .from('billing_receivables')
+            .select('*')
+            .eq('id', boleto.billing_receivable_id)
+            .single();
+
+          if (!billing_receivable) throw new Error(`Recebível de cobrança não encontrado`);
+          
+          console.log('billing_receivable')
+          console.log(billing_receivable)
+
+          const { data: pmt_receivables } = await supabase
+            .from('pmt_receivables')
+            .select('*')
+            .eq('receivable_id', billing_receivable.receivable_id)
+            .single();
+
+          if (pmt_receivables) {
+            const { data: analise } = await supabase
+              .from('company_credit_analysis')
+              .select('*')
+              .eq('company_id', boleto.company_id)
+              .eq('status', 'Ativa')
+              .single();
+
+            if (!analise) throw new Error(`Análise de crédito ativa não encontrada para a empresa`);
+
+            const novoConsumido = Number(analise.consumed_credit || 0) - Number(boleto.valor_face);
+
+            const { error: updateCreditoError } = await supabase
+              .from('company_credit_analysis')
+              .update({ consumed_credit: novoConsumido })
+              .eq('id', analise.id);
+
+            if (updateCreditoError) {
+              throw new Error(`Erro ao atualizar crédito consumido: ${updateCreditoError.message}`);
+            }
+          }
+        }
+
         // Update the webhook event as processed
         const { error: eventUpdateError } = await supabase.from('webhook_events').update({
           processed: true,
@@ -101,6 +144,7 @@ serve(async (req)=>{
         throw error;
       }
     }
+
     // If the tag is not handled, mark as processed
     await supabase.from('webhook_events').update({
       processed: true,
