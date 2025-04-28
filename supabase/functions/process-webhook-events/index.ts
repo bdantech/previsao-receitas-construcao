@@ -68,49 +68,31 @@ serve(async (req)=>{
         if (updateError) {
           throw new Error(`Error updating boleto: ${updateError.message}`);
         }
-
         // Só deduz crédito se estiver pago
         if (statusMapping[status] === 'Pago') {
-          const { data: billing_receivable } = await supabase
-            .from('billing_receivables')
-            .select('*')
-            .eq('id', boleto.billing_receivable_id)
-            .single();
-
+          const { data: billing_receivable } = await supabase.from('billing_receivables').select('*').eq('id', boleto.billing_receivable_id).single();
           if (!billing_receivable) throw new Error(`Recebível de cobrança não encontrado`);
-          
-          console.log('billing_receivable')
-          console.log(billing_receivable)
-
-          const { data: pmt_receivables } = await supabase
-            .from('pmt_receivables')
-            .select('*')
-            .eq('receivable_id', billing_receivable.receivable_id)
-            .single();
-
+          console.log('billing_receivable');
+          console.log(billing_receivable);
+          const { data: pmt_receivables } = await supabase.from('pmt_receivables').select('*').eq('receivable_id', billing_receivable.receivable_id);
+          console.log('pmt_receivables');
+          console.log(pmt_receivables);
           if (pmt_receivables) {
-            const { data: analise } = await supabase
-              .from('company_credit_analysis')
-              .select('*')
-              .eq('company_id', boleto.company_id)
-              .eq('status', 'Ativa')
-              .single();
-
+            console.log('Entrou em pmt_receivables');
+            const { data: analise } = await supabase.from('company_credit_analysis').select('*').eq('company_id', boleto.company_id).eq('status', 'Ativa').single();
+            console.log('analise');
+            console.log(analise);
             if (!analise) throw new Error(`Análise de crédito ativa não encontrada para a empresa`);
-
             const novoConsumido = Number(analise.consumed_credit || 0) - Number(boleto.valor_face);
-
-            const { error: updateCreditoError } = await supabase
-              .from('company_credit_analysis')
-              .update({ consumed_credit: novoConsumido })
-              .eq('id', analise.id);
-
+            console.log('novoConsumido: ' + novoConsumido);
+            const { error: updateCreditoError } = await supabase.from('company_credit_analysis').update({
+              consumed_credit: novoConsumido
+            }).eq('id', analise.id);
             if (updateCreditoError) {
               throw new Error(`Erro ao atualizar crédito consumido: ${updateCreditoError.message}`);
             }
           }
         }
-
         // Update the webhook event as processed
         const { error: eventUpdateError } = await supabase.from('webhook_events').update({
           processed: true,
@@ -144,7 +126,58 @@ serve(async (req)=>{
         throw error;
       }
     }
-
+    if (endpoint.tag === 'Liquid Pass') {
+      const payload = record.payload;
+      const status = payload.status;
+      const analyseId = payload.analysis_id;
+      // find analysisId in project_buyers table
+      const { data: projectBuyer, error: projectBuyerError } = await supabase.from('project_buyers').select('*').eq('external_analysis_id', analyseId).single();
+      if (projectBuyerError) {
+        throw new Error(`Error finding project buyer: ${projectBuyerError.message}`);
+      }
+      if (!projectBuyer) {
+        throw new Error(`Project buyer with external_analysis_id ${analyseId} not found`);
+      }
+      const mapStatus = {
+        match: 'aprovado',
+        'unmatch': 'reprovado',
+        'onboarding': 'moderacao',
+        'moderation': 'moderacao'
+      };
+      const updatedStatus = mapStatus[status];
+      if (!updatedStatus) {
+        throw new Error(`Invalid status: ${status}`);
+      }
+      // Update the project buyer status
+      const { error: updateError } = await supabase.from('project_buyers').update({
+        credit_analysis_status: updatedStatus,
+        updated_at: new Date().toISOString()
+      }).eq('id', projectBuyer.id);
+      if (updateError) {
+        throw new Error(`Error updating project buyer: ${updateError.message}`);
+      }
+      // Update the webhook event as processed
+      const { error: eventUpdateError } = await supabase.from('webhook_events').update({
+        processed: true,
+        processing_result: {
+          success: true,
+          message: `Project buyer credit_analysis_status updated to ${updatedStatus}`
+        }
+      }).eq('id', record.id);
+      if (eventUpdateError) {
+        console.error('Error updating webhook event:', eventUpdateError);
+      }
+      return new Response(JSON.stringify({
+        success: true,
+        message: `Project buyer credit_analysis_status updated to ${updatedStatus}`
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 200
+      });
+    }
     // If the tag is not handled, mark as processed
     await supabase.from('webhook_events').update({
       processed: true,
