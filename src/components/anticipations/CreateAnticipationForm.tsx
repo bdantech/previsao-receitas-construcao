@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCNPJ, formatCPF, formatCurrency } from "@/lib/formatters";
+import { onlyNumbers } from "@/utils/helpers/onlyNumbers.helper";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Loader } from "lucide-react";
@@ -49,6 +50,32 @@ interface CalculationResult {
   taxas: CreditAnalysis;
 }
 
+type TDataToPdf = {
+  projectId: string;
+  cedente: {
+    razaoSocial: string;
+    cnpj: string;
+  };
+  recebiveis: {
+    comprador: string;
+    cpf: string;
+    vencimento: string;
+    valor: string;
+    linkContrato?: string
+  }[];
+  valores: {
+    valorTotalCreditosVencimento: number;
+    precoPagoCessao: number;
+    formaPagamento: string;
+    descontos: number;
+    valorLiquidoPagoAoCedente: number;
+    dataPagamento: string;
+  };
+  user: {
+    email: string;
+  };
+};
+
 const CreateAnticipationForm = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -65,6 +92,7 @@ const CreateAnticipationForm = () => {
   const [companyData, setCompanyData] = useState<{ id: string; name: string, cnpj: string } | null>(null);
   const [operationDaysLimit, setOperationDaysLimit] = useState<number | null>(null);
   const reportTemplateRef = useRef(null)
+  const [recebiveisState, setRecebiveisState] = useState<TDataToPdf['recebiveis']>([])
 
   // Add useEffect to log operationDaysLimit changes
   useEffect(() => {
@@ -368,12 +396,7 @@ const CreateAnticipationForm = () => {
               razaoSocial: companyData.name,
               cnpj: formatCNPJ(companyData.cnpj),
             },
-            recebiveis:selectedReceivables.map((receivable) => ({
-              comprador: receivable.buyer_name || "—",
-              cpf: formatCPF(receivable.buyer_cpf),
-              valor: formatCurrency(receivable.amount),
-              vencimento: format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })
-            })),
+            recebiveis: recebiveisState,
             valores:{
               dataPagamento: format(new Date(), 'dd/MM/yyyy', { locale: ptBR }),
               descontos: calculationResult.taxas.fee_per_receivable,
@@ -408,6 +431,42 @@ const CreateAnticipationForm = () => {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (step !== 3) return;
+    const fetchBuyers = async () => {
+      setRecebiveisState([]);
+      selectedReceivables.map(async (item, index) => {
+        const { data } = await supabase.functions.invoke('project-buyers', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: { 
+            action: 'filterByCpfAndProject',
+            projectId,
+            buyerData: {
+              cpf: onlyNumbers(item.buyer_cpf)
+            }
+          }
+        });
+
+        if (data) {
+          setRecebiveisState((prev) => [
+            ...prev,
+            {
+              comprador: item.buyer_name || "—",
+              cpf: formatCPF(item.buyer_cpf),
+              valor: formatCurrency(item.amount),
+              vencimento: format(new Date(item.due_date), 'dd/MM/yyyy', { locale: ptBR }),
+              linkContrato: `${import.meta.env.VITE_APP_URL}/public/buyer/${data.id}/contract`
+            }
+          ])
+        }
+      })
+    }
+
+    fetchBuyers()
+  }, [step])
   
   // Render loading state
   if (isLoading && step === 1 && receivables.length === 0) {
@@ -647,32 +706,35 @@ const CreateAnticipationForm = () => {
                 </div>
                 
                 <div className="bg-primary/5 p-6 rounded-lg border">
-                  <AnticipationTerms
-                    refComponent={reportTemplateRef}
-                    projectId={projectId}
-                    user={{
-                      email: user.email,
-                    }}
-                    cedente={{
-                      razaoSocial: companyData.name,
-                      cnpj: formatCNPJ(companyData.cnpj),
-                    }}
-                    recebiveis={selectedReceivables.map((receivable) => ({
-                      comprador: receivable.buyer_name || "—",
-                      cpf: formatCPF(receivable.buyer_cpf),
-                      valor: formatCurrency(receivable.amount),
-                      vencimento: format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })
-                    }))}
-                    valores={{
-                      // DATA DO DIA DA OPERAÇAO. SE ATE AS 14HRS, HOJE, SE DEPOIS, AMANHA
-                      dataPagamento: format(new Date(), 'dd/MM/yyyy', { locale: ptBR }),
-                      descontos: calculationResult.taxas.fee_per_receivable,
-                      formaPagamento: "A Vista",
-                      precoPagoCessao: calculationResult.valorLiquido,
-                      valorLiquidoPagoAoCedente: calculationResult.valorLiquido,
-                      valorTotalCreditosVencimento: calculationResult.valorTotal,
-                    }}
-                  />
+                  {
+                    !recebiveisState.length ? (
+                      <div className="flex items-center justify-center">
+                        <Loader className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    ) : (      
+                      <AnticipationTerms
+                        refComponent={reportTemplateRef}
+                        projectId={projectId}
+                        user={{
+                          email: user?.email
+                        }}
+                        cedente={{
+                          razaoSocial: companyData?.name,
+                          cnpj: formatCNPJ(companyData?.cnpj),
+                        }}
+                        recebiveis={recebiveisState}
+                        valores={{
+                          // DATA DO DIA DA OPERAÇAO. SE ATE AS 14HRS, HOJE, SE DEPOIS, AMANHA
+                          dataPagamento: format(new Date(), 'dd/MM/yyyy', { locale: ptBR }),
+                          descontos: calculationResult?.taxas.fee_per_receivable,
+                          formaPagamento: "A Vista",
+                          precoPagoCessao: calculationResult?.valorLiquido,
+                          valorLiquidoPagoAoCedente: calculationResult?.valorLiquido,
+                          valorTotalCreditosVencimento: calculationResult?.valorTotal,
+                        }}
+                      />
+                    )
+                  }
                   <div className="my-6 bg-gray-300 h-[1px]"/>
                   <p className="text-sm text-gray-600 mb-4">
                     Ao clicar em "Confirmar Antecipação", você concorda com os seguintes termos:
