@@ -14,7 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft, FileText, Loader, Receipt } from "lucide-react";
+import { ArrowLeft, Check, Clipboard, FileText, Loader, Receipt } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
@@ -89,6 +89,7 @@ const AnticipationDetails = () => {
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [loadingContract, setLoadingContract] = useState(false);
   const [htmlContract, setHtmlContract] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false); // State to handle copy feedback
 
   const fetchHtmlContract = async () => {
     setLoadingContract(true);
@@ -114,6 +115,21 @@ const AnticipationDetails = () => {
     }
     setLoadingContract(false);
   }
+
+  const handleCopyLink = () => {
+    const publicLink = `${window.location.origin}/public/anticipation/${anticipationId}/contract`;
+    navigator.clipboard.writeText(publicLink).then(() => {
+      setIsCopied(true);
+      toast({
+        title: "Link copiado!",
+        description: "O link público do contrato foi copiado para a área de transferência.",
+        variant: "default",
+      });
+
+      // Reset the copied state after 2 seconds
+      setTimeout(() => setIsCopied(false), 2000);
+    });
+  };
 
   useEffect(() => {
     if(isContractDialogOpen && !htmlContract) {
@@ -314,6 +330,15 @@ const AnticipationDetails = () => {
           <FileText className="h-4 w-4" />
           Contrato
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCopyLink}
+          className="flex items-center gap-2"
+        >
+          {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Clipboard className="h-4 w-4" />}
+          {isCopied ? "Copiado!" : "Copiar Link Contrato"}
+        </Button>
       </div>
 
             {/* Contract Dialog */}
@@ -330,7 +355,7 @@ const AnticipationDetails = () => {
               </div>
             ): htmlContract ? (
               <div
-                className="contract-content max-w-[400px] overflow-auto"
+                className="contract-content overflow-auto"
                 dangerouslySetInnerHTML={{ __html: htmlContract }}
               />
             ) : (
@@ -341,6 +366,15 @@ const AnticipationDetails = () => {
             )}
           </div>
           <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyLink}
+              className="flex items-center gap-2"
+            >
+              {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Clipboard className="h-4 w-4" />}
+              {isCopied ? "Copiado!" : "Copiar Link Contrato"}
+            </Button>
             <Button variant="outline" onClick={() => setIsContractDialogOpen(false)}>
               Fechar
             </Button>
