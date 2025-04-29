@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -343,15 +343,6 @@ const CreateAnticipationForm = () => {
     
     try {
       setIsSubmitting(true);
-
-      function htmlToBase64(htmlString) {
-        return btoa(encodeURIComponent(htmlString).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode(`0x${p1}` as any)));
-      }
-
-      // Exemplo de uso
-      const html = `<!DOCTYPE html><html><body>` + reportTemplateRef.current.outerHTML + `</body></html>`;
-      const base64 = htmlToBase64(html);
-
       
       const response = await supabase.functions.invoke('company-anticipations', {
         headers: {
@@ -369,7 +360,30 @@ const CreateAnticipationForm = () => {
           taxaJuros720: calculationResult.taxas.interest_rate_720,
           taxaJurosLongoPrazo: calculationResult.taxas.interest_rate_long_term,
           tarifaPorRecebivel: calculationResult.taxas.fee_per_receivable,
-          fileBase64: base64,
+          dataToPdf: {
+            user: {
+              email: user.email,
+            },
+            cedente:{
+              razaoSocial: companyData.name,
+              cnpj: formatCNPJ(companyData.cnpj),
+            },
+            recebiveis:selectedReceivables.map((receivable) => ({
+              comprador: receivable.buyer_name || "—",
+              cpf: formatCPF(receivable.buyer_cpf),
+              valor: formatCurrency(receivable.amount),
+              vencimento: format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR }),
+              linkContrato: `https://example.com/contrato/${receivable.id}`,
+            })),
+            valores:{
+              dataPagamento: format(new Date(), 'dd/MM/yyyy', { locale: ptBR }),
+              descontos: calculationResult.taxas.fee_per_receivable,
+              formaPagamento: "A Vista",
+              precoPagoCessao: calculationResult.valorLiquido,
+              valorLiquidoPagoAoCedente: calculationResult.valorLiquido,
+              valorTotalCreditosVencimento: calculationResult.valorTotal,
+            }
+          },
         }
       });
       
@@ -643,13 +657,12 @@ const CreateAnticipationForm = () => {
                       razaoSocial: companyData.name,
                       cnpj: formatCNPJ(companyData.cnpj),
                     }}
-                    devedor="Nome do Devedor"
-                    devedorSolidario="Nome do Devedor Solidário"
                     recebiveis={selectedReceivables.map((receivable) => ({
                       comprador: receivable.buyer_name || "—",
                       cpf: formatCPF(receivable.buyer_cpf),
                       valor: formatCurrency(receivable.amount),
                       vencimento: format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR }),
+                      linkContrato: `https://example.com/contrato/${receivable.id}`,
                     }))}
                     valores={{
                       // DATA DO DIA DA OPERAÇAO. SE ATE AS 14HRS, HOJE, SE DEPOIS, AMANHA

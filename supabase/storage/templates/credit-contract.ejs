@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Contrato de cessão de créditos</title>
+</head>
+<body>
+    <div style="max-width: 595.3pt; margin: 0 auto; line-height: 150%; padding: 0 24px;">
+        <h1 style="text-align: center; font-weight: bold; margin-top: 12pt; margin-bottom: 12pt;">
+        CONTRATO DE CESSÃO DE CRÉDITOS
+        </h1>
+
+        <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; border: 1pt solid black;">
+        <tbody>
+            <tr>
+            <td style="border: 1pt solid black; padding: 4px;"><strong>CEDENTE</strong></td>
+            <td style="border: 1pt solid black; padding: 4px;"><strong><%= cedente.razaoSocial %></strong>, CNPJ nº <%= cedente.cnpj %></td>
+            </tr>
+            <tr>
+            <td style="border: 1pt solid black; padding: 4px;"><strong>CESSIONÁRIA</strong></td>
+            <td style="border: 1pt solid black; padding: 4px;"><strong>CONSTRUCREDIT SECURITIZADORA S.A.</strong>, CNPJ nº 43.738.268/0001-38</td>
+            </tr>
+        </tbody>
+        </table>
+
+        <p style="text-align: justify;">
+        1. <strong>Objeto da Cessão.</strong> O Cedente cede e transfere à Cessionária, em caráter definitivo e irrevogável, os créditos descritos neste instrumento, pelo preço e nas condições aqui ajustadas.
+        </p>
+
+        <p style="text-align: justify; margin-top: 16px; margin-bottom: 16px;">
+        2. <strong>Identificação dos Direitos Creditórios.</strong> Os Direitos Creditórios ora cedidos são oriundos de contratos de compra e venda de unidade(s) imobiliária(s) celebrados entre o Cedente e os respectivos devedores, cujas informações principais constam da tabela abaixo:
+        </p>
+
+        <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; border: 1pt solid black;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+            <th style="border: 1pt solid black; padding: 4px;">Devedor ou Sacado</th>
+            <th style="border: 1pt solid black; padding: 4px;">Data de Vencimento</th>
+            <th style="border: 1pt solid black; padding: 4px;">Valor (R$)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% recebiveis.forEach(function(item) { %>
+            <tr>
+                <td style="border: 1pt solid black; padding: 4px;"><%= item.comprador %> (<%= item.cpf %>)</td>
+                <td style="border: 1pt solid black; padding: 4px;"><%= item.vencimento %></td>
+                <td style="border: 1pt solid black; padding: 4px;"><%= item.valor %></td>
+            </tr>
+            <% }) %>
+        </tbody>
+        </table>
+
+        <p style="text-align: justify;">
+        2.1. Os referidos créditos decorrem de obrigações contratuais líquidas, certas e exigíveis, formalizadas por meio eletrônico ou físico, conforme aplicável, com documentos arquivados na plataforma <strong>One Pay</strong>, nos links indicados acima ou, se necessário, nos anexos a este instrumento.
+        </p>
+
+        <p style="text-align: justify; margin-top: 16px; margin-bottom: 16px;">3. <strong>Condições da Cessão</strong></p>
+
+        <table style="border-collapse: collapse; width: 100%; margin-bottom: 20px; border: 1pt solid black;">
+        <tbody>
+            <tr>
+            <td style="border: 1pt solid black; padding: 5px;">Valor total dos Créditos no Vencimento</td>
+            <td style="border: 1pt solid black; padding: 5px; font-weight: bold;">R$ <%= valores.valorTotalCreditosVencimento.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) %></td>
+            </tr>
+            <tr>
+            <td style="border: 1pt solid black; padding: 5px;">Preço pago pela cessão</td>
+            <td style="border: 1pt solid black; padding: 5px; font-weight: bold;">R$ <%= valores.precoPagoCessao.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) %></td>
+            </tr>
+            <tr>
+            <td style="border: 1pt solid black; padding: 5px;">Forma de Pagamento</td>
+            <td style="border: 1pt solid black; padding: 5px; font-weight: bold;"><%= valores.formaPagamento %></td>
+            </tr>
+            <tr>
+            <td style="border: 1pt solid black; padding: 5px;">Descontos (recompras, despesas e taxas)</td>
+            <td style="border: 1pt solid black; padding: 5px; font-weight: bold;">R$ <%= valores.descontos.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) %></td>
+            </tr>
+            <tr>
+            <td style="border: 1pt solid black; padding: 5px;">Valor líquido pago ao Cedente</td>
+            <td style="border: 1pt solid black; padding: 5px; font-weight: bold;">R$ <%= valores.valorLiquidoPagoAoCedente.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) %></td>
+            </tr>
+            <tr>
+            <td style="border: 1pt solid black; padding: 5px;">Data de Pagamento</td>
+            <td style="border: 1pt solid black; padding: 5px;"><%= valores.dataPagamento %></td>
+            </tr>
+        </tbody>
+        </table>
+
+        <!-- Seguem os demais parágrafos exatamente como no seu HTML, substituindo onde necessário -->
+
+        <p style="text-align: justify; margin-top: 16px;">
+        4. <strong>Declarações e Obrigações do Cedente.</strong> O Cedente declara e garante, para todos os fins de direito:
+        </p>
+        <p style="text-align: justify; margin-top: 16px; margin-bottom: 16px;">
+        (a) que os créditos não foram objeto de cessão anterior, penhora, garantia ou qualquer ônus, e não são objeto de demanda judicial ou disputa quanto à sua existência ou valor;
+        </p>
+        <!-- Repita os demais parágrafos de 4 a 9 conforme seu exemplo -->
+
+        <p style="text-align: center; margin-top: 40px;">
+        São Paulo, <%= new Date().toLocaleDateString('pt-BR', { day: '2-digit' }) %> de 
+        <%= new Date().toLocaleDateString('pt-BR', { month: 'long' }) %> de 
+        <%= new Date().toLocaleDateString('pt-BR', { year: 'numeric' }) %>.
+        </p>
+
+        <div style="margin-top: 40px; text-align: center;">
+        <p style="margin-top: 40px; font-family: cursive; font-size: 26px;"><em><%= cedente.razaoSocial %></em></p>
+        <p>_________________________________________________________________</p>
+        <p><%= cedente.razaoSocial %></p>
+        <p>CNPJ nº <%= cedente.cnpj %>. Por seu representante legal <%= user.email %></p>
+        <p>Cedente</p>
+
+        <p style="margin-top: 40px; font-family: cursive; font-size: 26px;"><em>Construcredit Securitizadora S.A.</em></p>
+        <p>_________________________________________________________________</p>
+        <p><strong>CONSTRUCREDIT SECURITIZADORA S.A</strong></p>
+        <p>CNPJ nº 43.738.268/0001-38. Por seu representante legal Bruno Dante Chiaroni</p>
+        <p>Cessionária</p>
+        </div>
+    </div>
+</body>
+</html>

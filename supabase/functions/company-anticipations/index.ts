@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { SMTPClient } from "https://deno.land/x/denomailer/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+import { generateAndUploadHtml } from './generatePdf.ts'; // ajuste o caminho conforme necessário
+
 // CORS configuration
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -88,6 +90,10 @@ serve(async (req)=>{
         {
           return await handleGetAnticipationDetails(supabaseClient, data, corsHeaders);
         }
+      case 'getContractHtml':
+        {
+          return await handleGetContractHtml(serviceClient, data, corsHeaders);
+        }
       default:
         return new Response(JSON.stringify({
           error: 'Invalid action'
@@ -112,6 +118,53 @@ serve(async (req)=>{
     });
   }
 });
+
+async function handleGetContractHtml(serviceClient, data, corsHeaders) {
+  const { anticipationId } = data;
+  if (!anticipationId) {
+    return new Response(JSON.stringify({
+      error: 'Anticipation ID is required'
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 400
+    });
+  }
+  
+  const { data: contractHtml, error: contractError } = await serviceClient.storage
+    .from('documents')
+    .download(`contracts/contract-${anticipationId}.html`);
+
+  if (contractError) {
+    console.error('Error fetching contract HTML:', contractError);
+    return new Response(JSON.stringify({
+      error: 'Contract HTML not found'
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 404
+    });
+  }
+
+  console.log('contractHtml')
+  console.log(contractHtml)
+  
+  const htmlText = await contractHtml.text();
+  return new Response(JSON.stringify({
+    html: htmlText
+  }), {
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json'
+    },
+    status: 200
+  });
+}
+
 // Handler for calculating the valor liquido (anticipated amount after deductions)
 async function handleCalculateValorLiquido(supabaseClient, serviceClient, data, corsHeaders) {
   const { receivableIds, companyId } = data;
@@ -279,7 +332,7 @@ async function handleGetReceivablesForAnticipation(supabaseClient, serviceClient
 }
 // Handler for creating a new anticipation request
 async function handleCreateAnticipation(supabaseClient, serviceClient, data, corsHeaders, user) {
-  const { companyId, projectId, receivableIds, valorTotal, valorLiquido, taxaJuros180, taxaJuros360, taxaJuros720, taxaJurosLongoPrazo, tarifaPorRecebivel, fileBase64 } = data;
+  const { companyId, projectId, receivableIds, valorTotal, valorLiquido, taxaJuros180, taxaJuros360, taxaJuros720, taxaJurosLongoPrazo, tarifaPorRecebivel, dataToPdf } = data;
   // Validate required fields
   if (!companyId || !projectId || !receivableIds || !valorTotal || !valorLiquido) {
     return new Response(JSON.stringify({
@@ -341,8 +394,14 @@ async function handleCreateAnticipation(supabaseClient, serviceClient, data, cor
       console.error('Error updating receivables status:', updateReceivablesError);
       throw updateReceivablesError;
     }
-    // Send email with PDF attachment if fileBase64 is provided
-    if (fileBase64) {
+    // Generate PDF contract via Edge Function
+    const result = await generateAndUploadHtml({
+      anticipationId: anticipation.id,
+      ...dataToPdf,
+    });
+
+    
+    if (result.htmlContent) {
       const smtpConfig = {
         hostname: Deno.env.get('SMTP_HOST') || 'smtp.gmail.com',
         port: parseInt(Deno.env.get('SMTP_PORT') || '587'),
@@ -364,9 +423,7 @@ async function handleCreateAnticipation(supabaseClient, serviceClient, data, cor
           }
         }
       });
-      function base64ToHtml(base64String) {
-        return decodeURIComponent(atob(base64String).split('').map((c)=>'%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-      }
+
       const email = {
         from: Deno.env.get('SMTP_FROM'),
         to: [
@@ -376,15 +433,15 @@ async function handleCreateAnticipation(supabaseClient, serviceClient, data, cor
           Deno.env.get('SMTP_CC_TERMS')
         ],
         subject: `Onepay Pro - Antecipação criada com sucesso`,
-        html: base64ToHtml(fileBase64)
+        content: 'Olá! Segue em anexo o contrato da sua antecipação.',
+        html: result.htmlContent,
       };
+
       try {
         await client.send(email);
         await client.close();
       } catch (emailError) {
         console.error('Error sending email:', emailError);
-      // Note: We're not throwing here to allow the anticipation creation to succeed
-      // even if email sending fails
       }
     }
     return new Response(JSON.stringify({
