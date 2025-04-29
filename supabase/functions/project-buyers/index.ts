@@ -73,6 +73,52 @@ serve(async (req)=>{
     }
     const isAdmin = profile.role === 'admin';
     console.log('User role:', profile.role);
+    // GET buyer by cpf and projectId
+    if (action === 'filterByCpfAndProject' && projectId && buyerData?.cpf) {
+      const { cpf } = buyerData;
+
+      console.log(`Filtering buyer by CPF: ${cpf} and Project ID: ${projectId}`);
+
+      // Query to find the buyer by CPF and projectId
+      const { data: buyer, error: buyerError } = await serviceClient
+        .from('project_buyers')
+        .select('*')
+        .eq('cpf', cpf)
+        .eq('project_id', projectId)
+        .single();
+
+      if (buyerError) {
+        console.error('Error filtering buyer by CPF and Project ID:', buyerError);
+
+        if (buyerError.code === 'PGRST116') {
+          return new Response(
+            JSON.stringify({
+              error: 'Buyer not found for the given CPF and Project ID',
+            }),
+            {
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/json',
+              },
+              status: 404,
+            }
+          );
+        }
+
+        throw buyerError;
+      }
+
+      return new Response(
+        JSON.stringify(buyer),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+          status: 200,
+        }
+      );
+    }
     // GET project buyers (list)
     if (action === 'list') {
       let query = serviceClient.from('project_buyers').select('*');

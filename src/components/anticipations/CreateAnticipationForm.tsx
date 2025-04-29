@@ -372,8 +372,7 @@ const CreateAnticipationForm = () => {
               comprador: receivable.buyer_name || "—",
               cpf: formatCPF(receivable.buyer_cpf),
               valor: formatCurrency(receivable.amount),
-              vencimento: format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR }),
-              linkContrato: `${import.meta.env.VITE_BASE_URL}/public/buyer/${receivable.id}/contract`,
+              vencimento: format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })
             })),
             valores:{
               dataPagamento: format(new Date(), 'dd/MM/yyyy', { locale: ptBR }),
@@ -650,6 +649,7 @@ const CreateAnticipationForm = () => {
                 <div className="bg-primary/5 p-6 rounded-lg border">
                   <AnticipationTerms
                     refComponent={reportTemplateRef}
+                    projectId={projectId}
                     user={{
                       email: user.email,
                     }}
@@ -661,8 +661,7 @@ const CreateAnticipationForm = () => {
                       comprador: receivable.buyer_name || "—",
                       cpf: formatCPF(receivable.buyer_cpf),
                       valor: formatCurrency(receivable.amount),
-                      vencimento: format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR }),
-                      linkContrato: `https://example.com/contrato/${receivable.id}`,
+                      vencimento: format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR })
                     }))}
                     valores={{
                       // DATA DO DIA DA OPERAÇAO. SE ATE AS 14HRS, HOJE, SE DEPOIS, AMANHA

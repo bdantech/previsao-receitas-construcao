@@ -72,7 +72,6 @@ const PublicBuyerContract: React.FC = () => {
         src={contractUrl}
         title="Contrato de Comprador"
         className="w-full h-screen"
-        frameBorder="0"
         allowFullScreen
       ></iframe>
     </div>

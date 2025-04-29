@@ -5,7 +5,34 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-export async function generateAndUploadHtml(props: any): Promise<{ htmlContent?:string, path?: string, error?: string }> {
+type TProps = {
+    anticipationId: string;
+    cedente: {
+        razaoSocial: string;
+        cnpj: string;
+    };
+    recebiveis: {
+        comprador: string;
+        cpf: string;
+        vencimento: string;
+        valor: string;
+        linkContrato?: string
+    }[];
+    valores: {
+        valorTotalCreditosVencimento: number;
+        precoPagoCessao: number;
+        formaPagamento: string;
+        descontos: number;
+        valorLiquidoPagoAoCedente: number;
+        dataPagamento: string;
+    };
+    user: {
+        email: string;
+    };
+    refComponent?: React.RefObject<HTMLDivElement>;
+}
+
+export async function generateAndUploadHtml(props: TProps): Promise<{ htmlContent?:string, path?: string, error?: string }> {
     // Baixa o template
     const { data: templateFile, error: downloadError } = await supabase.storage
         .from('templates')

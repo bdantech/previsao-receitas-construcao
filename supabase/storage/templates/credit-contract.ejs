@@ -43,9 +43,13 @@
             <% recebiveis.forEach(function(item) { %>
             <tr>
                 <td style="border: 1pt solid black; padding: 4px;"><%= item.comprador %> (<%= item.cpf %>)
-                <a href="<%= item.linkContrato %>" target="_blank" style="text-decoration: none; color: blue;">
-                    Link do Contrato
-                </a>
+                    <% if (item.linkContrato) { %>
+                    <p>
+                        <a href="<%= item.linkContrato %>" target="_blank" style="text-decoration: none; color: blue;">
+                            Visualizar Contrato
+                        </a>
+                    </p>
+                    <% }
                 </td>
                 <td style="border: 1pt solid black; padding: 4px;"><%= item.vencimento %></td>
                 <td style="border: 1pt solid black; padding: 4px;"><%= item.valor %></td>

@@ -1,6 +1,10 @@
-import React from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { onlyNumbers } from '@/utils/helpers/onlyNumbers.helper';
+import React, { useEffect } from 'react';
 
 type TProps = {
+  projectId: string;
   cedente: {
     razaoSocial: string;
     cnpj: string;
@@ -10,7 +14,7 @@ type TProps = {
     cpf: string;
     vencimento: string;
     valor: string;
-    linkContrato: string;
+    linkContrato?: string
   }[];
   valores: {
     valorTotalCreditosVencimento: number;
@@ -27,7 +31,52 @@ type TProps = {
 };
 
 export const AnticipationTerms = (props: TProps) => {
-  const { refComponent, cedente, recebiveis, valores, user } = props;
+  const { projectId, refComponent, cedente, recebiveis, valores, user } = props;
+  const { session } = useAuth()
+  const [recebiveisState, setRecebiveisState] = React.useState<TProps['recebiveis']>([]);
+
+  useEffect(() => {
+    const fetchBuyers = async () => {
+      recebiveis.map(async (item, index) => {
+        const { data } = await supabase.functions.invoke('project-buyers', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: { 
+            action: 'filterByCpfAndProject',
+            projectId,
+            buyerData: {
+              cpf: onlyNumbers(item.cpf)
+            }
+          }
+        });
+
+        if (data) {
+          setRecebiveisState((prev) => {
+            const newRecebiveis = [...prev];
+            newRecebiveis[index] = { ...item, linkContrato: `${import.meta.env.VITE_APP_URL}/public/buyer/${data.id}/contract` };
+            return newRecebiveis;
+          })
+        }
+      })
+    }
+
+    fetchBuyers()
+  }, [])
+
+  if(!recebiveisState.length) {
+    return (
+      <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+        <div ref={refComponent} style={{ maxWidth: '595.3pt', margin: '0 auto', lineHeight: '150%', padding: '0 24px' }}>
+          <h1 style={{ textAlign: 'center', fontWeight: 'bold', marginTop: '12pt', marginBottom: '12pt' }}>
+            CONTRATO DE CESSÃO DE CRÉDITOS
+          </h1>
+          <p>Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ maxHeight: '400px', overflow: 'auto' }}>
       <div ref={refComponent} style={{ maxWidth: '595.3pt', margin: '0 auto', lineHeight: '150%', padding: '0 24px' }}>
@@ -66,13 +115,23 @@ export const AnticipationTerms = (props: TProps) => {
             </tr>
           </thead>
           <tbody>
-            {recebiveis.map((item, index) => (
+            {recebiveisState.map((item, index) => (
               <tr key={index}>
-                <td style={{ border: '1pt solid black', padding: '4px' }}>{item.comprador} ({item.cpf})</td>
+                <td style={{ border: '1pt solid black', padding: '4px' }}>
+                  {item.comprador} ({item.cpf})
+                  <p>
+                    {
+                      item.linkContrato && (
+                        <a href={item.linkContrato} target="_blank" style={{ color: 'blue', textDecoration: 'underline' }}>
+                          Visualizar Contrato
+                        </a>
+                      )
+                    }
+                  </p>
+                </td>
                 {/* <td style={{ border: '1pt solid black', padding: '4px' }}>{item.numeroContrato}</td> */}
                 <td style={{ border: '1pt solid black', padding: '4px' }}>{item.vencimento}</td>
                 <td style={{ border: '1pt solid black', padding: '4px' }}>{item.valor}</td>
-                {/* <td style={{ border: '1pt solid black', padding: '4px' }}><a href={item.linkContrato} target="_blank" rel="noopener noreferrer">Visualizar</a></td> */}
               </tr>
             ))}
           </tbody>

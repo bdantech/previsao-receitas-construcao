@@ -336,6 +336,7 @@ async function handleGetReceivablesForAnticipation(supabaseClient, serviceClient
 // Handler for creating a new anticipation request
 async function handleCreateAnticipation(supabaseClient, serviceClient, data, corsHeaders, user) {
   const { companyId, projectId, receivableIds, valorTotal, valorLiquido, taxaJuros180, taxaJuros360, taxaJuros720, taxaJurosLongoPrazo, tarifaPorRecebivel, dataToPdf } = data;
+
   // Validate required fields
   if (!companyId || !projectId || !receivableIds || !valorTotal || !valorLiquido) {
     return new Response(JSON.stringify({
@@ -397,13 +398,13 @@ async function handleCreateAnticipation(supabaseClient, serviceClient, data, cor
       console.error('Error updating receivables status:', updateReceivablesError);
       throw updateReceivablesError;
     }
+
     // Generate PDF contract via Edge Function
     const result = await generateAndUploadHtml({
       anticipationId: anticipation.id,
       ...dataToPdf,
     });
 
-    
     if (result.htmlContent) {
       const smtpConfig = {
         hostname: Deno.env.get('SMTP_HOST') || 'smtp.gmail.com',
