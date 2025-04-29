@@ -42,7 +42,11 @@
         <tbody>
             <% recebiveis.forEach(function(item) { %>
             <tr>
-                <td style="border: 1pt solid black; padding: 4px;"><%= item.comprador %> (<%= item.cpf %>)</td>
+                <td style="border: 1pt solid black; padding: 4px;"><%= item.comprador %> (<%= item.cpf %>)
+                <a href="<%= item.linkContrato %>" target="_blank" style="text-decoration: none; color: blue;">
+                    Link do Contrato
+                </a>
+                </td>
                 <td style="border: 1pt solid black; padding: 4px;"><%= item.vencimento %></td>
                 <td style="border: 1pt solid black; padding: 4px;"><%= item.valor %></td>
             </tr>
@@ -51,7 +55,7 @@
         </table>
 
         <p style="text-align: justify;">
-        2.1. Os referidos créditos decorrem de obrigações contratuais líquidas, certas e exigíveis, formalizadas por meio eletrônico ou físico, conforme aplicável, com documentos arquivados na plataforma <strong>One Pay</strong>, nos links indicados acima ou, se necessário, nos anexos a este instrumento.
+            2.1. Os referidos créditos decorrem de obrigações contratuais líquidas, certas e exigíveis, formalizadas por meio eletrônico ou físico, conforme aplicável, com documentos arquivados na plataforma <strong>One Pay</strong>, nos links indicados acima ou, se necessário, nos anexos a este instrumento.
         </p>
 
         <p style="text-align: justify; margin-top: 16px; margin-bottom: 16px;">3. <strong>Condições da Cessão</strong></p>
@@ -85,16 +89,52 @@
         </tbody>
         </table>
 
-        <!-- Seguem os demais parágrafos exatamente como no seu HTML, substituindo onde necessário -->
-
-        <p style="text-align: justify; margin-top: 16px;">
+        <p style="text-align: 'justify'; margin-top: 16">
         4. <strong>Declarações e Obrigações do Cedente.</strong> O Cedente declara e garante, para todos os fins de direito:
         </p>
-        <p style="text-align: justify; margin-top: 16px; margin-bottom: 16px;">
+
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16">
         (a) que os créditos não foram objeto de cessão anterior, penhora, garantia ou qualquer ônus, e não são objeto de demanda judicial ou disputa quanto à sua existência ou valor;
         </p>
-        <!-- Repita os demais parágrafos de 4 a 9 conforme seu exemplo -->
 
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16">
+        (b) que não são objeto de litígio, disputa judicial ou extrajudicial quanto à sua existência, validade ou exequibilidade;
+        </p>
+
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16">
+        (c) que, mediante solicitação da Cessionária, compromete-se a fornecer, no prazo máximo de 3 (três) dias úteis, os documentos comprobatórios da origem e validade dos créditos, incluindo: contratos, aditivos, boletos, comprovantes de pagamento e documentos de garantias (como alienação fiduciária, hipoteca ou fiança);
+        </p>
+
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16">
+        (d) que prestará à Cessionária, no prazo de até 5 (cinco) dias úteis, quaisquer outras informações ou documentos complementares que se façam necessários à verificação da legitimidade dos créditos.
+        </p>
+
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16">
+        5. <strong>Responsabilidade pela Legitimidade e Recompra.</strong> O Cedente é integralmente responsável pela existência, validade, exigibilidade e legitimidade dos créditos cedidos, respondendo por vícios de origem, nulidades contratuais ou qualquer circunstância que comprometa a legalidade da cessão. Declara, ainda, que tais créditos não estão sujeitos a vícios como ausência de documentação, irregularidades registrais, vícios construtivos, ausência de "habite-se" ou inadimplemento de obrigações acessórias que possam afetar sua exigibilidade.
+        </p>
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16; padding-left: '24px'">
+        5.1 O Cedente obriga-se a fornecer à Cessionária, mediante solicitação e no prazo de até 3 (três) dias úteis, todos os documentos comprobatórios da existência e regularidade dos créditos, incluindo contratos, aditivos, boletos, comprovantes de pagamento e garantias eventualmente constituídas (tais como alienação fiduciária, hipoteca ou fiança).
+        </p>
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16; padding-left: '24px'">
+        5.2 A Cedente e os Devedores Solidários assumem, de forma expressa e irrevogável, a responsabilidade solidária com os devedores cedidos pelo pagamento integral e pontual de todos os Direitos Creditórios cedidos, abrangendo principal, juros, multas e demais encargos, bem como a obrigação de recomprar, pelo valor de face, corrigido pelo IGP-M/FGV desde a constatação do vício, qualquer crédito que, após a conclusão da operação, revele vício de origem, nulidade ou outra exceção que afete sua validade, liquidez ou exigibilidade, acrescido de juros moratórios de 1% (um por cento) ao mês, honorários advocatícios e multa de 5% (cinco por cento) se o pagamento ocorrer em até 5 (cinco) dias da notificação, 10% (dez por cento) se entre 6 (seis) e 30 (trinta) dias, e 20% (vinte por cento) se após 30 (trinta) dias.
+        </p>
+
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16">
+        6. <strong>Inexigibilidade Parcial ou Total de Créditos.</strong> Verificada, a qualquer tempo, a inexistência ou inexigibilidade de qualquer crédito cedido, decorrente de vício de origem, a Cedente será notificada para, no prazo de 48 (quarenta e oito) horas, sanar o vício ou, sendo isso inviável, restituir à Cessionária o valor correspondente, limitado à parte considerada juridicamente inexigível.
+        </p>
+
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16">
+        7. <strong>Natureza Irrevogável e Executiva.</strong> O presente instrumento é firmado em caráter irrevogável e irretratável, obrigando as partes, seus herdeiros e/ou sucessores a qualquer título.  A este contrato, atribui-se a condição de título executivo extrajudicial na forma da legislação processual em vigor. A liquidez do presente contrato, para fins legais, será apurada pela soma do valor dos créditos antecipados não pagos pelo devedor, seja em virtude da constatação de vício de origem ou qualquer outra exceção, ou ainda por mero inadimplemento, acrescido dos encargos de mora previstos no presente contrato.
+        </p>
+
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16">
+        8. <strong>Assinatura Eletrônica.</strong> As partes desde já acordam que este Contrato poderá ser assinado eletronicamente, nos termos do art. 10º, § 2º, da Medida Provisória 2.200-2 de 24 de agosto de 2001, e demais alterações posteriores, por meio de plataforma indicada pelo Cessionário e automaticamente aceita pelas partes por ocasião da efetiva assinatura.
+        </p>
+
+        <p style="text-align: 'justify'; margin-top: 16; margin-bottom: 16">
+        9. <strong>Foro.</strong> Fica eleito o Foro da Comarca de São Paulo para dirimir quaisquer questões oriundas da presente cessão. 
+        </p>
+  
         <p style="text-align: center; margin-top: 40px;">
         São Paulo, <%= new Date().toLocaleDateString('pt-BR', { day: '2-digit' }) %> de 
         <%= new Date().toLocaleDateString('pt-BR', { month: 'long' }) %> de 

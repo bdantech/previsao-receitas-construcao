@@ -373,7 +373,7 @@ const CreateAnticipationForm = () => {
               cpf: formatCPF(receivable.buyer_cpf),
               valor: formatCurrency(receivable.amount),
               vencimento: format(new Date(receivable.due_date), 'dd/MM/yyyy', { locale: ptBR }),
-              linkContrato: `https://example.com/contrato/${receivable.id}`,
+              linkContrato: `${import.meta.env.VITE_BASE_URL}/public/buyer/${receivable.id}/contract`,
             })),
             valores:{
               dataPagamento: format(new Date(), 'dd/MM/yyyy', { locale: ptBR }),

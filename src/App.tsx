@@ -28,6 +28,7 @@ import NotFound from "./pages/NotFound";
 import ProjectDashboardPage from "./pages/ProjectDashboardPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import PublicAnticipationContract from "./pages/public/AnticipationContractPage";
+import PublicBuyerContract from "./pages/public/BuyerContractPage";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -53,6 +54,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/admin/auth" element={<AdminAuth />} />
               <Route path="/public/anticipation/:anticipationId/contract" element={<PublicAnticipationContract />} />
+              <Route path="/public/buyer/:buyerId/contract" element={<PublicBuyerContract />} />
               
               {/* Protected routes */}
               <Route element={<DashboardLayout/>}>

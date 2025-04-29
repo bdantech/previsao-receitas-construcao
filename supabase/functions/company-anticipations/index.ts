@@ -23,6 +23,16 @@ serve(async (req)=>{
     if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
       throw new Error('Missing environment variables');
     }
+    // Service client for operations that bypass RLS
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+    // Parse request
+    const requestData = await req.json();
+    const { action, ...data } = requestData;
+    
+    if (action === 'getContractHtml') {
+      return await handleGetContractHtml(serviceClient, data, corsHeaders);
+    }
+
     // Get authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -44,8 +54,7 @@ serve(async (req)=>{
         }
       }
     });
-    // Service client for operations that bypass RLS
-    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+
     // Authenticate user
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
@@ -61,9 +70,7 @@ serve(async (req)=>{
       });
     }
     console.log('User authenticated:', user.id);
-    // Parse request
-    const requestData = await req.json();
-    const { action, ...data } = requestData;
+    
     // Handle different actions
     switch(action){
       case 'calculateValorLiquido':
@@ -89,10 +96,6 @@ serve(async (req)=>{
       case 'getAnticipationDetails':
         {
           return await handleGetAnticipationDetails(supabaseClient, data, corsHeaders);
-        }
-      case 'getContractHtml':
-        {
-          return await handleGetContractHtml(serviceClient, data, corsHeaders);
         }
       default:
         return new Response(JSON.stringify({

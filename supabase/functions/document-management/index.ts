@@ -18,6 +18,81 @@ serve(async (req)=>{
     if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
       throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY env variables');
     }
+    const requestData = await req.json();
+    const { action } = requestData;
+
+    // Initialize service role client for reliable database access
+    const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (action === 'getBuyerContractPdf') {
+      const { buyerId } = requestData;
+
+      if (!buyerId) {
+        return new Response(JSON.stringify({
+          error: 'Missing buyerId parameter'
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          },
+          status: 400
+        });
+      }
+
+      // Query project_buyers table to get contract_file_path
+      const { data: buyerData, error: buyerError } = await adminSupabase
+        .from('project_buyers')
+        .select('contract_file_path')
+        .eq('id', buyerId)
+        .single();
+
+      console.log('buyerData:', buyerData);
+      if (buyerError || !buyerData || !buyerData.contract_file_path) {
+        console.error('Error fetching buyer contract path:', buyerError);
+        return new Response(JSON.stringify({
+          error: 'Contract not found for the specified buyer'
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          },
+          status: 404
+        });
+      }
+
+      // Download the contract file from storage
+      const { data: fileData, error: fileError } = await adminSupabase
+        .storage
+        .from('documents')
+        .download(buyerData.contract_file_path);
+
+      console.log('File data:', fileData);
+      if (fileError || !fileData) {
+        console.error('Error downloading contract file:', fileError);
+        return new Response(JSON.stringify({
+          error: 'Failed to retrieve contract file'
+        }), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          },
+          status: 500
+        });
+      }
+
+      // Set response headers for PDF download
+      const headers = {
+        ...corsHeaders,
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${buyerData.contract_file_name || 'contract.pdf'}"`,
+      };
+
+      return new Response(fileData, {
+        headers,
+        status: 200
+      });
+    }
+
     // Get the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -31,8 +106,6 @@ serve(async (req)=>{
         status: 401
       });
     }
-    // Initialize service role client for reliable database access
-    const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
     // Extract the token and verify the user
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await adminSupabase.auth.getUser(token);
@@ -49,8 +122,7 @@ serve(async (req)=>{
         status: 401
       });
     }
-    const requestData = await req.json();
-    const { action } = requestData;
+    
     if (action === 'getDocumentSignedUrl') {
       const { filePath } = requestData;
       if (!filePath) {
