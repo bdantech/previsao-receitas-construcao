@@ -2,6 +2,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { useParams } from "react-router-dom";
 
 const PublicBuyerContract: React.FC = () => {
@@ -68,6 +69,14 @@ const PublicBuyerContract: React.FC = () => {
 
   return (
     <div>
+      <Helmet>
+        <title>Contrato de Comprador</title>
+        <meta name="description" content="Visualize o contrato do comprador de forma pública e segura." />
+        <meta property="og:title" content="Contrato de Comprador" />
+        <meta property="og:description" content="Acesse o contrato do comprador diretamente pelo link público." />
+        <meta property="og:type" content="document" />
+        <meta property="og:url" content={window.location.href} />
+      </Helmet>
       <iframe
         src={contractUrl}
         title="Contrato de Comprador"
