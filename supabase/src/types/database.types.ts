@@ -803,6 +803,7 @@ export type Database = {
           cpf: string
           created_at: string
           credit_analysis_status: Database["public"]["Enums"]["credit_analysis_status"]
+          external_analysis_id: string | null
           full_name: string
           id: string
           project_id: string
@@ -816,6 +817,7 @@ export type Database = {
           cpf: string
           created_at?: string
           credit_analysis_status?: Database["public"]["Enums"]["credit_analysis_status"]
+          external_analysis_id?: string | null
           full_name: string
           id?: string
           project_id: string
@@ -829,6 +831,7 @@ export type Database = {
           cpf?: string
           created_at?: string
           credit_analysis_status?: Database["public"]["Enums"]["credit_analysis_status"]
+          external_analysis_id?: string | null
           full_name?: string
           id?: string
           project_id?: string

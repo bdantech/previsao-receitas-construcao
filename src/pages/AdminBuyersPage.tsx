@@ -21,7 +21,8 @@ import { useQuery } from "@tanstack/react-query";
 import { FileText, Loader2, PenSquare, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { BuyerStatusDialog } from '@/components/admin/BuyerStatusDialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function AdminBuyersPage() {
   const { session, userRole, isLoading: isLoadingAuth } = useAuth();
@@ -32,6 +33,8 @@ export default function AdminBuyersPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [companies, setCompanies] = useState<{id: string, name: string}[]>([]);
   const [projects, setProjects] = useState<{id: string, name: string, company_id: string}[]>([]);
+  const [selectedBuyers, setSelectedBuyers] = useState<string[]>([]);
+  const [isProcessingAnalysis, setIsProcessingAnalysis] = useState(false);
   
   // State for filters and applied filters
   const [filters, setFilters] = useState({
@@ -292,6 +295,105 @@ export default function AdminBuyersPage() {
     }
   };
 
+  const handleSelectBuyer = (buyerId: string) => {
+    const buyer = buyers.find(b => b.id === buyerId);
+    if (!buyer) return;
+
+    // Check if buyer is eligible for selection
+    if (buyer.credit_analysis_status === 'aprovado' || buyer.contract_status === 'reprovado') {
+      toast({
+        title: "Seleção não permitida",
+        description: "Este comprador não pode ser selecionado para análise de crédito.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSelectedBuyers(prev => {
+      if (prev.includes(buyerId)) {
+        return prev.filter(id => id !== buyerId);
+      } else {
+        return [...prev, buyerId];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedBuyers.length === buyers.length) {
+      setSelectedBuyers([]);
+    } else {
+      // Filter eligible buyers
+      const eligibleBuyers = buyers.filter(buyer => 
+        buyer.credit_analysis_status !== 'aprovado' && 
+        buyer.contract_status !== 'reprovado'
+      );
+      setSelectedBuyers(eligibleBuyers.map(buyer => buyer.id));
+    }
+  };
+
+  const handleRunCreditAnalysis = async () => {
+    if (selectedBuyers.length === 0) {
+      toast({
+        title: "Nenhum comprador selecionado",
+        description: "Selecione pelo menos um comprador para realizar a análise de crédito.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsProcessingAnalysis(true);
+      const selectedBuyersData = buyers.filter(buyer => selectedBuyers.includes(buyer.id));
+      
+      const { data, error } = await supabase.functions.invoke('get-analysis-with-liquidpass', {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: {
+          projectBuyers: selectedBuyersData.map(buyer => ({ cpf: buyer.cpf }))
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Update project_buyers table with analysis_ids
+      if (data && data.success && data.data) {
+        const updates = data.data.map((result: any) => {
+          const buyer = selectedBuyersData.find(b => b.cpf === result.cpf);
+          if (buyer && result.success && result.data.analysis_id) {
+            return supabase
+              .from('project_buyers')
+              .update({ external_analysis_id: result.data.analysis_id })
+              .eq('id', buyer.id);
+          }
+          return null;
+        }).filter(Boolean);
+
+        await Promise.all(updates);
+      }
+
+      toast({
+        title: "Análises iniciadas",
+        description: "As análises de crédito foram iniciadas com sucesso.",
+        variant: "default"
+      });
+
+      // Refresh the buyers list to show updated status
+      refetch();
+    } catch (error) {
+      console.error('Error running credit analysis:', error);
+      toast({
+        title: "Erro ao iniciar análises",
+        description: "Ocorreu um erro ao iniciar as análises de crédito.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessingAnalysis(false);
+    }
+  };
+
   if (isLoadingAuth) {
     return (
       <>
@@ -509,77 +611,103 @@ export default function AdminBuyersPage() {
           ) : (
             <div className="overflow-x-auto">
               {buyers && buyers.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>CPF</TableHead>
-                      <TableHead>Empresa</TableHead>
-                      <TableHead>Projeto</TableHead>
-                      <TableHead>Status Comprador</TableHead>
-                      <TableHead>Status Contrato</TableHead>
-                      <TableHead>Status Análise</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {buyers.map((buyer) => {
-                      const buyerStatus = getStatusDisplay(buyer.buyer_status);
-                      const contractStatus = getStatusDisplay(buyer.contract_status);
-                      const creditStatus = getStatusDisplay(buyer.credit_analysis_status);
+                <>
+                  {selectedBuyers.length > 0 && (
+                    <div className="p-4 border-b bg-gray-50">
+                      <Button
+                        onClick={handleRunCreditAnalysis}
+                        disabled={isProcessingAnalysis}
+                        className="w-full sm:w-auto"
+                      >
+                        {isProcessingAnalysis ? 'Processando...' : 'Realizar Análises de Crédito'}
+                      </Button>
+                    </div>
+                  )}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox
+                            checked={selectedBuyers.length === buyers.length}
+                            onCheckedChange={handleSelectAll}
+                          />
+                        </TableHead>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>CPF</TableHead>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead>Projeto</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Contrato</TableHead>
+                        <TableHead className="w-[150px] whitespace-nowrap">Análise de Crédito</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {buyers.map((buyer) => {
+                        const buyerStatus = getStatusDisplay(buyer.buyer_status);
+                        const contractStatus = getStatusDisplay(buyer.contract_status);
+                        const creditStatus = getStatusDisplay(buyer.credit_analysis_status);
 
-                      return (
-                        <TableRow key={buyer.id}>
-                          <TableCell>{buyer.full_name}</TableCell>
-                          <TableCell>{formatCPF(buyer.cpf)}</TableCell>
-                          <TableCell>{buyer.company_name}</TableCell>
-                          <TableCell>{buyer.project_name}</TableCell>
-                          <TableCell className={buyerStatus.className}>
-                            {buyerStatus.label}
-                          </TableCell>
-                          <TableCell className={contractStatus.className}>
-                            {contractStatus.label}
-                          </TableCell>
-                          <TableCell className={creditStatus.className}>
-                            {creditStatus.label}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => openStatusDialog(buyer.id, 'contract', buyer.contract_status)}
-                                title="Alterar status do contrato"
-                              >
-                                <PenSquare className="h-4 w-4 mr-1" />
-                                Contrato
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => openStatusDialog(buyer.id, 'credit', buyer.credit_analysis_status)}
-                                title="Alterar status da análise de crédito"
-                              >
-                                <PenSquare className="h-4 w-4 mr-1" />
-                                Crédito
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => downloadContract(buyer)}
-                                disabled={!buyer.contract_file_path || buyer.contract_file_path.trim() === ''}
-                                title={buyer.contract_file_path && buyer.contract_file_path.trim() !== '' ? "Baixar contrato" : "Sem contrato disponível"}
-                              >
-                                <FileText className="h-4 w-4 mr-1" />
-                                Contrato
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                        return (
+                          <TableRow key={buyer.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedBuyers.includes(buyer.id)}
+                                onCheckedChange={() => handleSelectBuyer(buyer.id)}
+                                disabled={buyer.credit_analysis_status === 'aprovado' || buyer.contract_status === 'reprovado'}
+                              />
+                            </TableCell>
+                            <TableCell>{buyer.full_name}</TableCell>
+                            <TableCell>{formatCPF(buyer.cpf)}</TableCell>
+                            <TableCell>{buyer.company_name}</TableCell>
+                            <TableCell>{buyer.project_name}</TableCell>
+                            <TableCell className={buyerStatus.className}>
+                              {buyerStatus.label}
+                            </TableCell>
+                            <TableCell className={contractStatus.className}>
+                              {contractStatus.label}
+                            </TableCell>
+                            <TableCell className={creditStatus.className}>
+                              {creditStatus.label}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end space-x-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => openStatusDialog(buyer.id, 'contract', buyer.contract_status)}
+                                  title="Alterar status do contrato"
+                                >
+                                  <PenSquare className="h-4 w-4 mr-1" />
+                                  Contrato
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => openStatusDialog(buyer.id, 'credit', buyer.credit_analysis_status)}
+                                  title="Alterar status da análise de crédito"
+                                >
+                                  <PenSquare className="h-4 w-4 mr-1" />
+                                  Crédito
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => downloadContract(buyer)}
+                                  disabled={!buyer.contract_file_path || buyer.contract_file_path.trim() === ''}
+                                  title={buyer.contract_file_path && buyer.contract_file_path.trim() !== '' ? "Baixar contrato" : "Sem contrato disponível"}
+                                >
+                                  <FileText className="h-4 w-4 mr-1" />
+                                  Contrato
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </>
               ) : (
                 <div className="text-center py-10 text-gray-500">
                   Nenhum comprador encontrado.
