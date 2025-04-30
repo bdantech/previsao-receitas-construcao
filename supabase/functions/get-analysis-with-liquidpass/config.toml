@@ -1,0 +1,2 @@
+[functions.get-analysis-with-liquidpass]
+verify_jwt = true 
