@@ -1,26 +1,24 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
 };
-
 const LIQUIDPASS_API_URL = 'https://api.dev.liquidpass.co/analysis/integration/run';
-const LIQUIDPASS_CLIENT_ID = '7e33ba7c-6415-45e6-92e3-f66c8d21d619';
-const LIQUIDPASS_SECRET_TOKEN = '5a05cd84-758f-4868-acdc-6f8e6f1278bf';
-const LIQUIDPASS_PRODUCT_ID = 'b68ec654-7750-4f64-94f6-73eafe0b0cc8';
+const LIQUIDPASS_CLIENT_ID = Deno.env.get('LIQUIDPASS_CLIENT_ID');
+const LIQUIDPASS_SECRET_TOKEN = Deno.env.get('LIQUIDPASS_SECRET_TOKEN');
+const LIQUIDPASS_PRODUCT_ID = Deno.env.get('LIQUIDPASS_PRODUCT_ID');
+
 const CALLBACK_URL = 'https://hshfqxjrilqzjpkcotgz.supabase.co/functions/v1/webhook-events/webhook-2fc7e7b3-842d-4145-9414-43839f8699b3';
 
-serve(async (req) => {
+serve(async (req)=>{
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: corsHeaders
     });
   }
-
   try {
     // Get supabase client with auth context from request
     const authorization = req.headers.get('Authorization');
@@ -35,7 +33,6 @@ serve(async (req) => {
         }
       });
     }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = createClient(supabaseUrl, supabaseKey, {
@@ -48,7 +45,6 @@ serve(async (req) => {
         persistSession: false
       }
     });
-
     // Verify the user is an admin
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -62,14 +58,8 @@ serve(async (req) => {
         }
       });
     }
-
     // Verify user is an admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
+    const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
     if (profileError || profile?.role !== 'admin') {
       console.error('Admin verification failed:', profileError || 'Not an admin');
       return new Response(JSON.stringify({
@@ -82,11 +72,9 @@ serve(async (req) => {
         }
       });
     }
-
     // Get the request body
     const requestData = await req.json();
     const { projectBuyers } = requestData;
-
     if (!projectBuyers || !Array.isArray(projectBuyers) || projectBuyers.length === 0) {
       return new Response(JSON.stringify({
         error: 'No project buyers provided'
@@ -98,10 +86,9 @@ serve(async (req) => {
         }
       });
     }
-
     // Process each project buyer separately
     const results = [];
-    for (const buyer of projectBuyers) {
+    for (const buyer of projectBuyers){
       try {
         const response = await fetch(LIQUIDPASS_API_URL, {
           method: 'POST',
@@ -122,7 +109,6 @@ serve(async (req) => {
             ]
           })
         });
-
         if (!response.ok) {
           const errorData = await response.json();
           console.error('Error calling LiquidPass API:', errorData);
@@ -133,7 +119,6 @@ serve(async (req) => {
           });
           continue;
         }
-
         const result = await response.json();
         results.push({
           cpf: buyer.cpf,
@@ -149,7 +134,6 @@ serve(async (req) => {
         });
       }
     }
-
     return new Response(JSON.stringify({
       success: true,
       data: results
@@ -159,7 +143,6 @@ serve(async (req) => {
         'Content-Type': 'application/json'
       }
     });
-
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(JSON.stringify({
@@ -172,4 +155,4 @@ serve(async (req) => {
       }
     });
   }
-}); 
+});

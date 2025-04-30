@@ -1,22 +1,23 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle,
-  CardDescription,
-  CardFooter
-} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader, ArrowLeft, Receipt } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Check, Clipboard, FileText, Loader, Receipt } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
 
 interface Anticipation {
   id: string;
@@ -58,16 +59,84 @@ interface AnticipationDetailsResponse {
   receivables: Receivable[];
 }
 
+interface CreditAnalysis {
+  interest_rate_180: number;
+  interest_rate_360: number;
+  interest_rate_720: number;
+  interest_rate_long_term: number;
+  fee_per_receivable: number;
+  operation_days_limit: number;
+}
+
+interface CalculationResult {
+  valorTotal: number;
+  valorLiquido: number;
+  quantidade: number;
+  taxas: CreditAnalysis;
+}
+
 const AnticipationDetails = () => {
   const { projectId, anticipationId } = useParams<{ projectId: string; anticipationId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { session } = useAuth();
+  const { session, user,getAuthHeader } = useAuth();
   
   const [isLoading, setIsLoading] = useState(true);
   const [anticipation, setAnticipation] = useState<Anticipation | null>(null);
   const [receivables, setReceivables] = useState<Receivable[]>([]);
-  
+  const [companyData, setCompanyData] = useState<{ id: string; name: string, cnpj: string } | null>(null);
+  const [isContractDialogOpen, setIsContractDialogOpen] = useState(false);
+  const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
+  const [loadingContract, setLoadingContract] = useState(false);
+  const [htmlContract, setHtmlContract] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false); // State to handle copy feedback
+
+  const fetchHtmlContract = async () => {
+    setLoadingContract(true);
+    const response = await supabase.functions.invoke('company-anticipations', {
+      headers: {
+        Authorization: `Bearer ${session?.access_token}`
+      },
+      body: {
+        action: 'getContractHtml',
+        anticipationId: anticipation.id,
+      }
+    });
+
+    if (response.error) {
+      console.error('Error fetching contract HTML:', response.error);
+      toast({
+        title: "Erro ao carregar contrato",
+        description: "Não foi possível obter o contrato da antecipação.",
+        variant: "destructive"
+      });
+    } else {
+      setHtmlContract(response.data.html);
+    }
+    setLoadingContract(false);
+  }
+
+  const handleCopyLink = () => {
+    const publicLink = `${window.location.origin}/public/anticipation/${anticipationId}/contract`;
+    navigator.clipboard.writeText(publicLink).then(() => {
+      setIsCopied(true);
+      toast({
+        title: "Link copiado!",
+        description: "O link público do contrato foi copiado para a área de transferência.",
+        variant: "default",
+      });
+
+      // Reset the copied state after 2 seconds
+      setTimeout(() => setIsCopied(false), 2000);
+    });
+  };
+
+  useEffect(() => {
+    if(isContractDialogOpen && !htmlContract) {
+      fetchHtmlContract()
+    }    
+  },[isContractDialogOpen])
+
   // Fetch anticipation details
   useEffect(() => {
     const fetchAnticipationDetails = async () => {
@@ -100,6 +169,79 @@ const AnticipationDetails = () => {
         
         setAnticipation(typedData.anticipation);
         setReceivables(typedData.receivables || []);
+
+        // Fetch company name separately if needed
+        const { data: companyResult } = await supabase.functions.invoke('company-data', {
+          method: 'POST',
+          headers: await getAuthHeader(),
+          body: {
+            action: 'getCompanyDetails',
+            companyId: typedData.anticipation.company_id,
+          }
+        });
+        console.log('companyResult')
+        console.log(companyResult)
+
+        let companyName = '';
+        let companyCnpj = '';
+
+        if (companyResult && companyResult.company) {
+          companyName = companyResult.company.name;
+          companyCnpj = companyResult.company.cnpj;
+        } else {
+          companyName = 'Company';  // Fallback name
+          companyCnpj = '00.000.000/0000-00';  // Fallback CNPJ
+        }
+
+        setCompanyData({
+          id: typedData.anticipation.company_id,
+          name: companyName,
+          cnpj: companyCnpj,
+        })
+
+        // Calculate values directly in the frontend
+        const valorTotal = typedData.receivables.reduce((total, rec) => total + Number(rec.amount), 0);
+        const quantidade = typedData.receivables.length;
+        
+        // Calculate interest deduction for each receivable
+        let valorLiquido = 0;
+        const today = new Date();
+
+        for (const receivable of typedData.receivables) {
+          const dueDate = new Date(receivable.due_date);
+          const daysTodue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Get appropriate interest rate based on days to due
+          let interestRate;
+          if (daysTodue <= 180) {
+            interestRate = typedData.anticipation.taxa_juros_180
+          } else if (daysTodue <= 360) {
+            interestRate = typedData.anticipation.taxa_juros_360;
+          } else if (daysTodue <= 720) {
+            interestRate =  typedData.anticipation.taxa_juros_720;
+          } else {
+            interestRate = typedData.anticipation.taxa_juros_longo_prazo;
+          }
+          
+          // Calculate net value for this receivable using the new formula
+          const valorLiquidoRecebivel = receivable.amount - ((receivable.amount * (Math.pow((interestRate/100 + 1), daysTodue/30))) - receivable.amount) - typedData.anticipation.tarifa_por_recebivel;
+          valorLiquido += valorLiquidoRecebivel;
+        }
+        
+        // Set calculation result
+        setCalculationResult({
+          valorTotal,
+          valorLiquido,
+          quantidade,
+          taxas: {
+            interest_rate_180: typedData.anticipation.taxa_juros_180,
+            interest_rate_360: typedData.anticipation.taxa_juros_360,
+            interest_rate_720: typedData.anticipation.taxa_juros_720,
+            interest_rate_long_term: typedData.anticipation.taxa_juros_longo_prazo,
+            fee_per_receivable: typedData.anticipation.tarifa_por_recebivel,
+          }
+        });
+        
       } catch (error) {
         console.error('Error fetching anticipation details:', error);
         toast({
@@ -179,7 +321,66 @@ const AnticipationDetails = () => {
         </Button>
         <h1 className="text-2xl font-bold">Detalhes da Antecipação</h1>
         {getStatusBadge(anticipation.status)}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsContractDialogOpen(true)} // Open dialog
+          className="flex items-center gap-2"
+        >
+          <FileText className="h-4 w-4" />
+          Contrato
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCopyLink}
+          className="flex items-center gap-2"
+        >
+          {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Clipboard className="h-4 w-4" />}
+          {isCopied ? "Copiado!" : "Copiar Link Contrato"}
+        </Button>
       </div>
+
+            {/* Contract Dialog */}
+      <Dialog open={isContractDialogOpen} onOpenChange={setIsContractDialogOpen}>
+        <DialogContent style={{ maxWidth: '800px' }}>
+          <DialogHeader>
+            <DialogTitle>Contrato</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {
+            loadingContract ?(
+              <div className="flex justify-center py-10">
+                <Loader className="h-8 w-8 animate-spin text-gray-500" />
+              </div>
+            ): htmlContract ? (
+              <div
+                className="contract-content overflow-auto"
+                dangerouslySetInnerHTML={{ __html: htmlContract }}
+              />
+            ) : (
+              <div className="text-center py-8">
+                <Receipt className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">Não foi possível carregar o contrato.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyLink}
+              className="flex items-center gap-2"
+            >
+              {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Clipboard className="h-4 w-4" />}
+              {isCopied ? "Copiado!" : "Copiar Link Contrato"}
+            </Button>
+            <Button variant="outline" onClick={() => setIsContractDialogOpen(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <Card>
