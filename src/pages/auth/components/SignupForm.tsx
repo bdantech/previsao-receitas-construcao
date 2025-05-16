@@ -1,10 +1,10 @@
 
-import React, { useState } from "react";
-import { Eye, EyeOff, Mail, Lock, Building } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Building, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import React, { useState } from "react";
 
 interface SignupFormProps {
   toggleView: () => void;
@@ -23,11 +23,28 @@ const SignupForm = ({ toggleView }: SignupFormProps) => {
     companyWebsite: ""
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrorMessage(null);
+  const formatCNPJ = (value: string) => {
+    return value
+      .replace(/\D/g, "") // Remove tudo que não for número
+      .replace(/^(\d{2})(\d)/, "$1.$2")
+      .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1/$2")
+      .replace(/(\d{4})(\d)/, "$1-$2")
+      .slice(0, 18); // Limita o tamanho
   };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const { name, value } = e.target;
+
+  let formattedValue = value;
+  if (name === "companyCNPJ") {
+    formattedValue = formatCNPJ(value);
+  }
+
+  setFormData((prev) => ({ ...prev, [name]: formattedValue }));
+  setErrorMessage(null);
+};
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
